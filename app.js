@@ -16,7 +16,7 @@ const THERAPISTS = [
     formats: ['video', 'in-person'], rateMin: 140, insuranceList: ['Aetna', 'BCBS'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
-    practiceType: 'specialist'
+    practiceType: 'specialist', externalAppointments: []
   },
   {
     id: 't2', name: 'James Okafor', creds: 'LMFT',
@@ -35,7 +35,7 @@ const THERAPISTS = [
     formats: ['video'], rateMin: 110, insuranceList: [],
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Thu 4:00pm', rank: 2 }],
     nextAvailableRank: 3, nextAvailableLabel: 'Next week',
-    practiceType: 'generalist'
+    practiceType: 'generalist', externalAppointments: []
   },
   {
     id: 't3', name: 'Priya Raman', creds: 'LPC, Trauma Specialist',
@@ -54,7 +54,7 @@ const THERAPISTS = [
     formats: ['in-person'], rateMin: 150, insuranceList: [],
     acceptingOngoing: false, onDemand: true, onDemandSlots: [{ label: 'Wed 1:00pm', rank: 1 }, { label: 'Fri 11:00am', rank: 3 }],
     nextAvailableRank: null, nextAvailableLabel: 'Not accepting new ongoing clients',
-    practiceType: 'specialist'
+    practiceType: 'specialist', externalAppointments: []
   },
   {
     id: 't4', name: 'Dr. Sam Alvarez', creds: 'PsyD',
@@ -73,7 +73,7 @@ const THERAPISTS = [
     formats: ['video', 'in-person'], rateMin: 160, insuranceList: ['Cigna'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
-    practiceType: 'specialist'
+    practiceType: 'specialist', externalAppointments: []
   },
   {
     id: 't5', name: 'Dr. Leah Fitzgerald', creds: 'PhD, Perinatal Specialist',
@@ -92,7 +92,7 @@ const THERAPISTS = [
     formats: ['video'], rateMin: 135, insuranceList: ['United'],
     acceptingOngoing: false, onDemand: false, onDemandSlots: [],
     nextAvailableRank: null, nextAvailableLabel: 'Paused',
-    practiceType: 'specialist'
+    practiceType: 'specialist', externalAppointments: []
   },
   {
     id: 't6', name: 'Marcus Webb', creds: 'LCSW',
@@ -111,7 +111,7 @@ const THERAPISTS = [
     formats: ['video', 'in-person'], rateMin: 120, insuranceList: [],
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Tue 9:00am', rank: 1 }],
     nextAvailableRank: 4, nextAvailableLabel: 'In 2 weeks',
-    practiceType: 'generalist'
+    practiceType: 'generalist', externalAppointments: []
   }
 ];
 
@@ -744,18 +744,25 @@ function confirmMatchRequest(therapistId, introMessage, desiredFrequency) {
   renderMatches();
 }
 
-function respondToRequest(therapistId, decision) {
+function declineRequest(therapistId) {
   const m = matches.find(m => m.therapist.id === therapistId && m.status === 'pending');
   if (!m) return;
   chatLog[therapistId] = chatLog[therapistId] || [];
-  if (decision === 'accept') {
-    m.status = 'matched';
-    m.newlyMatched = true;
-    chatLog[therapistId].push({ from: 'them', text: `Great — I'd love to move forward and get you set up on my regular schedule. I'll follow up here about a recurring time.` });
-  } else {
-    m.status = 'declined';
-    chatLog[therapistId].push({ from: 'them', text: `Thank you for sharing this with me. I don't think I'm the right fit for what you're looking for right now, but I hope you find someone who is.` });
-  }
+  m.status = 'declined';
+  chatLog[therapistId].push({ from: 'them', text: `Thank you for sharing this with me. I don't think I'm the right fit for what you're looking for right now, but I hope you find someone who is.` });
+  renderRequests();
+}
+
+function confirmAcceptWithSchedule(therapistId, scheduledDay, scheduledTimeRaw) {
+  const m = matches.find(m => m.therapist.id === therapistId && m.status === 'pending');
+  if (!m) return;
+  const scheduledTime = formatTime12h(scheduledTimeRaw);
+  chatLog[therapistId] = chatLog[therapistId] || [];
+  m.status = 'matched';
+  m.newlyMatched = true;
+  m.scheduledDay = scheduledDay;
+  m.scheduledTime = scheduledTime;
+  chatLog[therapistId].push({ from: 'them', text: `Great — I'd love to move forward. I've got you scheduled for ${scheduledDay}s at ${scheduledTime}, and I'll follow up here to confirm.` });
   renderRequests();
 }
 
@@ -1068,8 +1075,12 @@ document.getElementById('login-submit-btn').addEventListener('click', () => {
       startIntake();
     }
   } else {
-    renderTherapistSelect();
-    showScreen('therapist-select');
+    // No real per-account passwords in this prototype, so "Log In" just
+    // takes you into whichever therapist account is currently active —
+    // the same account you were in before you logged out, defaulting to
+    // the first seeded profile the very first time. Real accounts wouldn't
+    // make you pick from a roster of other people's profiles.
+    showTherapistView();
   }
 });
 
@@ -1080,27 +1091,6 @@ document.getElementById('login-create-btn').addEventListener('click', () => {
     startTherapistSignup();
   }
 });
-
-// ===== THERAPIST PROFILE SELECT (stands in for "which account is mine" —
-// this prototype has no real per-therapist passwords, so logging in as a
-// therapist means picking which seeded profile you're managing) =====
-document.getElementById('therapist-select-back').addEventListener('click', () => showScreen('account-type'));
-
-function renderTherapistSelect() {
-  const list = document.getElementById('therapist-select-list');
-  list.innerHTML = THERAPISTS.map(t => `
-    <div class="match-row" data-tid="${t.id}">
-      <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
-      <div><div class="chat-name">${t.name}</div><div class="last-msg">${t.creds}</div></div>
-    </div>
-  `).join('');
-  list.querySelectorAll('.match-row').forEach(row => {
-    row.addEventListener('click', () => {
-      currentTherapistId = row.dataset.tid;
-      showTherapistView();
-    });
-  });
-}
 
 // ===== THERAPIST SIGNUP — brand-new profile from scratch =====
 const THERAPIST_PROMPT_OPTIONS = [
@@ -1117,6 +1107,26 @@ const NEW_THERAPIST_GRADIENTS = [
   'linear-gradient(135deg,#8fae7d,#5f7f4c)',
   'linear-gradient(135deg,#b08cc9,#82599e)'
 ];
+
+const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function formatTime12h(hhmm) {
+  if (!hhmm) return '';
+  const [h, m] = hhmm.split(':').map(Number);
+  const period = h >= 12 ? 'pm' : 'am';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')}${period}`;
+}
+
+function timeSortKey(t12h) {
+  const match = (t12h || '').match(/(\d+):(\d+)(am|pm)/);
+  if (!match) return 0;
+  let h = parseInt(match[1], 10);
+  const min = parseInt(match[2], 10);
+  if (match[3] === 'pm' && h !== 12) h += 12;
+  if (match[3] === 'am' && h === 12) h = 0;
+  return h * 60 + min;
+}
 
 let signupStep = 0;
 const TOTAL_SIGNUP_STEPS = 6;
@@ -1390,7 +1400,7 @@ function finishTherapistSignup() {
     id, name: d.name.trim(), creds: d.creds.trim() || 'Licensed Therapist',
     initials, gradient,
     meta: buildTherapistMeta(d),
-    tags: d.tags, practiceType: d.practiceType,
+    tags: d.tags, practiceType: d.practiceType, externalAppointments: [],
     promptAnswers: d.promptAnswers.map(a => a.trim()),
     modalities: d.modalities, style: d.style,
     identity: { gender: d.gender, lgbtqAffirming: d.lgbtqAffirming }, languages: d.languages,
@@ -1418,7 +1428,7 @@ let profileShowOtherLanguage = false; // transient UI flag for the profile edito
 function showTherapistView() {
   document.getElementById('bottom-nav').classList.add('hidden');
   document.getElementById('therapist-nav').classList.remove('hidden');
-  showTScreen('t-requests');
+  showTScreen('t-home');
 }
 
 function showTScreen(name) {
@@ -1427,6 +1437,7 @@ function showTScreen(name) {
   document.getElementById(`screen-${name}`).classList.remove('hidden');
   const navBtn = document.querySelector(`#therapist-nav .nav-btn[data-tscreen="${name}"]`);
   if (navBtn) navBtn.classList.add('active');
+  if (name === 't-home') renderTherapistHome();
   if (name === 't-requests') renderRequests();
   if (name === 't-profile') renderTherapistProfile();
 }
@@ -1434,6 +1445,7 @@ function showTScreen(name) {
 document.querySelectorAll('#therapist-nav .nav-btn').forEach(btn => {
   btn.addEventListener('click', () => showTScreen(btn.dataset.tscreen));
 });
+document.getElementById('therapist-logout-0').addEventListener('click', logout);
 document.getElementById('therapist-logout-1').addEventListener('click', logout);
 document.getElementById('therapist-logout-2').addEventListener('click', logout);
 
@@ -1442,6 +1454,71 @@ function updateTNavBadge() {
   const count = matches.filter(m => m.therapist.id === currentTherapistId && m.status === 'pending').length;
   if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); }
   else badge.classList.add('hidden');
+}
+
+// ===== THERAPIST HOME — combined weekly schedule =====
+// Pulls together three sources into one view: on-demand one-time bookings
+// (already have a real slot), ongoing matches with a recurring time set
+// during accept, and appointments the therapist adds manually for anything
+// booked outside Kindred — so this is their real full week, not just what
+// happened on the platform.
+function renderTherapistHome() {
+  const t = THERAPISTS.find(t => t.id === currentTherapistId);
+  document.getElementById('t-home-title').textContent = `This Week — ${t.name}`;
+  const list = document.getElementById('t-home-list');
+
+  const items = [];
+  matches.filter(m => m.therapist.id === currentTherapistId && m.status === 'ondemand').forEach(m => {
+    const [day, ...timeParts] = m.slotLabel.split(' ');
+    items.push({ day, time: timeParts.join(' '), label: 'One-time session' });
+  });
+  matches.filter(m => m.therapist.id === currentTherapistId && m.status === 'matched' && m.scheduledDay).forEach(m => {
+    items.push({ day: m.scheduledDay, time: m.scheduledTime, label: 'Ongoing client' });
+  });
+  t.externalAppointments.forEach((a, i) => {
+    items.push({ day: a.day, time: a.time, label: a.label, external: true, index: i });
+  });
+  items.sort((a, b) => DAYS_OF_WEEK.indexOf(a.day) - DAYS_OF_WEEK.indexOf(b.day) || timeSortKey(a.time) - timeSortKey(b.time));
+
+  let html = `<div class="request-cap-banner">${items.length} appointment${items.length === 1 ? '' : 's'} this week</div>`;
+  if (items.length === 0) {
+    html += `<p class="empty-state">Nothing on the calendar yet.</p>`;
+  } else {
+    html += items.map(it => `
+      <div class="appt-card">
+        <div class="appt-day">${it.day}</div>
+        <div class="appt-details"><div class="appt-label">${it.label}</div><div class="appt-time">${it.time}</div></div>
+        ${it.external ? `<button class="appt-remove" data-remove-external="${it.index}">✕</button>` : ''}
+      </div>
+    `).join('');
+  }
+
+  html += `
+    <div class="t-form-label" style="margin-top:20px;">Add an appointment booked elsewhere</div>
+    <input type="text" class="t-rate-input" id="external-appt-label" placeholder="e.g. John D. — phone consult">
+    <div class="schedule-row">
+      <select id="external-appt-day">${DAYS_OF_WEEK.map(d => `<option value="${d}">${d}</option>`).join('')}</select>
+      <input type="time" id="external-appt-time" value="10:00">
+    </div>
+    <button class="message-btn-full" id="add-external-appt-btn">+ Add Appointment</button>
+  `;
+
+  list.innerHTML = html;
+
+  list.querySelectorAll('[data-remove-external]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      t.externalAppointments.splice(Number(btn.dataset.removeExternal), 1);
+      renderTherapistHome();
+    });
+  });
+  document.getElementById('add-external-appt-btn').addEventListener('click', () => {
+    const label = document.getElementById('external-appt-label').value.trim();
+    if (!label) return;
+    const day = document.getElementById('external-appt-day').value;
+    const time = formatTime12h(document.getElementById('external-appt-time').value);
+    t.externalAppointments.push({ label, day, time });
+    renderTherapistHome();
+  });
 }
 
 function renderRequests() {
@@ -1462,15 +1539,25 @@ function renderRequests() {
           ${m.desiredFrequency ? `<div class="request-need">Hoping to meet: <strong>${m.desiredFrequency}</strong></div>` : ''}
           ${m.introMessage ? `<div class="request-intro">&ldquo;${m.introMessage}&rdquo;</div>` : ''}
           <button class="message-btn-full" data-action="message">💬 Message before deciding</button>
-          <div class="request-actions">
-            <button class="decline-btn" data-decision="decline">Decline</button>
-            <button class="accept-btn" data-decision="accept">Accept</button>
-          </div>
+          ${m._showScheduleForm ? `
+            <div class="t-form-label">Set a recurring time for this client</div>
+            <div class="schedule-row">
+              <select id="schedule-day">${DAYS_OF_WEEK.map(d => `<option value="${d}">${d}</option>`).join('')}</select>
+              <input type="time" id="schedule-time" value="10:00">
+            </div>
+            <button class="message-btn-full" data-action="confirm-schedule">Confirm Schedule</button>
+          ` : `
+            <div class="request-actions">
+              <button class="decline-btn" data-decision="decline">Decline</button>
+              <button class="accept-btn" data-decision="accept">Accept</button>
+            </div>
+          `}
         </div>`;
       }
       if (m.status === 'matched') {
         return `<div class="request-card resolved">
           <span class="resolved-tag matched">✓ Accepted</span> — now chatting
+          ${m.scheduledDay ? `<div class="request-need" style="margin-top:6px;">Recurring: <strong>${m.scheduledDay}s at ${m.scheduledTime}</strong></div>` : ''}
           <button class="message-btn-full" data-action="message" style="margin-top:10px;">💬 Message</button>
         </div>`;
       }
@@ -1482,8 +1569,21 @@ function renderRequests() {
   });
 
   list.innerHTML = html;
-  list.querySelectorAll('[data-decision]').forEach(btn => {
-    btn.addEventListener('click', () => respondToRequest(currentTherapistId, btn.dataset.decision));
+  list.querySelectorAll('[data-decision="decline"]').forEach(btn => {
+    btn.addEventListener('click', () => declineRequest(currentTherapistId));
+  });
+  list.querySelectorAll('[data-decision="accept"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = matches.find(m => m.therapist.id === currentTherapistId && m.status === 'pending');
+      if (m) { m._showScheduleForm = true; renderRequests(); }
+    });
+  });
+  list.querySelectorAll('[data-action="confirm-schedule"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const day = document.getElementById('schedule-day').value;
+      const time = document.getElementById('schedule-time').value;
+      confirmAcceptWithSchedule(currentTherapistId, day, time);
+    });
   });
   list.querySelectorAll('[data-action="message"]').forEach(btn => {
     btn.addEventListener('click', () => openChat(t, 'therapist'));

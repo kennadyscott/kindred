@@ -45,15 +45,6 @@
     </div>
   </section>
 
-  <!-- ===== THERAPIST PROFILE SELECT (post-login) ===== -->
-  <section class="screen hidden" id="screen-therapist-select">
-    <header class="top-bar">
-      <button class="icon-btn back-btn" id="therapist-select-back">←</button>
-      <div class="logo">Select Your Profile</div>
-    </header>
-    <div class="matches-list" id="therapist-select-list"></div>
-  </section>
-
   <!-- ===== THERAPIST SIGNUP (brand-new profile) ===== -->
   <section class="screen hidden" id="screen-therapist-signup">
     <div class="intake-content" id="therapist-signup-content"></div>
@@ -128,6 +119,15 @@
     </div>
   </section>
 
+  <!-- ===== THERAPIST: HOME / WEEKLY SCHEDULE ===== -->
+  <section class="screen hidden" id="screen-t-home">
+    <header class="top-bar">
+      <div class="logo" id="t-home-title">This Week</div>
+      <button class="icon-btn" id="therapist-logout-0" aria-label="Log out">🚪</button>
+    </header>
+    <div class="requests-list" id="t-home-list"></div>
+  </section>
+
   <!-- ===== THERAPIST: REQUESTS INBOX ===== -->
   <section class="screen hidden" id="screen-t-requests">
     <header class="top-bar">
@@ -148,7 +148,10 @@
 
   <!-- ===== THERAPIST BOTTOM NAV ===== -->
   <nav class="bottom-nav hidden" id="therapist-nav">
-    <button class="nav-btn active" data-tscreen="t-requests">
+    <button class="nav-btn active" data-tscreen="t-home">
+      <span class="nav-icon">🏠</span><span>Home</span>
+    </button>
+    <button class="nav-btn" data-tscreen="t-requests">
       <span class="nav-icon">📥</span><span>Requests</span>
       <span class="nav-badge hidden" id="t-nav-badge">0</span>
     </button>
