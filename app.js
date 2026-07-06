@@ -897,6 +897,8 @@ document.getElementById('login-submit-btn').addEventListener('click', () => {
     } else {
       startIntake();
     }
+  } else if (loginCreatingAccount) {
+    startTherapistSignup();
   } else {
     renderTherapistSelect();
     showScreen('therapist-select');
@@ -922,6 +924,275 @@ function renderTherapistSelect() {
       showTherapistView();
     });
   });
+}
+
+// ===== THERAPIST SIGNUP — brand-new profile from scratch =====
+const THERAPIST_PROMPT_OPTIONS = [
+  'My approach to our first session',
+  "You'll probably click with me if",
+  'A belief I hold as a therapist',
+  'Session with me feels like',
+  "What most people don't expect"
+];
+const NEW_THERAPIST_GRADIENTS = [
+  'linear-gradient(135deg,#c97b9e,#a3557a)',
+  'linear-gradient(135deg,#7ba7c9,#4f7ea3)',
+  'linear-gradient(135deg,#c9a15a,#a37a35)',
+  'linear-gradient(135deg,#8fae7d,#5f7f4c)',
+  'linear-gradient(135deg,#b08cc9,#82599e)'
+];
+
+let signupStep = 0;
+const TOTAL_SIGNUP_STEPS = 6;
+let newTherapistDraft = null;
+const signupContent = document.getElementById('therapist-signup-content');
+
+function startTherapistSignup() {
+  signupStep = 0;
+  newTherapistDraft = {
+    name: '', creds: '',
+    tags: [], modalities: [],
+    style: 'balanced', gender: 'female', lgbtqAffirming: false,
+    formats: [], insuranceList: [], rateMin: 130,
+    promptQ: THERAPIST_PROMPT_OPTIONS[0], promptA: '',
+    acceptingOngoing: true, onDemand: false, onDemandSlots: []
+  };
+  renderSignupStep();
+  showScreen('therapist-signup');
+}
+
+function renderSignupStep() {
+  const d = newTherapistDraft;
+  let html = `<div class="intake-progress">${Array.from({ length: TOTAL_SIGNUP_STEPS }).map((_, i) =>
+    `<div class="dot ${i <= signupStep ? 'done' : ''}"></div>`).join('')}</div>`;
+
+  if (signupStep === 0) {
+    html += `
+      <h1>Let's set up your profile</h1>
+      <div class="intake-sub">This is what clients see first — you can edit all of it later.</div>
+      <div class="t-form-label">Full name</div>
+      <input type="text" class="t-rate-input" id="ts-name" placeholder="e.g. Dr. Jordan Reyes" value="${d.name}">
+      <div class="t-form-label">Credentials</div>
+      <input type="text" class="t-rate-input" id="ts-creds" placeholder="e.g. LPC, PhD, LMFT" value="${d.creds}">`;
+  } else if (signupStep === 1) {
+    html += `
+      <h1>What do you specialize in?</h1>
+      <div class="intake-sub">Pick everything that applies — this is how clients with matching needs find you.</div>
+      <div class="chip-grid" id="ts-tags-grid">
+        ${NEED_OPTIONS.map(n => `<div class="chip-option ${d.tags.includes(n) ? 'selected' : ''}" data-tag="${n}">${n}</div>`).join('')}
+      </div>
+      <div class="t-form-label">Modalities you're certified in</div>
+      <div class="chip-grid" id="ts-modalities-grid">
+        ${MODALITY_OPTIONS.map(m => `<div class="chip-option ${d.modalities.includes(m) ? 'selected' : ''}" data-modality="${m}">${m}</div>`).join('')}
+      </div>`;
+  } else if (signupStep === 2) {
+    html += `
+      <h1>How would you describe yourself?</h1>
+      <div class="intake-sub">This helps clients who care about style find a fit — there's no wrong answer.</div>
+      <div class="option-list" id="ts-style-list">
+        <div class="option-row ${d.style === 'gentle' ? 'selected' : ''}" data-style="gentle">Mostly listens and reflects back</div>
+        <div class="option-row ${d.style === 'balanced' ? 'selected' : ''}" data-style="balanced">A mix of both</div>
+        <div class="option-row ${d.style === 'direct' ? 'selected' : ''}" data-style="direct">Direct — tells it like it is</div>
+      </div>
+      <div class="t-form-label">Gender</div>
+      <div class="option-list" id="ts-gender-list">
+        <div class="option-row ${d.gender === 'female' ? 'selected' : ''}" data-gender="female">Female</div>
+        <div class="option-row ${d.gender === 'male' ? 'selected' : ''}" data-gender="male">Male</div>
+      </div>
+      <div class="must-have-toggle">
+        <div class="toggle-label"><strong>LGBTQ+ affirming</strong><span>Shown to clients who require this</span></div>
+        <div class="switch ${d.lgbtqAffirming ? 'on' : ''}" id="ts-lgbtq-switch"></div>
+      </div>`;
+  } else if (signupStep === 3) {
+    html += `
+      <h1>Logistics</h1>
+      <div class="intake-sub">So clients only see you if they can actually work with you.</div>
+      <div class="t-form-label">Session format</div>
+      <div class="chip-grid" id="ts-format-grid">
+        <div class="chip-option ${d.formats.includes('video') ? 'selected' : ''}" data-format="video">Video</div>
+        <div class="chip-option ${d.formats.includes('in-person') ? 'selected' : ''}" data-format="in-person">In-person</div>
+      </div>
+      <div class="t-form-label">Insurance accepted</div>
+      <div class="chip-grid" id="ts-insurance-grid">
+        ${['Aetna', 'BCBS', 'Cigna', 'United'].map(i => `<div class="chip-option ${d.insuranceList.includes(i) ? 'selected' : ''}" data-insurance="${i}">${i}</div>`).join('')}
+      </div>
+      <div class="t-form-label">Your rate per session</div>
+      <div class="budget-slider-row">
+        <input type="range" id="ts-rate-slider" min="80" max="250" step="10" value="${d.rateMin}">
+        <div class="budget-value" id="ts-rate-value">$${d.rateMin}</div>
+      </div>`;
+  } else if (signupStep === 4) {
+    html += `
+      <h1>In your words</h1>
+      <div class="intake-sub">This becomes the quote clients see on your card — it matters more than your credentials.</div>
+      <div class="option-list" id="ts-prompt-list">
+        ${THERAPIST_PROMPT_OPTIONS.map(q => `<div class="option-row ${d.promptQ === q ? 'selected' : ''}" data-prompt="${q}">${q}</div>`).join('')}
+      </div>
+      <textarea class="intake-textarea" id="ts-prompt-answer" rows="3" placeholder="Finish the sentence in your own voice...">${d.promptA}</textarea>`;
+  } else if (signupStep === 5) {
+    html += `
+      <h1>Availability</h1>
+      <div class="intake-sub">You can change this anytime from your profile.</div>
+      <div class="must-have-toggle">
+        <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>Shown in Discover for new long-term matches</span></div>
+        <div class="switch ${d.acceptingOngoing ? 'on' : ''}" id="ts-ongoing-switch"></div>
+      </div>
+      <div class="must-have-toggle">
+        <div class="toggle-label"><strong>Offering on-demand this week</strong><span>Shown in On-Demand for one-time sessions</span></div>
+        <div class="switch ${d.onDemand ? 'on' : ''}" id="ts-ondemand-switch"></div>
+      </div>
+      <div id="ts-slots-section" style="${d.onDemand ? '' : 'display:none;'}">
+        <div class="t-form-label">Open slots this week</div>
+        <div class="slot-row" id="ts-slots-list">
+          ${d.onDemandSlots.map((s, i) => `<span class="slot-btn booked" style="cursor:pointer;" data-remove-slot="${i}">${s.label} ✕</span>`).join('')}
+        </div>
+        <div class="add-slot-row">
+          <input type="text" id="ts-new-slot-input" placeholder="e.g. Mon 3:00pm">
+          <button id="ts-add-slot-btn">Add</button>
+        </div>
+      </div>`;
+  }
+
+  const canProceed = signupStep !== 0 || d.name.trim().length > 0;
+  html += `
+    <div class="intake-footer">
+      ${signupStep > 0 ? `<button class="btn-back" id="ts-back">Back</button>` : ''}
+      <button class="btn-next" id="ts-next" ${canProceed ? '' : 'disabled'}>${signupStep === TOTAL_SIGNUP_STEPS - 1 ? 'Create Profile' : 'Continue'}</button>
+    </div>`;
+
+  signupContent.innerHTML = html;
+  attachSignupHandlers();
+}
+
+function attachSignupHandlers() {
+  const d = newTherapistDraft;
+
+  const nameInput = document.getElementById('ts-name');
+  if (nameInput) nameInput.addEventListener('input', () => {
+    d.name = nameInput.value;
+    document.getElementById('ts-next').disabled = d.name.trim().length === 0;
+  });
+  const credsInput = document.getElementById('ts-creds');
+  if (credsInput) credsInput.addEventListener('input', () => { d.creds = credsInput.value; });
+
+  document.querySelectorAll('#ts-tags-grid .chip-option').forEach(el => {
+    el.addEventListener('click', () => {
+      const tag = el.dataset.tag;
+      const i = d.tags.indexOf(tag);
+      if (i === -1) d.tags.push(tag); else d.tags.splice(i, 1);
+      renderSignupStep();
+    });
+  });
+  document.querySelectorAll('#ts-modalities-grid .chip-option').forEach(el => {
+    el.addEventListener('click', () => {
+      const m = el.dataset.modality;
+      const i = d.modalities.indexOf(m);
+      if (i === -1) d.modalities.push(m); else d.modalities.splice(i, 1);
+      renderSignupStep();
+    });
+  });
+
+  document.querySelectorAll('#ts-style-list .option-row').forEach(el => {
+    el.addEventListener('click', () => { d.style = el.dataset.style; renderSignupStep(); });
+  });
+  document.querySelectorAll('#ts-gender-list .option-row').forEach(el => {
+    el.addEventListener('click', () => { d.gender = el.dataset.gender; renderSignupStep(); });
+  });
+  const lgbtqSwitch = document.getElementById('ts-lgbtq-switch');
+  if (lgbtqSwitch) lgbtqSwitch.addEventListener('click', () => { d.lgbtqAffirming = !d.lgbtqAffirming; renderSignupStep(); });
+
+  document.querySelectorAll('#ts-format-grid .chip-option').forEach(el => {
+    el.addEventListener('click', () => {
+      const f = el.dataset.format;
+      const i = d.formats.indexOf(f);
+      if (i === -1) d.formats.push(f); else d.formats.splice(i, 1);
+      renderSignupStep();
+    });
+  });
+  document.querySelectorAll('#ts-insurance-grid .chip-option').forEach(el => {
+    el.addEventListener('click', () => {
+      const ins = el.dataset.insurance;
+      const i = d.insuranceList.indexOf(ins);
+      if (i === -1) d.insuranceList.push(ins); else d.insuranceList.splice(i, 1);
+      renderSignupStep();
+    });
+  });
+  const rateSlider = document.getElementById('ts-rate-slider');
+  if (rateSlider) {
+    rateSlider.addEventListener('input', () => {
+      d.rateMin = Number(rateSlider.value);
+      document.getElementById('ts-rate-value').textContent = `$${d.rateMin}`;
+    });
+  }
+
+  document.querySelectorAll('#ts-prompt-list .option-row').forEach(el => {
+    el.addEventListener('click', () => { d.promptQ = el.dataset.prompt; renderSignupStep(); });
+  });
+  const promptAnswer = document.getElementById('ts-prompt-answer');
+  if (promptAnswer) promptAnswer.addEventListener('input', () => { d.promptA = promptAnswer.value; });
+
+  const ongoingSwitch = document.getElementById('ts-ongoing-switch');
+  if (ongoingSwitch) ongoingSwitch.addEventListener('click', () => { d.acceptingOngoing = !d.acceptingOngoing; renderSignupStep(); });
+  const ondemandSwitch = document.getElementById('ts-ondemand-switch');
+  if (ondemandSwitch) ondemandSwitch.addEventListener('click', () => { d.onDemand = !d.onDemand; renderSignupStep(); });
+  const addSlotBtn = document.getElementById('ts-add-slot-btn');
+  if (addSlotBtn) addSlotBtn.addEventListener('click', () => {
+    const input = document.getElementById('ts-new-slot-input');
+    const label = input.value.trim();
+    if (!label) return;
+    const rank = d.onDemandSlots.length ? Math.max(...d.onDemandSlots.map(s => s.rank)) + 1 : 1;
+    d.onDemandSlots.push({ label, rank });
+    renderSignupStep();
+  });
+  document.querySelectorAll('#ts-slots-list [data-remove-slot]').forEach(el => {
+    el.addEventListener('click', () => { d.onDemandSlots.splice(Number(el.dataset.removeSlot), 1); renderSignupStep(); });
+  });
+
+  const backBtn = document.getElementById('ts-back');
+  if (backBtn) backBtn.addEventListener('click', () => { signupStep--; renderSignupStep(); });
+
+  document.getElementById('ts-next').addEventListener('click', () => {
+    if (signupStep < TOTAL_SIGNUP_STEPS - 1) {
+      signupStep++;
+      renderSignupStep();
+    } else {
+      finishTherapistSignup();
+    }
+  });
+}
+
+function buildTherapistMeta(d) {
+  const formatLabel = d.formats.length === 2 ? 'Video & In-person'
+    : d.formats.includes('video') ? 'Video only'
+    : d.formats.includes('in-person') ? 'In-person only'
+    : 'Format not set';
+  const insuranceLabel = d.insuranceList.length ? `Accepts ${d.insuranceList.join(', ')}` : 'Self-pay / out-of-network';
+  return [formatLabel, `$${d.rateMin}/session`, insuranceLabel];
+}
+
+function finishTherapistSignup() {
+  const d = newTherapistDraft;
+  const id = 't' + Date.now();
+  const nameWords = d.name.replace(/^Dr\.?\s*/i, '').split(' ').filter(Boolean);
+  const initials = nameWords.map(w => w[0]).join('').slice(0, 2).toUpperCase() || '??';
+  const gradient = NEW_THERAPIST_GRADIENTS[THERAPISTS.length % NEW_THERAPIST_GRADIENTS.length];
+
+  THERAPISTS.push({
+    id, name: d.name.trim(), creds: d.creds.trim() || 'Licensed Therapist',
+    initials, gradient,
+    meta: buildTherapistMeta(d),
+    tags: d.tags,
+    prompt: { q: d.promptQ, a: d.promptA.trim() || "I'm still writing this one — check back soon." },
+    modalities: d.modalities, style: d.style,
+    identity: { gender: d.gender, lgbtqAffirming: d.lgbtqAffirming },
+    formats: d.formats, rateMin: d.rateMin, insuranceList: d.insuranceList,
+    acceptingOngoing: d.acceptingOngoing, onDemand: d.onDemand, onDemandSlots: d.onDemandSlots,
+    nextAvailableRank: d.acceptingOngoing ? 1 : null,
+    nextAvailableLabel: d.acceptingOngoing ? 'This week' : 'Not accepting new ongoing clients'
+  });
+
+  currentTherapistId = id;
+  showTherapistView();
 }
 
 function logout() {
