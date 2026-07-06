@@ -963,6 +963,33 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   cursor: pointer;
 }
 
+.other-language-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+.other-language-row select {
+  flex: 1;
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  background: white;
+}
+.other-language-row button {
+  background: var(--coral);
+  color: white;
+  border: none;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
 /* ===== ACCOUNT TYPE / LOGIN ===== */
 .welcome-content {
   flex: 1;

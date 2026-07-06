@@ -4,9 +4,15 @@ const THERAPISTS = [
     initials: 'MC', gradient: 'linear-gradient(135deg,#4a9d96,#2e7d76)',
     meta: ['Video & In-person', '$140–180/session', 'Accepts Aetna, BCBS'],
     tags: ['Anxiety', 'Life Transitions', 'CBT', 'LGBTQ+ Affirming'],
-    prompt: { q: 'My approach to our first session', a: "We'll skip the small talk. I want to know what's actually been sitting heavy on you lately, and what you're hoping is different a few months from now." },
+    promptAnswers: [
+      "We'll skip the small talk. I want to know what's actually been sitting heavy on you lately, and what you're hoping is different a few months from now.",
+      "you want homework between sessions and someone who'll actually follow up on it — I track progress, not just feelings.",
+      "Insight without action doesn't change anything. We can understand your anxiety perfectly and still be stuck if we don't practice doing things differently.",
+      "a working meeting with someone who's genuinely rooting for you — structured, but never clinical or cold.",
+      "how much CBT is just noticing your own thoughts in real time. It sounds simple. It's not easy, but it works."
+    ],
     modalities: ['CBT'], style: 'direct',
-    identity: { gender: 'female', lgbtqAffirming: true }, languages: [],
+    identity: { gender: 'female', lgbtqAffirming: true }, languages: ['English'],
     formats: ['video', 'in-person'], rateMin: 140, insuranceList: ['Aetna', 'BCBS'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
@@ -17,9 +23,15 @@ const THERAPISTS = [
     initials: 'JO', gradient: 'linear-gradient(135deg,#e8836b,#c85a41)',
     meta: ['Video only', '$110–130/session', 'Sliding scale available'],
     tags: ['Couples', 'Family Conflict', 'EFT'],
-    prompt: { q: "You'll probably click with me if", a: "you want a therapist who'll gently push back instead of just nodding along — I believe in doing the work between sessions, not just venting in them." },
+    promptAnswers: [
+      "I want to hear both sides before either of you starts defending yours. First sessions are for understanding the pattern, not assigning blame.",
+      "you want a therapist who'll gently push back instead of just nodding along — I believe in doing the work between sessions, not just venting in them.",
+      "Most fights aren't about the dishes. They're about whether you feel like you matter to each other. We go straight to that.",
+      "less refereeing and more translating — helping you actually hear what the other person is trying to say.",
+      "how fast things can shift once you both stop trying to win the argument and start trying to understand it."
+    ],
     modalities: ['EFT'], style: 'direct',
-    identity: { gender: 'male', lgbtqAffirming: false }, languages: ['Spanish'],
+    identity: { gender: 'male', lgbtqAffirming: false }, languages: ['English', 'Spanish'],
     formats: ['video'], rateMin: 110, insuranceList: [],
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Thu 4:00pm', rank: 2 }],
     nextAvailableRank: 3, nextAvailableLabel: 'Next week',
@@ -30,9 +42,15 @@ const THERAPISTS = [
     initials: 'PR', gradient: 'linear-gradient(135deg,#a68fc9,#7a5fa8)',
     meta: ['In-person, Downtown', '$150/session', 'Out-of-network'],
     tags: ['Trauma', 'EMDR', 'PTSD', 'Grief'],
-    prompt: { q: 'A belief I hold as a therapist', a: "Healing isn't linear, and you don't have to have your story fully sorted out before you walk in the door. We can figure out the shape of it together." },
+    promptAnswers: [
+      "There's no pressure to tell the whole story right away. We'll go at whatever pace actually feels safe for you.",
+      "you want someone patient, who won't rush you toward 'moving on' before you're ready.",
+      "Healing isn't linear, and you don't have to have your story fully sorted out before you walk in the door. We can figure out the shape of it together.",
+      "a quiet, steady space — no pressure to perform being okay.",
+      "how physical trauma responses can be. A lot of our work is as much about your body settling down as it is about talking."
+    ],
     modalities: ['EMDR'], style: 'gentle',
-    identity: { gender: 'female', lgbtqAffirming: true }, languages: ['Hindi'],
+    identity: { gender: 'female', lgbtqAffirming: true }, languages: ['English', 'Hindi'],
     formats: ['in-person'], rateMin: 150, insuranceList: [],
     acceptingOngoing: false, onDemand: true, onDemandSlots: [{ label: 'Wed 1:00pm', rank: 1 }, { label: 'Fri 11:00am', rank: 3 }],
     nextAvailableRank: null, nextAvailableLabel: 'Not accepting new ongoing clients',
@@ -43,9 +61,15 @@ const THERAPISTS = [
     initials: 'SA', gradient: 'linear-gradient(135deg,#d4a24e,#b57e2f)',
     meta: ['Video & In-person', '$160/session', 'Accepts Cigna'],
     tags: ['ADHD', 'Burnout', "Men's Issues", 'ACT'],
-    prompt: { q: "Session with me feels like", a: "less of a couch-and-tissue-box vibe and more like a direct, sometimes funny conversation with someone who's genuinely in your corner." },
+    promptAnswers: [
+      "I'll ask a lot of direct questions and probably crack a joke or two. I want to know what's actually going on, not the polished version.",
+      "you're tired of being told to 'just relax' and want someone who gets that your brain doesn't work that way.",
+      "You don't have to eliminate anxiety or distraction to build a good life around it. Chasing that trade-off usually backfires.",
+      "less of a couch-and-tissue-box vibe and more like a direct, sometimes funny conversation with someone who's genuinely in your corner.",
+      "how much burnout gets misdiagnosed as a focus problem. Sometimes the fix isn't a better system, it's fewer things on your plate."
+    ],
     modalities: ['ACT'], style: 'direct',
-    identity: { gender: 'male', lgbtqAffirming: false }, languages: ['Spanish'],
+    identity: { gender: 'male', lgbtqAffirming: false }, languages: ['English', 'Spanish'],
     formats: ['video', 'in-person'], rateMin: 160, insuranceList: ['Cigna'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
@@ -56,9 +80,15 @@ const THERAPISTS = [
     initials: 'LF', gradient: 'linear-gradient(135deg,#6ba4c9,#4278a0)',
     meta: ['Video only', '$135/session', 'Accepts United'],
     tags: ['Postpartum', 'Anxiety', 'New Parents'],
-    prompt: { q: "What most people don't expect", a: "is how much relief comes from just being told 'this is a normal reaction to an abnormal amount of pressure.' You're not broken." },
+    promptAnswers: [
+      "I want to know how you're actually sleeping, eating, and coping — not just how the baby's doing. You matter here too.",
+      "you're exhausted, maybe scared to admit how hard this has been, and just want someone to say 'this makes sense.'",
+      "Postpartum struggles are not a reflection of how much you love your baby. That guilt is common, and it's almost never true.",
+      "permission to say the unspeakable parts out loud without anyone flinching.",
+      "is how much relief comes from just being told 'this is a normal reaction to an abnormal amount of pressure.' You're not broken."
+    ],
     modalities: [], style: 'gentle',
-    identity: { gender: 'female', lgbtqAffirming: true }, languages: [],
+    identity: { gender: 'female', lgbtqAffirming: true }, languages: ['English'],
     formats: ['video'], rateMin: 135, insuranceList: ['United'],
     acceptingOngoing: false, onDemand: false, onDemandSlots: [],
     nextAvailableRank: null, nextAvailableLabel: 'Paused',
@@ -69,9 +99,15 @@ const THERAPISTS = [
     initials: 'MW', gradient: 'linear-gradient(135deg,#8a9b6e,#647a4a)',
     meta: ['In-person & Video', '$120/session', 'Sliding scale'],
     tags: ['Substance Use', 'Young Adults', 'Motivational Interviewing'],
-    prompt: { q: 'My approach to our first session', a: "No lectures, no judgment. I want to understand what role this has been playing in your life before we talk about changing anything." },
+    promptAnswers: [
+      "No lectures, no judgment. I want to understand what role this has been playing in your life before we talk about changing anything.",
+      "you're sick of being told what to do and want someone who'll actually ask what you want instead.",
+      "Ambivalence isn't a character flaw. Most people who change something big felt torn about it the whole way through.",
+      "a real conversation, not an intervention. There's no script I'm trying to get you to follow.",
+      "that I'm not going to push you toward a decision. My job is to help you hear yourself think."
+    ],
     modalities: ['Motivational Interviewing'], style: 'gentle',
-    identity: { gender: 'male', lgbtqAffirming: true }, languages: [],
+    identity: { gender: 'male', lgbtqAffirming: true }, languages: ['English'],
     formats: ['video', 'in-person'], rateMin: 120, insuranceList: [],
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Tue 9:00am', rank: 1 }],
     nextAvailableRank: 4, nextAvailableLabel: 'In 2 weeks',
@@ -82,10 +118,29 @@ const THERAPISTS = [
 const NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
 const MODALITY_OPTIONS = ['CBT', 'EMDR', 'ACT', 'EFT', 'Motivational Interviewing'];
 const INSURANCE_OPTIONS = ['Aetna', 'BCBS', 'Cigna', 'United', 'any'];
-// English is assumed as the baseline for every therapist and isn't tracked
-// as a selectable language — this list is specifically "which additional
-// languages," since that's the actual access gap clients are filtering for.
-const LANGUAGE_OPTIONS = ['Spanish', 'Mandarin', 'Vietnamese', 'Arabic', 'Portuguese', 'French', 'Tagalog', 'Korean', 'Hindi'];
+// Three quick-tap chips cover the most common cases. "Other" opens a real
+// dropdown pulled from OTHER_LANGUAGES instead of free text, so language
+// names stay consistent between what a therapist selects and what a client
+// filters by — a typo in either place would silently break matching.
+const LANGUAGE_QUICK_OPTIONS = ['English', 'Spanish', 'Mandarin'];
+const OTHER_LANGUAGES = ['American Sign Language', 'Arabic', 'Bengali', 'Burmese', 'Cantonese', 'Czech', 'Dutch', 'French', 'German', 'Greek', 'Haitian Creole', 'Hausa', 'Hebrew', 'Hindi', 'Hmong', 'Hungarian', 'Igbo', 'Indonesian', 'Italian', 'Japanese', 'Khmer', 'Korean', 'Lao', 'Nepali', 'Persian (Farsi)', 'Polish', 'Portuguese', 'Punjabi', 'Romanian', 'Russian', 'Serbian', 'Sinhala', 'Somali', 'Swahili', 'Swedish', 'Tagalog', 'Thai', 'Turkish', 'Ukrainian', 'Urdu', 'Vietnamese', 'Yoruba'];
+
+function languageChipsHtml(languagesArr, showOther, idPrefix) {
+  const custom = languagesArr.filter(l => !LANGUAGE_QUICK_OPTIONS.includes(l));
+  let html = `<div class="chip-grid" id="${idPrefix}-languages-grid">`;
+  html += LANGUAGE_QUICK_OPTIONS.map(l => `<div class="chip-option ${languagesArr.includes(l) ? 'selected' : ''}" data-language="${l}">${l}</div>`).join('');
+  html += custom.map(l => `<div class="chip-option selected" data-remove-custom-language="${l}">${l} ✕</div>`).join('');
+  html += `<div class="chip-option" id="${idPrefix}-other-btn">+ Other</div>`;
+  html += `</div>`;
+  if (showOther) {
+    const available = OTHER_LANGUAGES.filter(l => !languagesArr.includes(l));
+    html += `<div class="other-language-row">
+      <select id="${idPrefix}-other-select">${available.map(l => `<option value="${l}">${l}</option>`).join('')}</select>
+      <button id="${idPrefix}-other-add-btn">Add</button>
+    </div>`;
+  }
+  return html;
+}
 
 // Same underlying tags as NEED_OPTIONS, just phrased as lived experience
 // instead of clinical categories — for clients who don't have a name for
@@ -112,7 +167,7 @@ let intake = {
   stylePref: 'balanced',
   genderPref: 'no-preference', genderRequired: false,
   lgbtqRequired: false,
-  languagePref: 'any', languageRequired: false,
+  languagePref: 'any', languageRequired: false, languageOtherOpen: false,
   format: 'no-preference',
   insurance: 'any',
   budgetMax: 300, // slider defaults to the top of the range so no one is filtered out until the client actually narrows it
@@ -278,8 +333,13 @@ function renderIntakeStep() {
       <div class="t-form-label">Language</div>
       <div class="chip-grid" id="language-grid">
         <div class="chip-option ${intake.languagePref === 'any' ? 'selected' : ''}" data-language="any">No preference</div>
-        ${LANGUAGE_OPTIONS.map(l => `<div class="chip-option ${intake.languagePref === l ? 'selected' : ''}" data-language="${l}">${l}</div>`).join('')}
+        ${LANGUAGE_QUICK_OPTIONS.map(l => `<div class="chip-option ${intake.languagePref === l ? 'selected' : ''}" data-language="${l}">${l}</div>`).join('')}
+        ${(!LANGUAGE_QUICK_OPTIONS.includes(intake.languagePref) && intake.languagePref !== 'any') ? `<div class="chip-option selected" data-language="${intake.languagePref}">${intake.languagePref}</div>` : ''}
+        <div class="chip-option" id="language-other-btn">+ Other</div>
       </div>
+      ${intake.languageOtherOpen ? `<div class="other-language-row">
+        <select id="language-other-select">${OTHER_LANGUAGES.map(l => `<option value="${l}" ${l === intake.languagePref ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      </div>` : ''}
       <div id="language-must-have" style="${intake.languagePref === 'any' ? 'display:none;' : ''}">
         <div class="must-have-toggle">
           <div class="toggle-label"><strong>Must-have</strong><span>Only show therapists who speak this language</span></div>
@@ -372,13 +432,18 @@ function attachIntakeHandlers() {
   const lgbtqSwitch = document.getElementById('lgbtq-switch');
   if (lgbtqSwitch) lgbtqSwitch.addEventListener('click', () => { intake.lgbtqRequired = !intake.lgbtqRequired; renderIntakeStep(); });
 
-  document.querySelectorAll('#language-grid .chip-option').forEach(el => {
+  document.querySelectorAll('#language-grid [data-language]').forEach(el => {
     el.addEventListener('click', () => {
       intake.languagePref = el.dataset.language;
+      intake.languageOtherOpen = false;
       if (intake.languagePref === 'any') intake.languageRequired = false;
       renderIntakeStep();
     });
   });
+  const languageOtherBtn = document.getElementById('language-other-btn');
+  if (languageOtherBtn) languageOtherBtn.addEventListener('click', () => { intake.languageOtherOpen = true; renderIntakeStep(); });
+  const languageOtherSelect = document.getElementById('language-other-select');
+  if (languageOtherSelect) languageOtherSelect.addEventListener('change', () => { intake.languagePref = languageOtherSelect.value; renderIntakeStep(); });
   const languageReqSwitch = document.getElementById('language-required-switch');
   if (languageReqSwitch) languageReqSwitch.addEventListener('click', () => { intake.languageRequired = !intake.languageRequired; renderIntakeStep(); });
 
@@ -478,7 +543,16 @@ function practiceBadgeHtml(t) {
 }
 
 function languagesLabel(t) {
-  return `Speaks: ${['English', ...t.languages].join(', ')}`;
+  return `Speaks: ${t.languages.join(', ')}`;
+}
+
+function promptBlocksHtml(t) {
+  return THERAPIST_PROMPT_OPTIONS.map((q, i) => `
+    <div class="prompt-block">
+      <div class="prompt-q">${q}</div>
+      <div class="prompt-a">${t.promptAnswers[i] || "I'm still writing this one — check back soon."}</div>
+    </div>
+  `).join('');
 }
 
 function buildCard(t) {
@@ -499,10 +573,7 @@ function buildCard(t) {
       <div class="tag-row">${t.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>
       ${practiceBadgeHtml(t)}
       ${matchTagsHtml(t)}
-      <div class="prompt-block">
-        <div class="prompt-q">${t.prompt.q}</div>
-        <div class="prompt-a">${t.prompt.a}</div>
-      </div>
+      ${promptBlocksHtml(t)}
     </div>
   `;
   card.addEventListener('click', (e) => {
@@ -734,10 +805,7 @@ function openDetail(t) {
     ${practiceBadgeHtml(t)}
     ${matchTagsHtml(t)}
     <div class="section-title">In their words</div>
-    <div class="prompt-block">
-      <div class="prompt-q">${t.prompt.q}</div>
-      <div class="prompt-a">${t.prompt.a}</div>
-    </div>
+    ${promptBlocksHtml(t)}
     <button class="primary-btn" style="margin-top:20px;background:var(--coral);color:white;" id="detail-like-btn">Add to Shortlist</button>
   `;
   detailModal.classList.remove('hidden');
@@ -1058,9 +1126,9 @@ function startTherapistSignup() {
     name: '', creds: '',
     practiceType: 'specialist',
     tags: [], modalities: [],
-    style: 'balanced', gender: 'female', lgbtqAffirming: false, languages: [],
+    style: 'balanced', gender: 'female', lgbtqAffirming: false, languages: [], showOtherLanguage: false,
     formats: [], insuranceList: [], rateMin: 130,
-    promptQ: THERAPIST_PROMPT_OPTIONS[0], promptA: '',
+    promptAnswers: THERAPIST_PROMPT_OPTIONS.map(() => ''),
     acceptingOngoing: true, onDemand: false, onDemandSlots: []
   };
   renderSignupStep();
@@ -1114,10 +1182,8 @@ function renderSignupStep() {
         <div class="toggle-label"><strong>LGBTQ+ affirming</strong><span>Shown to clients who require this</span></div>
         <div class="switch ${d.lgbtqAffirming ? 'on' : ''}" id="ts-lgbtq-switch"></div>
       </div>
-      <div class="t-form-label">Languages you speak (besides English)</div>
-      <div class="chip-grid" id="ts-languages-grid">
-        ${LANGUAGE_OPTIONS.map(l => `<div class="chip-option ${d.languages.includes(l) ? 'selected' : ''}" data-language="${l}">${l}</div>`).join('')}
-      </div>`;
+      <div class="t-form-label">Languages you speak</div>
+      ${languageChipsHtml(d.languages, d.showOtherLanguage, 'ts')}`;
   } else if (signupStep === 3) {
     html += `
       <h1>Logistics</h1>
@@ -1139,11 +1205,11 @@ function renderSignupStep() {
   } else if (signupStep === 4) {
     html += `
       <h1>In your words</h1>
-      <div class="intake-sub">This becomes the quote clients see on your card — it matters more than your credentials.</div>
-      <div class="option-list" id="ts-prompt-list">
-        ${THERAPIST_PROMPT_OPTIONS.map(q => `<div class="option-row ${d.promptQ === q ? 'selected' : ''}" data-prompt="${q}">${q}</div>`).join('')}
-      </div>
-      <textarea class="intake-textarea" id="ts-prompt-answer" rows="3" placeholder="Finish the sentence in your own voice...">${d.promptA}</textarea>`;
+      <div class="intake-sub">These are the first things clients read about you — answer as many as you can in your own voice. They'll scroll through all of them before reaching out.</div>
+      ${THERAPIST_PROMPT_OPTIONS.map((q, i) => `
+        <div class="t-form-label">${q}</div>
+        <textarea class="intake-textarea" data-prompt-index="${i}" rows="2" placeholder="Finish the sentence in your own voice...">${d.promptAnswers[i]}</textarea>
+      `).join('')}`;
   } else if (signupStep === 5) {
     html += `
       <h1>Availability</h1>
@@ -1220,13 +1286,27 @@ function attachSignupHandlers() {
   const lgbtqSwitch = document.getElementById('ts-lgbtq-switch');
   if (lgbtqSwitch) lgbtqSwitch.addEventListener('click', () => { d.lgbtqAffirming = !d.lgbtqAffirming; renderSignupStep(); });
 
-  document.querySelectorAll('#ts-languages-grid .chip-option').forEach(el => {
+  document.querySelectorAll('#ts-languages-grid [data-language]').forEach(el => {
     el.addEventListener('click', () => {
       const l = el.dataset.language;
       const i = d.languages.indexOf(l);
       if (i === -1) d.languages.push(l); else d.languages.splice(i, 1);
       renderSignupStep();
     });
+  });
+  document.querySelectorAll('#ts-languages-grid [data-remove-custom-language]').forEach(el => {
+    el.addEventListener('click', () => {
+      d.languages = d.languages.filter(l => l !== el.dataset.removeCustomLanguage);
+      renderSignupStep();
+    });
+  });
+  const tsOtherBtn = document.getElementById('ts-other-btn');
+  if (tsOtherBtn) tsOtherBtn.addEventListener('click', () => { d.showOtherLanguage = true; renderSignupStep(); });
+  const tsOtherAddBtn = document.getElementById('ts-other-add-btn');
+  if (tsOtherAddBtn) tsOtherAddBtn.addEventListener('click', () => {
+    const val = document.getElementById('ts-other-select').value;
+    if (val && !d.languages.includes(val)) d.languages.push(val);
+    renderSignupStep();
   });
 
   document.querySelectorAll('#ts-format-grid .chip-option').forEach(el => {
@@ -1253,11 +1333,9 @@ function attachSignupHandlers() {
     });
   }
 
-  document.querySelectorAll('#ts-prompt-list .option-row').forEach(el => {
-    el.addEventListener('click', () => { d.promptQ = el.dataset.prompt; renderSignupStep(); });
+  document.querySelectorAll('textarea[data-prompt-index]').forEach(el => {
+    el.addEventListener('input', () => { d.promptAnswers[Number(el.dataset.promptIndex)] = el.value; });
   });
-  const promptAnswer = document.getElementById('ts-prompt-answer');
-  if (promptAnswer) promptAnswer.addEventListener('input', () => { d.promptA = promptAnswer.value; });
 
   const ongoingSwitch = document.getElementById('ts-ongoing-switch');
   if (ongoingSwitch) ongoingSwitch.addEventListener('click', () => { d.acceptingOngoing = !d.acceptingOngoing; renderSignupStep(); });
@@ -1310,7 +1388,7 @@ function finishTherapistSignup() {
     initials, gradient,
     meta: buildTherapistMeta(d),
     tags: d.tags, practiceType: d.practiceType,
-    prompt: { q: d.promptQ, a: d.promptA.trim() || "I'm still writing this one — check back soon." },
+    promptAnswers: d.promptAnswers.map(a => a.trim()),
     modalities: d.modalities, style: d.style,
     identity: { gender: d.gender, lgbtqAffirming: d.lgbtqAffirming }, languages: d.languages,
     formats: d.formats, rateMin: d.rateMin, insuranceList: d.insuranceList,
@@ -1332,6 +1410,7 @@ function logout() {
 
 // ===== THERAPIST VIEW =====
 let currentTherapistId = THERAPISTS[0].id;
+let profileShowOtherLanguage = false; // transient UI flag for the profile editor's "+Other" language picker — not real therapist data
 
 function showTherapistView() {
   document.getElementById('bottom-nav').classList.add('hidden');
@@ -1438,8 +1517,8 @@ function renderTherapistProfile() {
       <div class="switch ${t.identity.lgbtqAffirming ? 'on' : ''}" id="t-lgbtq-switch"></div>
     </div>
 
-    <div class="t-form-label">Languages you speak (besides English)</div>
-    <div class="chip-grid">${LANGUAGE_OPTIONS.map(l => `<div class="chip-option ${t.languages.includes(l) ? 'selected' : ''}" data-toggle-language="${l}">${l}</div>`).join('')}</div>
+    <div class="t-form-label">Languages you speak</div>
+    ${languageChipsHtml(t.languages, profileShowOtherLanguage, 'tp')}
 
     <div class="t-form-label">Session format</div>
     <div class="chip-grid">
@@ -1452,6 +1531,12 @@ function renderTherapistProfile() {
 
     <div class="t-form-label">Rate (per session, $)</div>
     <input type="number" class="t-rate-input" id="t-rate-input" value="${t.rateMin}">
+
+    <div class="t-form-label" style="margin-top:20px;">In your words</div>
+    ${THERAPIST_PROMPT_OPTIONS.map((q, i) => `
+      <div class="t-form-label">${q}</div>
+      <textarea class="intake-textarea" data-edit-prompt-index="${i}" rows="2">${t.promptAnswers[i] || ''}</textarea>
+    `).join('')}
 
     <div class="must-have-toggle" style="margin-top:20px;">
       <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>Shown in Discover for new long-term matches</span></div>
@@ -1499,12 +1584,24 @@ function attachTherapistProfileHandlers(t) {
     renderTherapistProfile();
   }));
   document.getElementById('t-lgbtq-switch').addEventListener('click', () => { t.identity.lgbtqAffirming = !t.identity.lgbtqAffirming; renderTherapistProfile(); });
-  document.querySelectorAll('[data-toggle-language]').forEach(el => el.addEventListener('click', () => {
-    const l = el.dataset.toggleLanguage;
+  document.querySelectorAll('#tp-languages-grid [data-language]').forEach(el => el.addEventListener('click', () => {
+    const l = el.dataset.language;
     const i = t.languages.indexOf(l);
     if (i === -1) t.languages.push(l); else t.languages.splice(i, 1);
     renderTherapistProfile();
   }));
+  document.querySelectorAll('#tp-languages-grid [data-remove-custom-language]').forEach(el => el.addEventListener('click', () => {
+    t.languages = t.languages.filter(l => l !== el.dataset.removeCustomLanguage);
+    renderTherapistProfile();
+  }));
+  const tpOtherBtn = document.getElementById('tp-other-btn');
+  if (tpOtherBtn) tpOtherBtn.addEventListener('click', () => { profileShowOtherLanguage = true; renderTherapistProfile(); });
+  const tpOtherAddBtn = document.getElementById('tp-other-add-btn');
+  if (tpOtherAddBtn) tpOtherAddBtn.addEventListener('click', () => {
+    const val = document.getElementById('tp-other-select').value;
+    if (val && !t.languages.includes(val)) t.languages.push(val);
+    renderTherapistProfile();
+  });
   document.querySelectorAll('[data-toggle-format]').forEach(el => el.addEventListener('click', () => {
     const f = el.dataset.toggleFormat;
     const i = t.formats.indexOf(f);
@@ -1518,6 +1615,9 @@ function attachTherapistProfileHandlers(t) {
     renderTherapistProfile();
   }));
   document.getElementById('t-rate-input').addEventListener('change', (e) => { t.rateMin = Number(e.target.value) || 0; });
+  document.querySelectorAll('textarea[data-edit-prompt-index]').forEach(el => {
+    el.addEventListener('input', () => { t.promptAnswers[Number(el.dataset.editPromptIndex)] = el.value; });
+  });
   document.getElementById('t-ongoing-switch').addEventListener('click', () => { t.acceptingOngoing = !t.acceptingOngoing; renderTherapistProfile(); });
   document.getElementById('t-ondemand-switch').addEventListener('click', () => { t.onDemand = !t.onDemand; renderTherapistProfile(); });
   const addBtn = document.getElementById('add-slot-btn');
