@@ -9,7 +9,8 @@ const THERAPISTS = [
     identity: { gender: 'female', lgbtqAffirming: true },
     formats: ['video', 'in-person'], rateMin: 140, insuranceList: ['Aetna', 'BCBS'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
-    nextAvailableRank: 1, nextAvailableLabel: 'This week'
+    nextAvailableRank: 1, nextAvailableLabel: 'This week',
+    practiceType: 'specialist'
   },
   {
     id: 't2', name: 'James Okafor', creds: 'LMFT',
@@ -21,7 +22,8 @@ const THERAPISTS = [
     identity: { gender: 'male', lgbtqAffirming: false },
     formats: ['video'], rateMin: 110, insuranceList: [],
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Thu 4:00pm', rank: 2 }],
-    nextAvailableRank: 3, nextAvailableLabel: 'Next week'
+    nextAvailableRank: 3, nextAvailableLabel: 'Next week',
+    practiceType: 'generalist'
   },
   {
     id: 't3', name: 'Priya Raman', creds: 'LPC, Trauma Specialist',
@@ -33,7 +35,8 @@ const THERAPISTS = [
     identity: { gender: 'female', lgbtqAffirming: true },
     formats: ['in-person'], rateMin: 150, insuranceList: [],
     acceptingOngoing: false, onDemand: true, onDemandSlots: [{ label: 'Wed 1:00pm', rank: 1 }, { label: 'Fri 11:00am', rank: 3 }],
-    nextAvailableRank: null, nextAvailableLabel: 'Not accepting new ongoing clients'
+    nextAvailableRank: null, nextAvailableLabel: 'Not accepting new ongoing clients',
+    practiceType: 'specialist'
   },
   {
     id: 't4', name: 'Dr. Sam Alvarez', creds: 'PsyD',
@@ -45,7 +48,8 @@ const THERAPISTS = [
     identity: { gender: 'male', lgbtqAffirming: false },
     formats: ['video', 'in-person'], rateMin: 160, insuranceList: ['Cigna'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
-    nextAvailableRank: 1, nextAvailableLabel: 'This week'
+    nextAvailableRank: 1, nextAvailableLabel: 'This week',
+    practiceType: 'specialist'
   },
   {
     id: 't5', name: 'Dr. Leah Fitzgerald', creds: 'PhD, Perinatal Specialist',
@@ -57,7 +61,8 @@ const THERAPISTS = [
     identity: { gender: 'female', lgbtqAffirming: true },
     formats: ['video'], rateMin: 135, insuranceList: ['United'],
     acceptingOngoing: false, onDemand: false, onDemandSlots: [],
-    nextAvailableRank: null, nextAvailableLabel: 'Paused'
+    nextAvailableRank: null, nextAvailableLabel: 'Paused',
+    practiceType: 'specialist'
   },
   {
     id: 't6', name: 'Marcus Webb', creds: 'LCSW',
@@ -69,7 +74,8 @@ const THERAPISTS = [
     identity: { gender: 'male', lgbtqAffirming: true },
     formats: ['video', 'in-person'], rateMin: 120, insuranceList: [],
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Tue 9:00am', rank: 1 }],
-    nextAvailableRank: 4, nextAvailableLabel: 'In 2 weeks'
+    nextAvailableRank: 4, nextAvailableLabel: 'In 2 weeks',
+    practiceType: 'generalist'
   }
 ];
 
@@ -77,7 +83,26 @@ const NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions
 const MODALITY_OPTIONS = ['CBT', 'EMDR', 'ACT', 'EFT', 'Motivational Interviewing'];
 const INSURANCE_OPTIONS = ['Aetna', 'BCBS', 'Cigna', 'United', 'any'];
 
+// Same underlying tags as NEED_OPTIONS, just phrased as lived experience
+// instead of clinical categories — for clients who don't have a name for
+// what's going on yet. Selections still write into intake.needs directly,
+// so nothing downstream (matching, therapist tags) has to know which path
+// a client took.
+const UNSURE_OPTIONS = [
+  { label: "My mind won't stop racing, or I feel on edge a lot", tag: 'Anxiety' },
+  { label: "Something happened and I can't shake it", tag: 'Trauma' },
+  { label: 'Things feel tense or distant with my partner', tag: 'Couples' },
+  { label: "I lost someone or something and it's been hard to move through", tag: 'Grief' },
+  { label: "Everything in my life feels like it's changing at once", tag: 'Life Transitions' },
+  { label: "I'm running on empty, exhausted all the time", tag: 'Burnout' },
+  { label: 'I have trouble focusing or finishing things', tag: 'ADHD' },
+  { label: 'My drinking or drug use has been on my mind', tag: 'Substance Use' },
+  { label: 'Things have felt different since having a baby', tag: 'Postpartum' },
+  { label: 'Things are tense with my family', tag: 'Family Conflict' }
+];
+
 let intake = {
+  knowsNeeds: null, // 'yes' | 'no' — which onboarding path the client took
   needs: [],
   modality: 'open', modalityRequired: false,
   stylePref: 'balanced',
@@ -108,7 +133,9 @@ function isCompatible(t, mode) {
   if (mode === 'ongoing' && !t.acceptingOngoing) return false;
   if (mode === 'ondemand' && (!t.onDemand || t.onDemandSlots.length === 0)) return false;
 
-  if (intake.needs.length > 0 && !t.tags.some(tag => intake.needs.includes(tag))) return false;
+  // Generalists don't need a literal tag overlap — that's the whole point
+  // of being a generalist. Specialists still have to actually match.
+  if (intake.needs.length > 0 && t.practiceType !== 'generalist' && !t.tags.some(tag => intake.needs.includes(tag))) return false;
 
   if (intake.modality !== 'open' && intake.modalityRequired && !t.modalities.includes(intake.modality)) return false;
 
@@ -129,6 +156,9 @@ function getMatchReasons(t) {
   const reasons = [];
   const overlap = t.tags.filter(tag => intake.needs.includes(tag));
   overlap.forEach(tag => reasons.push(tag));
+  if (overlap.length === 0 && intake.needs.length > 0 && t.practiceType === 'generalist') {
+    reasons.push('Works with a broad range of concerns');
+  }
   if (intake.modality !== 'open' && t.modalities.includes(intake.modality)) reasons.push(intake.modality);
   if (intake.format !== 'no-preference' && t.formats.includes(intake.format)) {
     reasons.push(intake.format === 'video' ? 'Video sessions' : 'In-person sessions');
@@ -165,7 +195,7 @@ function loosenRequirements() {
 // INTAKE QUIZ
 // ===================================================================
 let intakeStep = 0;
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 const intakeContent = document.getElementById('intake-content');
 
 function renderIntakeStep() {
@@ -174,12 +204,27 @@ function renderIntakeStep() {
 
   if (intakeStep === 0) {
     html += `
+      <h1>Do you know what brings you to therapy?</h1>
+      <div class="intake-sub">Either answer is completely fine — we'll get you to the right therapists either way.</div>
+      <div class="option-list" id="knows-list">
+        <div class="option-row ${intake.knowsNeeds === 'yes' ? 'selected' : ''}" data-knows="yes">Yes, I know what I need help with</div>
+        <div class="option-row ${intake.knowsNeeds === 'no' ? 'selected' : ''}" data-knows="no">Not really — help me figure it out</div>
+      </div>`;
+  } else if (intakeStep === 1 && intake.knowsNeeds === 'no') {
+    html += `
+      <h1>What's been going on?</h1>
+      <div class="intake-sub">Pick anything that resonates — you don't need the right words for it, and it's okay if nothing quite fits.</div>
+      <div class="option-list" id="unsure-list">
+        ${UNSURE_OPTIONS.map(o => `<div class="option-row ${intake.needs.includes(o.tag) ? 'selected' : ''}" data-unsure-tag="${o.tag}">${o.label}</div>`).join('')}
+      </div>`;
+  } else if (intakeStep === 1) {
+    html += `
       <h1>What brings you to therapy right now?</h1>
       <div class="intake-sub">Pick as many as apply — this is how we find therapists who actually work with what you're dealing with.</div>
       <div class="chip-grid" id="needs-grid">
         ${NEED_OPTIONS.map(n => `<div class="chip-option ${intake.needs.includes(n) ? 'selected' : ''}" data-need="${n}">${n}</div>`).join('')}
       </div>`;
-  } else if (intakeStep === 1) {
+  } else if (intakeStep === 2) {
     html += `
       <h1>Looking for a specific approach?</h1>
       <div class="intake-sub">If you're not sure, that's completely fine — most people aren't.</div>
@@ -193,7 +238,7 @@ function renderIntakeStep() {
           <div class="switch ${intake.modalityRequired ? 'on' : ''}" id="modality-required-switch"></div>
         </div>
       </div>`;
-  } else if (intakeStep === 2) {
+  } else if (intakeStep === 3) {
     html += `
       <h1>What kind of guidance do you want?</h1>
       <div class="intake-sub">There's no wrong answer — this just helps us show you therapists whose style tends to match.</div>
@@ -202,7 +247,7 @@ function renderIntakeStep() {
         <div class="option-row ${intake.stylePref === 'balanced' ? 'selected' : ''}" data-style="balanced">A mix of both</div>
         <div class="option-row ${intake.stylePref === 'direct' ? 'selected' : ''}" data-style="direct">Direct — tells me like it is</div>
       </div>`;
-  } else if (intakeStep === 3) {
+  } else if (intakeStep === 4) {
     html += `
       <h1>Any preferences on who you work with?</h1>
       <div class="intake-sub">Totally optional — skip anything that doesn't matter to you.</div>
@@ -221,7 +266,7 @@ function renderIntakeStep() {
         <div class="toggle-label"><strong>LGBTQ+ affirming</strong><span>Must be explicitly affirming</span></div>
         <div class="switch ${intake.lgbtqRequired ? 'on' : ''}" id="lgbtq-switch"></div>
       </div>`;
-  } else if (intakeStep === 4) {
+  } else if (intakeStep === 5) {
     html += `
       <h1>A few logistics</h1>
       <div class="intake-sub">So we only show you therapists you can actually see.</div>
@@ -242,7 +287,12 @@ function renderIntakeStep() {
       </div>`;
   }
 
-  const canProceed = intakeStep !== 0 || intake.needs.length > 0;
+  let canProceed = true;
+  if (intakeStep === 0) canProceed = intake.knowsNeeds !== null;
+  else if (intakeStep === 1 && intake.knowsNeeds === 'yes') canProceed = intake.needs.length > 0;
+  // The "not sure" path never blocks on a minimum selection — someone who
+  // doesn't know what's going on yet shouldn't be stuck because none of the
+  // options quite fit.
   html += `
     <div class="intake-footer">
       ${intakeStep > 0 ? `<button class="btn-back" id="intake-back">Back</button>` : ''}
@@ -254,11 +304,24 @@ function renderIntakeStep() {
 }
 
 function attachIntakeHandlers() {
+  document.querySelectorAll('#knows-list .option-row').forEach(el => {
+    el.addEventListener('click', () => { intake.knowsNeeds = el.dataset.knows; renderIntakeStep(); });
+  });
+
   document.querySelectorAll('#needs-grid .chip-option').forEach(el => {
     el.addEventListener('click', () => {
       const need = el.dataset.need;
       const i = intake.needs.indexOf(need);
       if (i === -1) intake.needs.push(need); else intake.needs.splice(i, 1);
+      renderIntakeStep();
+    });
+  });
+
+  document.querySelectorAll('#unsure-list .option-row').forEach(el => {
+    el.addEventListener('click', () => {
+      const tag = el.dataset.unsureTag;
+      const i = intake.needs.indexOf(tag);
+      if (i === -1) intake.needs.push(tag); else intake.needs.splice(i, 1);
       renderIntakeStep();
     });
   });
@@ -380,6 +443,10 @@ function matchTagsHtml(t) {
     <div class="match-tag-row">${reasons.map(r => `<span class="match-tag">${r}</span>`).join('')}</div>`;
 }
 
+function practiceBadgeHtml(t) {
+  return t.practiceType === 'generalist' ? `<div class="practice-badge">🌐 General Practice</div>` : '';
+}
+
 function buildCard(t) {
   const card = document.createElement('div');
   card.className = 'card';
@@ -395,6 +462,7 @@ function buildCard(t) {
       <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
       <div class="card-meta"><span>Next available: ${t.nextAvailableLabel}</span></div>
       <div class="tag-row">${t.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>
+      ${practiceBadgeHtml(t)}
       ${matchTagsHtml(t)}
       <div class="prompt-block">
         <div class="prompt-q">${t.prompt.q}</div>
@@ -627,6 +695,7 @@ function openDetail(t) {
     <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
     <div class="section-title">Specialties</div>
     <div class="tag-row">${t.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>
+    ${practiceBadgeHtml(t)}
     ${matchTagsHtml(t)}
     <div class="section-title">In their words</div>
     <div class="prompt-block">
@@ -951,6 +1020,7 @@ function startTherapistSignup() {
   signupStep = 0;
   newTherapistDraft = {
     name: '', creds: '',
+    practiceType: 'specialist',
     tags: [], modalities: [],
     style: 'balanced', gender: 'female', lgbtqAffirming: false,
     formats: [], insuranceList: [], rateMin: 130,
@@ -977,7 +1047,12 @@ function renderSignupStep() {
   } else if (signupStep === 1) {
     html += `
       <h1>What do you specialize in?</h1>
-      <div class="intake-sub">Pick everything that applies — this is how clients with matching needs find you.</div>
+      <div class="intake-sub">Some therapists are deep in a few areas, others work well across the board — both are valuable, we just want to show you to the right clients.</div>
+      <div class="option-list" id="ts-practice-type-list">
+        <div class="option-row ${d.practiceType === 'specialist' ? 'selected' : ''}" data-practice="specialist">I have a few core specialties</div>
+        <div class="option-row ${d.practiceType === 'generalist' ? 'selected' : ''}" data-practice="generalist">I work with a broad range of concerns</div>
+      </div>
+      <div class="t-form-label">${d.practiceType === 'generalist' ? 'Optional — pick any specialties you especially enjoy' : "Specialties / needs you work with"}</div>
       <div class="chip-grid" id="ts-tags-grid">
         ${NEED_OPTIONS.map(n => `<div class="chip-option ${d.tags.includes(n) ? 'selected' : ''}" data-tag="${n}">${n}</div>`).join('')}
       </div>
@@ -1074,6 +1149,10 @@ function attachSignupHandlers() {
   });
   const credsInput = document.getElementById('ts-creds');
   if (credsInput) credsInput.addEventListener('input', () => { d.creds = credsInput.value; });
+
+  document.querySelectorAll('#ts-practice-type-list .option-row').forEach(el => {
+    el.addEventListener('click', () => { d.practiceType = el.dataset.practice; renderSignupStep(); });
+  });
 
   document.querySelectorAll('#ts-tags-grid .chip-option').forEach(el => {
     el.addEventListener('click', () => {
@@ -1181,7 +1260,7 @@ function finishTherapistSignup() {
     id, name: d.name.trim(), creds: d.creds.trim() || 'Licensed Therapist',
     initials, gradient,
     meta: buildTherapistMeta(d),
-    tags: d.tags,
+    tags: d.tags, practiceType: d.practiceType,
     prompt: { q: d.promptQ, a: d.promptA.trim() || "I'm still writing this one — check back soon." },
     modalities: d.modalities, style: d.style,
     identity: { gender: d.gender, lgbtqAffirming: d.lgbtqAffirming },
@@ -1287,6 +1366,12 @@ function renderTherapistProfile() {
   container.innerHTML = `
     <div class="t-form-name">${t.name} <span class="t-form-creds">${t.creds}</span></div>
 
+    <div class="t-form-label">Practice type</div>
+    <div class="chip-grid">
+      <div class="chip-option ${t.practiceType === 'specialist' ? 'selected' : ''}" data-set-practice="specialist">A few core specialties</div>
+      <div class="chip-option ${t.practiceType === 'generalist' ? 'selected' : ''}" data-set-practice="generalist">Broad range of concerns</div>
+    </div>
+
     <div class="t-form-label">Specialties / needs you work with</div>
     <div class="chip-grid">${NEED_OPTIONS.map(n => `<div class="chip-option ${t.tags.includes(n) ? 'selected' : ''}" data-toggle-tag="${n}">${n}</div>`).join('')}</div>
 
@@ -1341,6 +1426,10 @@ function renderTherapistProfile() {
 }
 
 function attachTherapistProfileHandlers(t) {
+  document.querySelectorAll('[data-set-practice]').forEach(el => el.addEventListener('click', () => {
+    t.practiceType = el.dataset.setPractice;
+    renderTherapistProfile();
+  }));
   document.querySelectorAll('[data-toggle-tag]').forEach(el => el.addEventListener('click', () => {
     const tag = el.dataset.toggleTag;
     const i = t.tags.indexOf(tag);
