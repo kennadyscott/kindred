@@ -1055,13 +1055,10 @@ document.getElementById('login-back').addEventListener('click', () => {
   showScreen('account-type');
 });
 
-let loginCreatingAccount = false;
-document.getElementById('login-toggle-mode').addEventListener('click', () => {
-  loginCreatingAccount = !loginCreatingAccount;
-  document.getElementById('login-submit-btn').textContent = loginCreatingAccount ? 'Create Account' : 'Log In';
-  document.getElementById('login-toggle-mode').textContent = loginCreatingAccount ? 'Already have an account? Log in' : 'New here? Create an account';
-});
-
+// "Log In" and "Create an Account" are two equally visible buttons rather
+// than one button behind a toggle — burying account creation behind a small
+// mode-switch link meant people testing the therapist flow never found it
+// and always landed on the existing-profile picker instead.
 document.getElementById('login-submit-btn').addEventListener('click', () => {
   if (accountType === 'client') {
     if (intake.completed) {
@@ -1070,11 +1067,17 @@ document.getElementById('login-submit-btn').addEventListener('click', () => {
     } else {
       startIntake();
     }
-  } else if (loginCreatingAccount) {
-    startTherapistSignup();
   } else {
     renderTherapistSelect();
     showScreen('therapist-select');
+  }
+});
+
+document.getElementById('login-create-btn').addEventListener('click', () => {
+  if (accountType === 'client') {
+    startIntake();
+  } else {
+    startTherapistSignup();
   }
 });
 
