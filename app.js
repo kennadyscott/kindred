@@ -117,6 +117,31 @@ const THERAPISTS = [
 
 const NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
 const MODALITY_OPTIONS = ['CBT', 'EMDR', 'ACT', 'EFT', 'Motivational Interviewing'];
+const MODALITY_INFO = {
+  'CBT': "Cognitive Behavioral Therapy. Focuses on identifying and changing unhelpful thought patterns and behaviors — often structured, with exercises to practice between sessions.",
+  'EMDR': "Eye Movement Desensitization and Reprocessing. A structured approach often used for trauma, using guided eye movements or other bilateral stimulation to help the brain reprocess difficult memories.",
+  'ACT': "Acceptance and Commitment Therapy. Focuses on accepting difficult thoughts and feelings rather than fighting them, while committing to actions aligned with your values.",
+  'EFT': "Emotionally Focused Therapy. Often used with couples and families — focused on identifying emotional patterns and building stronger, safer emotional bonds.",
+  'Motivational Interviewing': "A collaborative conversational style that helps you explore and strengthen your own motivation for change — especially useful for ambivalence around habits or behaviors."
+};
+
+function openModalityInfo(name) {
+  const desc = MODALITY_INFO[name];
+  if (!desc) return;
+  document.getElementById('modality-info-sheet').innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>${name}</h2>
+    <p class="modality-info-text">${desc}</p>
+    <button class="primary-btn" style="margin-top:16px;background:var(--coral);color:white;" id="modality-info-close-btn">Got it</button>
+  `;
+  document.getElementById('modality-info-modal').classList.remove('hidden');
+  document.getElementById('modality-info-close-btn').addEventListener('click', () => {
+    document.getElementById('modality-info-modal').classList.add('hidden');
+  });
+}
+document.getElementById('modality-info-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'modality-info-modal') document.getElementById('modality-info-modal').classList.add('hidden');
+});
 const INSURANCE_OPTIONS = ['Aetna', 'BCBS', 'Cigna', 'United', 'any'];
 // Three quick-tap chips cover the most common cases. "Other" opens a real
 // dropdown pulled from OTHER_LANGUAGES instead of free text, so language
@@ -294,7 +319,7 @@ function renderIntakeStep() {
       <div class="intake-sub">If you're not sure, that's completely fine — most people aren't.</div>
       <div class="option-list" id="modality-list">
         <div class="option-row ${intake.modality === 'open' ? 'selected' : ''}" data-modality="open">Not sure / open to anything</div>
-        ${MODALITY_OPTIONS.map(m => `<div class="option-row ${intake.modality === m ? 'selected' : ''}" data-modality="${m}">${m}</div>`).join('')}
+        ${MODALITY_OPTIONS.map(m => `<div class="option-row ${intake.modality === m ? 'selected' : ''}" data-modality="${m}">${m} <span class="info-btn" data-info="${m}">?</span></div>`).join('')}
       </div>
       <div id="modality-must-have" style="${intake.modality === 'open' ? 'display:none;' : ''}">
         <div class="must-have-toggle">
@@ -412,6 +437,9 @@ function attachIntakeHandlers() {
       if (intake.modality === 'open') intake.modalityRequired = false;
       renderIntakeStep();
     });
+  });
+  document.querySelectorAll('#modality-list .info-btn').forEach(el => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); openModalityInfo(el.dataset.info); });
   });
   const modReqSwitch = document.getElementById('modality-required-switch');
   if (modReqSwitch) modReqSwitch.addEventListener('click', () => { intake.modalityRequired = !intake.modalityRequired; renderIntakeStep(); });
@@ -546,6 +574,12 @@ function languagesLabel(t) {
   return `Speaks: ${t.languages.join(', ')}`;
 }
 
+function tagHtml(tag) {
+  return MODALITY_INFO[tag]
+    ? `<span class="tag tag-clickable" data-info="${tag}">${tag} <span class="info-icon">?</span></span>`
+    : `<span class="tag">${tag}</span>`;
+}
+
 function promptBlocksHtml(t) {
   return THERAPIST_PROMPT_OPTIONS.map((q, i) => `
     <div class="prompt-block">
@@ -570,12 +604,15 @@ function buildCard(t) {
       <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
       <div class="card-meta"><span>Next available: ${t.nextAvailableLabel}</span></div>
       <div class="card-meta"><span>${languagesLabel(t)}</span></div>
-      <div class="tag-row">${t.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>
+      <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
       ${practiceBadgeHtml(t)}
       ${matchTagsHtml(t)}
       ${promptBlocksHtml(t)}
     </div>
   `;
+  card.querySelectorAll('[data-info]').forEach(el => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); openModalityInfo(el.dataset.info); });
+  });
   card.addEventListener('click', (e) => {
     if (card.dataset.dragged === 'true') { card.dataset.dragged = 'false'; return; }
     openDetail(t);
@@ -808,7 +845,7 @@ function openDetail(t) {
     <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
     <div class="card-meta"><span>${languagesLabel(t)}</span></div>
     <div class="section-title">Specialties</div>
-    <div class="tag-row">${t.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>
+    <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
     ${practiceBadgeHtml(t)}
     ${matchTagsHtml(t)}
     <div class="section-title">In their words</div>
@@ -816,6 +853,9 @@ function openDetail(t) {
     <button class="primary-btn" style="margin-top:20px;background:var(--coral);color:white;" id="detail-like-btn">Add to Shortlist</button>
   `;
   detailModal.classList.remove('hidden');
+  detailSheet.querySelectorAll('[data-info]').forEach(el => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); openModalityInfo(el.dataset.info); });
+  });
   document.getElementById('detail-like-btn').addEventListener('click', () => {
     detailModal.classList.add('hidden');
     const topCard = cardStack.lastElementChild;
@@ -883,10 +923,16 @@ function renderMatches() {
       </div>`;
     }
     if (m.status === 'ondemand') {
+      if (m.paymentStatus !== 'paid') {
+        return `<div class="match-row pending" data-id="${t.id}" style="opacity:0.5;">
+          <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
+          <div><div class="chat-name">${t.name}</div><div class="last-msg">Cancelled — ${refundStatusLabel(m.paymentStatus)}</div></div>
+        </div>`;
+      }
       return `<div class="match-row pending" data-id="${t.id}">
         <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
-        <div><div class="chat-name">${t.name}</div><div class="last-msg">One-time session booked — ${m.slotLabel}</div></div>
-        <span class="pending-tag">Booked</span>
+        <div><div class="chat-name">${t.name}</div><div class="last-msg">One-time session booked — ${m.slotLabel} · $${m.amountPaid} paid</div></div>
+        <button class="cancel-session-btn" data-cancel-ondemand="${t.id}">Cancel</button>
       </div>`;
     }
     if (m.status === 'declined') {
@@ -911,6 +957,9 @@ function renderMatches() {
       const m = matches.find(m => m.therapist.id === row.dataset.id);
       if (m) openChat(m.therapist, 'client');
     });
+  });
+  matchesList.querySelectorAll('[data-cancel-ondemand]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); requestCancelOndemand(btn.dataset.cancelOndemand); });
   });
 }
 
@@ -1008,13 +1057,125 @@ function renderOndemand() {
   });
 }
 
+// ===== ON-DEMAND PAYMENT & CANCELLATION =====
+// On-demand slots require payment up front. Cancellation policy is measured
+// from the actual scheduled session time, not from when it was booked:
+// 48+ hours out = full refund, 24-48 hours = half, under 24 hours = none.
+function getRefundTier(hoursUntilSession) {
+  if (hoursUntilSession >= 48) return { percent: 100, label: 'a full refund' };
+  if (hoursUntilSession >= 24) return { percent: 50, label: 'a 50% refund' };
+  return { percent: 0, label: 'no refund' };
+}
+
+function nextOccurrence(dayAbbrev, timeLabel) {
+  const dayIndex = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const targetDow = dayIndex[dayAbbrev];
+  const match = (timeLabel || '').match(/(\d+):(\d+)(am|pm)/i);
+  let hour = 0, minute = 0;
+  if (match) {
+    hour = parseInt(match[1], 10);
+    minute = parseInt(match[2], 10);
+    const period = match[3].toLowerCase();
+    if (period === 'pm' && hour !== 12) hour += 12;
+    if (period === 'am' && hour === 12) hour = 0;
+  }
+  const now = new Date();
+  let daysAhead = (targetDow - now.getDay() + 7) % 7;
+  if (daysAhead === 0) {
+    const todayAtTime = new Date(now);
+    todayAtTime.setHours(hour, minute, 0, 0);
+    if (todayAtTime <= now) daysAhead = 7;
+  }
+  const result = new Date(now);
+  result.setDate(now.getDate() + daysAhead);
+  result.setHours(hour, minute, 0, 0);
+  return result;
+}
+
+function refundStatusLabel(status) {
+  if (status === 'refunded') return 'full refund issued';
+  if (status === 'partially-refunded') return '50% refund issued';
+  if (status === 'cancelled-no-refund') return 'no refund per policy';
+  return '';
+}
+
 function bookOndemand(tid, slotLabel, btnEl) {
   const t = THERAPISTS.find(t => t.id === tid);
+  openPaymentConfirm(t, slotLabel, btnEl);
+}
+
+function openPaymentConfirm(t, slotLabel, btnEl) {
+  const amount = t.rateMin;
+  document.getElementById('confirm-sheet').innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>Confirm &amp; Pay</h2>
+    <div class="intake-sub">One-time session with ${t.name} — ${slotLabel}</div>
+    <div class="payment-amount">$${amount}</div>
+    <div class="t-form-label">Cancellation policy</div>
+    <ul class="policy-list">
+      <li>48+ hours before your session: full refund</li>
+      <li>24–48 hours before: 50% refund</li>
+      <li>Less than 24 hours before: no refund</li>
+    </ul>
+    <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="confirm-pay-btn">Confirm &amp; Pay $${amount}</button>
+    <button class="text-btn" id="confirm-pay-cancel" style="color:var(--ink-soft);">Cancel</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  document.getElementById('confirm-pay-btn').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    finalizeOndemandBooking(t, slotLabel, btnEl, amount);
+  });
+  document.getElementById('confirm-pay-cancel').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+  });
+}
+document.getElementById('confirm-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'confirm-modal') e.currentTarget.classList.add('hidden');
+});
+
+function finalizeOndemandBooking(t, slotLabel, btnEl, amount) {
   const card = btnEl.closest('.ondemand-card');
   card.querySelectorAll('.slot-btn').forEach(b => { b.disabled = true; b.classList.add('booked'); });
   btnEl.textContent = `Booked: ${slotLabel}`;
-  matches.push({ therapist: t, status: 'ondemand', slotLabel });
+  const [day, ...timeParts] = slotLabel.split(' ');
+  const sessionDateTime = nextOccurrence(day, timeParts.join(' '));
+  matches.push({
+    therapist: t, status: 'ondemand', slotLabel,
+    amountPaid: amount, paymentStatus: 'paid',
+    sessionDateTime: sessionDateTime.toISOString()
+  });
   chatLog[t.id] = chatLog[t.id] || [{ from: 'them', text: `Looking forward to our session ${slotLabel}! Feel free to message me anything beforehand.` }];
+  showToast(`Payment confirmed — $${amount} charged.`);
+  renderMatches();
+}
+
+function requestCancelOndemand(therapistId) {
+  const m = matches.find(m => m.therapist.id === therapistId && m.status === 'ondemand' && m.paymentStatus === 'paid');
+  if (!m) return;
+  const hoursUntil = (new Date(m.sessionDateTime) - new Date()) / 3600000;
+  const tier = getRefundTier(hoursUntil);
+  document.getElementById('confirm-sheet').innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>Cancel this session?</h2>
+    <div class="intake-sub">Your session with ${m.therapist.name} is ${m.slotLabel}.</div>
+    <p class="modality-info-text">Based on our cancellation policy, you'll receive <strong>${tier.label}</strong> (${tier.percent}% of $${m.amountPaid}).</p>
+    <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="confirm-cancel-btn">Confirm Cancellation</button>
+    <button class="text-btn" id="confirm-cancel-back" style="color:var(--ink-soft);">Never Mind</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    finalizeCancellation(m, tier);
+  });
+  document.getElementById('confirm-cancel-back').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+  });
+}
+
+function finalizeCancellation(m, tier) {
+  m.paymentStatus = tier.percent === 100 ? 'refunded' : tier.percent === 50 ? 'partially-refunded' : 'cancelled-no-refund';
+  m.refundAmount = Math.round(m.amountPaid * (tier.percent / 100));
+  showToast(tier.percent > 0 ? `Cancelled — $${m.refundAmount} refunded.` : 'Cancelled — no refund per policy.');
   renderMatches();
 }
 
@@ -1468,7 +1629,7 @@ function renderTherapistHome() {
   const list = document.getElementById('t-home-list');
 
   const items = [];
-  matches.filter(m => m.therapist.id === currentTherapistId && m.status === 'ondemand').forEach(m => {
+  matches.filter(m => m.therapist.id === currentTherapistId && m.status === 'ondemand' && m.paymentStatus === 'paid').forEach(m => {
     const [day, ...timeParts] = m.slotLabel.split(' ');
     items.push({ day, time: timeParts.join(' '), label: 'One-time session' });
   });
@@ -1565,7 +1726,11 @@ function renderRequests() {
     }).join('');
   }
   myBookings.forEach(m => {
-    html += `<div class="confirmed-session">One-time session confirmed — ${m.slotLabel}</div>`;
+    if (m.paymentStatus === 'paid') {
+      html += `<div class="confirmed-session">One-time session confirmed — ${m.slotLabel} · $${m.amountPaid} paid</div>`;
+    } else {
+      html += `<div class="confirmed-session cancelled">Cancelled — ${m.slotLabel} (${refundStatusLabel(m.paymentStatus)})</div>`;
+    }
   });
 
   list.innerHTML = html;
