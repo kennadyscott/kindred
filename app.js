@@ -16,7 +16,7 @@ const THERAPISTS = [
     formats: ['video', 'in-person'], rateMin: 140, insuranceList: ['Aetna', 'BCBS'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
-    practiceType: 'specialist', externalAppointments: []
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false
   },
   {
     id: 't2', name: 'James Okafor', creds: 'LMFT',
@@ -35,7 +35,7 @@ const THERAPISTS = [
     formats: ['video'], rateMin: 110, insuranceList: [],
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Thu 4:00pm', rank: 2 }],
     nextAvailableRank: 3, nextAvailableLabel: 'Next week',
-    practiceType: 'generalist', externalAppointments: []
+    practiceType: 'generalist', externalAppointments: [], agreedToOnDemandPolicy: true
   },
   {
     id: 't3', name: 'Priya Raman', creds: 'LPC, Trauma Specialist',
@@ -54,7 +54,7 @@ const THERAPISTS = [
     formats: ['in-person'], rateMin: 150, insuranceList: [],
     acceptingOngoing: false, onDemand: true, onDemandSlots: [{ label: 'Wed 1:00pm', rank: 1 }, { label: 'Fri 11:00am', rank: 3 }],
     nextAvailableRank: null, nextAvailableLabel: 'Not accepting new ongoing clients',
-    practiceType: 'specialist', externalAppointments: []
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: true
   },
   {
     id: 't4', name: 'Dr. Sam Alvarez', creds: 'PsyD',
@@ -73,7 +73,7 @@ const THERAPISTS = [
     formats: ['video', 'in-person'], rateMin: 160, insuranceList: ['Cigna'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
-    practiceType: 'specialist', externalAppointments: []
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false
   },
   {
     id: 't5', name: 'Dr. Leah Fitzgerald', creds: 'PhD, Perinatal Specialist',
@@ -92,7 +92,7 @@ const THERAPISTS = [
     formats: ['video'], rateMin: 135, insuranceList: ['United'],
     acceptingOngoing: false, onDemand: false, onDemandSlots: [],
     nextAvailableRank: null, nextAvailableLabel: 'Paused',
-    practiceType: 'specialist', externalAppointments: []
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false
   },
   {
     id: 't6', name: 'Marcus Webb', creds: 'LCSW',
@@ -111,7 +111,7 @@ const THERAPISTS = [
     formats: ['video', 'in-person'], rateMin: 120, insuranceList: [],
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Tue 9:00am', rank: 1 }],
     nextAvailableRank: 4, nextAvailableLabel: 'In 2 weeks',
-    practiceType: 'generalist', externalAppointments: []
+    practiceType: 'generalist', externalAppointments: [], agreedToOnDemandPolicy: true
   }
 ];
 
@@ -1034,7 +1034,32 @@ document.getElementById('chat-back').addEventListener('click', () => {
 
 // ===== ON-DEMAND SCREEN =====
 const ondemandList = document.getElementById('ondemand-list');
+let clientAgreedToOnDemandPolicy = false;
+
+function renderOndemandPolicyGate() {
+  ondemandList.innerHTML = `
+    <div class="policy-gate">
+      <div class="t-form-label">Before you use On-Demand</div>
+      <p class="modality-info-text">On-Demand sessions require payment up front to confirm your slot. If your plans change:</p>
+      <ul class="policy-list">
+        <li>48+ hours before your session: full refund</li>
+        <li>24–48 hours before: 50% refund</li>
+        <li>Less than 24 hours before: no refund</li>
+      </ul>
+      <button class="primary-btn" style="background:var(--coral);color:white;" id="agree-ondemand-btn">I Agree &amp; Continue</button>
+    </div>
+  `;
+  document.getElementById('agree-ondemand-btn').addEventListener('click', () => {
+    clientAgreedToOnDemandPolicy = true;
+    renderOndemand();
+  });
+}
+
 function renderOndemand() {
+  if (!clientAgreedToOnDemandPolicy) {
+    renderOndemandPolicyGate();
+    return;
+  }
   const list = computeOnDemandList();
   if (list.length === 0) {
     ondemandList.innerHTML = `<p class="empty-state">No one-time slots match your needs this week — check back soon.</p>`;
@@ -1179,6 +1204,33 @@ function finalizeCancellation(m, tier) {
   renderMatches();
 }
 
+// A therapist must explicitly agree to the payment/cancellation terms before
+// they can turn On-Demand on for themselves — same policy the client agrees
+// to, but framed from the side that keeps the non-refunded portion.
+function openTherapistOnDemandAgreement(onAgree) {
+  document.getElementById('confirm-sheet').innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>On-Demand Payment Policy</h2>
+    <p class="modality-info-text">Clients pay up front to confirm an On-Demand slot with you. If a client cancels:</p>
+    <ul class="policy-list">
+      <li>48+ hours before the session: they get a full refund</li>
+      <li>24–48 hours before: they get a 50% refund — you keep the other 50%</li>
+      <li>Less than 24 hours before: no refund — you keep the full amount</li>
+    </ul>
+    <p class="modality-info-text">By continuing, you agree to these terms and to honor confirmed sessions.</p>
+    <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="agree-td-ondemand-btn">I Agree</button>
+    <button class="text-btn" id="decline-td-ondemand-btn" style="color:var(--ink-soft);">Not Now</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  document.getElementById('agree-td-ondemand-btn').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    onAgree();
+  });
+  document.getElementById('decline-td-ondemand-btn').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+  });
+}
+
 // ===== NAV / SCREENS =====
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
@@ -1303,7 +1355,7 @@ function startTherapistSignup() {
     style: 'balanced', gender: 'female', lgbtqAffirming: false, languages: [], showOtherLanguage: false,
     formats: [], insuranceList: [], rateMin: 130,
     promptAnswers: THERAPIST_PROMPT_OPTIONS.map(() => ''),
-    acceptingOngoing: true, onDemand: false, onDemandSlots: []
+    acceptingOngoing: true, onDemand: false, onDemandSlots: [], agreedToOnDemandPolicy: false
   };
   renderSignupStep();
   showScreen('therapist-signup');
@@ -1514,7 +1566,14 @@ function attachSignupHandlers() {
   const ongoingSwitch = document.getElementById('ts-ongoing-switch');
   if (ongoingSwitch) ongoingSwitch.addEventListener('click', () => { d.acceptingOngoing = !d.acceptingOngoing; renderSignupStep(); });
   const ondemandSwitch = document.getElementById('ts-ondemand-switch');
-  if (ondemandSwitch) ondemandSwitch.addEventListener('click', () => { d.onDemand = !d.onDemand; renderSignupStep(); });
+  if (ondemandSwitch) ondemandSwitch.addEventListener('click', () => {
+    if (!d.onDemand && !d.agreedToOnDemandPolicy) {
+      openTherapistOnDemandAgreement(() => { d.agreedToOnDemandPolicy = true; d.onDemand = true; renderSignupStep(); });
+    } else {
+      d.onDemand = !d.onDemand;
+      renderSignupStep();
+    }
+  });
   const addSlotBtn = document.getElementById('ts-add-slot-btn');
   if (addSlotBtn) addSlotBtn.addEventListener('click', () => {
     const input = document.getElementById('ts-new-slot-input');
@@ -1567,6 +1626,7 @@ function finishTherapistSignup() {
     identity: { gender: d.gender, lgbtqAffirming: d.lgbtqAffirming }, languages: d.languages,
     formats: d.formats, rateMin: d.rateMin, insuranceList: d.insuranceList,
     acceptingOngoing: d.acceptingOngoing, onDemand: d.onDemand, onDemandSlots: d.onDemandSlots,
+    agreedToOnDemandPolicy: d.agreedToOnDemandPolicy,
     nextAvailableRank: d.acceptingOngoing ? 1 : null,
     nextAvailableLabel: d.acceptingOngoing ? 'This week' : 'Not accepting new ongoing clients'
   });
@@ -1887,7 +1947,14 @@ function attachTherapistProfileHandlers(t) {
     el.addEventListener('input', () => { t.promptAnswers[Number(el.dataset.editPromptIndex)] = el.value; });
   });
   document.getElementById('t-ongoing-switch').addEventListener('click', () => { t.acceptingOngoing = !t.acceptingOngoing; renderTherapistProfile(); });
-  document.getElementById('t-ondemand-switch').addEventListener('click', () => { t.onDemand = !t.onDemand; renderTherapistProfile(); });
+  document.getElementById('t-ondemand-switch').addEventListener('click', () => {
+    if (!t.onDemand && !t.agreedToOnDemandPolicy) {
+      openTherapistOnDemandAgreement(() => { t.agreedToOnDemandPolicy = true; t.onDemand = true; renderTherapistProfile(); });
+    } else {
+      t.onDemand = !t.onDemand;
+      renderTherapistProfile();
+    }
+  });
   const addBtn = document.getElementById('add-slot-btn');
   if (addBtn) addBtn.addEventListener('click', () => {
     const input = document.getElementById('new-slot-input');

@@ -960,6 +960,13 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   line-height: 1.6;
   padding-left: 18px;
 }
+.policy-gate {
+  background: white;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+.policy-gate .primary-btn { margin-top: 14px; }
 
 .t-profile-content {
   flex: 1;
