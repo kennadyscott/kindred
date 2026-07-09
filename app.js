@@ -1,16 +1,20 @@
 const THERAPISTS = [
   {
-    id: 't1', name: 'Dr. Maya Chen', creds: 'PhD, Clinical Psychologist',
+    id: 't1', name: 'Dr. Maya Chen', credentials: ['PhD', 'Clinical Psychologist'],
+    pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
     initials: 'MC', gradient: 'linear-gradient(135deg,#4a9d96,#2e7d76)',
     meta: ['Video & In-person', '$140–180/session'],
     bestFor: 'I work best with high-achievers who are quietly running on empty.',
     tags: ['Anxiety', 'Life Transitions', 'CBT', 'LGBTQ+ Affirming'],
-    promptAnswers: [
-      "We'll skip the small talk. I want to know what's actually been sitting heavy on you lately, and what you're hoping is different a few months from now.",
-      "you want homework between sessions and someone who'll actually follow up on it — I track progress, not just feelings.",
-      "Insight without action doesn't change anything. We can understand your anxiety perfectly and still be stuck if we don't practice doing things differently.",
-      "a working meeting with someone who's genuinely rooting for you — structured, but never clinical or cold.",
-      "how much CBT is just noticing your own thoughts in real time. It sounds simple. It's not easy, but it works."
+    mandatoryPromptAnswers: [
+      "turning the anxious noise in your head into an actual plan you can follow, even on the days you don't feel like it.",
+      "We'll skip the small talk. I want to know what's actually been sitting heavy on you lately, and what you're hoping is different a few months from now."
+    ],
+    optionalPrompts: [
+      { question: "You'll probably click with me if...", answer: "you want homework between sessions and someone who'll actually follow up on it — I track progress, not just feelings.", photo: null },
+      { question: 'I became a therapist because...', answer: "I used to be the person who had it all together on paper and was quietly falling apart. I wanted to be the therapist I needed back then.", photo: null },
+      { question: 'My greatest strength is...', answer: "turning insight into an actual plan — understanding your anxiety perfectly doesn't help if we don't practice doing things differently.", photo: null },
+      { question: 'How I can help...', answer: "give you a structured, judgment-free space to build habits that actually stick, not just talk about wanting to.", photo: null }
     ],
     modalities: ['CBT'], style: 'direct',
     identity: { gender: 'female', lgbtqAffirming: true }, languages: ['English'],
@@ -21,18 +25,22 @@ const THERAPISTS = [
     location: { city: 'Austin', state: 'TX' }
   },
   {
-    id: 't2', name: 'James Okafor', creds: 'LMFT',
+    id: 't2', name: 'James Okafor', credentials: ['LMFT'],
+    pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
     initials: 'JO', gradient: 'linear-gradient(135deg,#e8836b,#c85a41)',
     meta: ['Video only', '$110–130/session'],
     selfPayNote: 'Sliding scale available',
     bestFor: "I work best with couples who still want to fight for the relationship, not just survive it.",
     tags: ['Couples', 'Family Conflict', 'EFT'],
-    promptAnswers: [
-      "I want to hear both sides before either of you starts defending yours. First sessions are for understanding the pattern, not assigning blame.",
-      "you want a therapist who'll gently push back instead of just nodding along — I believe in doing the work between sessions, not just venting in them.",
-      "Most fights aren't about the dishes. They're about whether you feel like you matter to each other. We go straight to that.",
-      "less refereeing and more translating — helping you actually hear what the other person is trying to say.",
-      "how fast things can shift once you both stop trying to win the argument and start trying to understand it."
+    mandatoryPromptAnswers: [
+      "learning how to fight for each other again instead of just fighting.",
+      "I want to hear both sides before either of you starts defending yours. First sessions are for understanding the pattern, not assigning blame."
+    ],
+    optionalPrompts: [
+      { question: "You'll probably click with me if...", answer: "you want a therapist who'll gently push back instead of just nodding along — I believe in doing the work between sessions, not just venting in them.", photo: null },
+      { question: 'Together we could...', answer: "figure out what you're actually fighting about underneath the dishes and the schedules.", photo: null },
+      { question: "I won't shut up about...", answer: "how fast things can shift once you both stop trying to win the argument and start trying to understand it.", photo: null },
+      { question: 'How I can help...', answer: "translate what you're each trying to say so the other person can actually hear it.", photo: null }
     ],
     modalities: ['EFT'], style: 'direct',
     identity: { gender: 'male', lgbtqAffirming: false }, languages: ['English', 'Spanish'],
@@ -43,18 +51,22 @@ const THERAPISTS = [
     location: { city: 'Chicago', state: 'IL' }
   },
   {
-    id: 't3', name: 'Priya Raman', creds: 'LPC, Trauma Specialist',
+    id: 't3', name: 'Priya Raman', credentials: ['LPC', 'Trauma Specialist'],
+    pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
     initials: 'PR', gradient: 'linear-gradient(135deg,#a68fc9,#7a5fa8)',
     meta: ['In-person, Downtown', '$150/session'],
     selfPayNote: 'Out-of-network',
     bestFor: "I work best with people carrying trauma they've never had the space to fully unpack.",
     tags: ['Trauma', 'EMDR', 'PTSD', 'Grief'],
-    promptAnswers: [
-      "There's no pressure to tell the whole story right away. We'll go at whatever pace actually feels safe for you.",
-      "you want someone patient, who won't rush you toward 'moving on' before you're ready.",
-      "Healing isn't linear, and you don't have to have your story fully sorted out before you walk in the door. We can figure out the shape of it together.",
-      "a quiet, steady space — no pressure to perform being okay.",
-      "how physical trauma responses can be. A lot of our work is as much about your body settling down as it is about talking."
+    mandatoryPromptAnswers: [
+      "moving at a pace that actually feels safe, not the pace you think you're supposed to be at.",
+      "There's no pressure to tell the whole story right away. We'll go at whatever pace actually feels safe for you."
+    ],
+    optionalPrompts: [
+      { question: "You'll probably click with me if...", answer: "you want someone patient, who won't rush you toward 'moving on' before you're ready.", photo: null },
+      { question: 'My greatest strength is...', answer: "holding space without needing you to have your story fully sorted out before you walk in the door.", photo: null },
+      { question: "I won't shut up about...", answer: "how physical trauma responses can be — a lot of our work is as much about your body settling down as it is about talking.", photo: null },
+      { question: 'How I can help...', answer: "offer a quiet, steady space with no pressure to perform being okay.", photo: null }
     ],
     modalities: ['EMDR'], style: 'gentle',
     identity: { gender: 'female', lgbtqAffirming: true }, languages: ['English', 'Hindi'],
@@ -65,17 +77,21 @@ const THERAPISTS = [
     location: { city: 'Austin', state: 'TX' }
   },
   {
-    id: 't4', name: 'Dr. Sam Alvarez', creds: 'PsyD',
+    id: 't4', name: 'Dr. Sam Alvarez', credentials: ['PsyD'],
+    pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
     initials: 'SA', gradient: 'linear-gradient(135deg,#d4a24e,#b57e2f)',
     meta: ['Video & In-person', '$160/session'],
     bestFor: "I work best with men who are burnt out and tired of being told to 'just relax.'",
     tags: ['ADHD', 'Burnout', "Men's Issues", 'ACT'],
-    promptAnswers: [
-      "I'll ask a lot of direct questions and probably crack a joke or two. I want to know what's actually going on, not the polished version.",
-      "you're tired of being told to 'just relax' and want someone who gets that your brain doesn't work that way.",
-      "You don't have to eliminate anxiety or distraction to build a good life around it. Chasing that trade-off usually backfires.",
-      "less of a couch-and-tissue-box vibe and more like a direct, sometimes funny conversation with someone who's genuinely in your corner.",
-      "how much burnout gets misdiagnosed as a focus problem. Sometimes the fix isn't a better system, it's fewer things on your plate."
+    mandatoryPromptAnswers: [
+      "building a life that actually works with your brain instead of constantly fighting it.",
+      "I'll ask a lot of direct questions and probably crack a joke or two. I want to know what's actually going on, not the polished version."
+    ],
+    optionalPrompts: [
+      { question: "You'll probably click with me if...", answer: "you're tired of being told to 'just relax' and want someone who gets that your brain doesn't work that way.", photo: null },
+      { question: 'My greatest strength is...', answer: "helping you stop chasing the trade-off of eliminating anxiety or distraction, and instead build a good life around it.", photo: null },
+      { question: "My favorite thing I've learned...", answer: "how much burnout gets misdiagnosed as a focus problem. Sometimes the fix isn't a better system, it's fewer things on your plate.", photo: null },
+      { question: 'How I can help...', answer: "bring a direct, sometimes funny conversation instead of a couch-and-tissue-box vibe.", photo: null }
     ],
     modalities: ['ACT'], style: 'direct',
     identity: { gender: 'male', lgbtqAffirming: false }, languages: ['English', 'Spanish'],
@@ -86,17 +102,21 @@ const THERAPISTS = [
     location: { city: 'Chicago', state: 'IL' }
   },
   {
-    id: 't5', name: 'Dr. Leah Fitzgerald', creds: 'PhD, Perinatal Specialist',
+    id: 't5', name: 'Dr. Leah Fitzgerald', credentials: ['PhD', 'Perinatal Specialist'],
+    pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
     initials: 'LF', gradient: 'linear-gradient(135deg,#6ba4c9,#4278a0)',
     meta: ['Video only', '$135/session'],
     bestFor: 'I work best with new parents who feel like they should be coping better than they are.',
     tags: ['Postpartum', 'Anxiety', 'New Parents'],
-    promptAnswers: [
-      "I want to know how you're actually sleeping, eating, and coping — not just how the baby's doing. You matter here too.",
-      "you're exhausted, maybe scared to admit how hard this has been, and just want someone to say 'this makes sense.'",
-      "Postpartum struggles are not a reflection of how much you love your baby. That guilt is common, and it's almost never true.",
-      "permission to say the unspeakable parts out loud without anyone flinching.",
-      "is how much relief comes from just being told 'this is a normal reaction to an abnormal amount of pressure.' You're not broken."
+    mandatoryPromptAnswers: [
+      "feeling like yourself again, not just 'fine' for the baby's sake.",
+      "I want to know how you're actually sleeping, eating, and coping — not just how the baby's doing. You matter here too."
+    ],
+    optionalPrompts: [
+      { question: "You'll probably click with me if...", answer: "you're exhausted, maybe scared to admit how hard this has been, and just want someone to say 'this makes sense.'", photo: null },
+      { question: 'My greatest strength is...', answer: "reminding you that postpartum struggles are not a reflection of how much you love your baby — that guilt is common, and it's almost never true.", photo: null },
+      { question: 'All I ask is that you...', answer: "let yourself say the unspeakable parts out loud without expecting yourself to flinch first.", photo: null },
+      { question: "My favorite thing I've learned...", answer: "how much relief comes from just being told 'this is a normal reaction to an abnormal amount of pressure.' You're not broken.", photo: null }
     ],
     modalities: [], style: 'gentle',
     identity: { gender: 'female', lgbtqAffirming: true }, languages: ['English'],
@@ -107,18 +127,22 @@ const THERAPISTS = [
     location: { city: 'Denver', state: 'CO' }
   },
   {
-    id: 't6', name: 'Marcus Webb', creds: 'LCSW',
+    id: 't6', name: 'Marcus Webb', credentials: ['LCSW'],
+    pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
     initials: 'MW', gradient: 'linear-gradient(135deg,#8a9b6e,#647a4a)',
     meta: ['In-person & Video', '$120/session'],
     selfPayNote: 'Sliding scale',
     bestFor: 'I work best with young adults who are ambivalent about change and sick of being lectured.',
     tags: ['Substance Use', 'Young Adults', 'Motivational Interviewing'],
-    promptAnswers: [
-      "No lectures, no judgment. I want to understand what role this has been playing in your life before we talk about changing anything.",
-      "you're sick of being told what to do and want someone who'll actually ask what you want instead.",
-      "Ambivalence isn't a character flaw. Most people who change something big felt torn about it the whole way through.",
-      "a real conversation, not an intervention. There's no script I'm trying to get you to follow.",
-      "that I'm not going to push you toward a decision. My job is to help you hear yourself think."
+    mandatoryPromptAnswers: [
+      "figuring out what you actually want, without anyone else's voice in your head about it.",
+      "No lectures, no judgment. I want to understand what role this has been playing in your life before we talk about changing anything."
+    ],
+    optionalPrompts: [
+      { question: "You'll probably click with me if...", answer: "you're sick of being told what to do and want someone who'll actually ask what you want instead.", photo: null },
+      { question: 'My greatest strength is...', answer: "sitting with ambivalence instead of rushing you past it — most people who change something big felt torn about it the whole way through.", photo: null },
+      { question: 'How I can help...', answer: "have a real conversation, not an intervention. There's no script I'm trying to get you to follow.", photo: null },
+      { question: "My favorite thing I've learned...", answer: "that I'm not going to push you toward a decision. My job is to help you hear yourself think.", photo: null }
     ],
     modalities: ['Motivational Interviewing'], style: 'gentle',
     identity: { gender: 'male', lgbtqAffirming: true }, languages: ['English'],
@@ -618,6 +642,15 @@ function practiceBadgeHtml(t) {
   return t.practiceType === 'generalist' ? `<div class="practice-badge">🌐 General Practice</div>` : '';
 }
 
+function displayName(t) {
+  return (t.useCompanyName && t.companyName) ? t.companyName : t.name;
+}
+
+function credentialsLabel(t) {
+  const filled = t.credentials.filter(Boolean);
+  return filled.length ? filled.join(' • ') : 'Licensed Therapist';
+}
+
 function insuranceDisplayLabel(t, opts = {}) {
   if (!opts.preview && intake.insurance !== 'any') return `Accepts ${intake.insurance}`;
   if (t.insuranceList.length) return `Accepts ${t.insuranceList.join(', ')}`;
@@ -639,12 +672,49 @@ function tagHtml(tag) {
 }
 
 function promptBlocksHtml(t) {
-  return THERAPIST_PROMPT_OPTIONS.map((q, i) => `
+  const mandatory = MANDATORY_PROMPTS.map((q, i) => `
     <div class="prompt-block">
       <div class="prompt-q">${q}</div>
-      <div class="prompt-a">${t.promptAnswers[i] || "I'm still writing this one — check back soon."}</div>
+      <div class="prompt-a">${(t.mandatoryPromptAnswers && t.mandatoryPromptAnswers[i]) || "I'm still writing this one — check back soon."}</div>
     </div>
   `).join('');
+  const optional = (t.optionalPrompts || []).map(p => `
+    <div class="prompt-block">
+      <div class="prompt-q">${p.question}</div>
+      <div class="prompt-a">${p.answer || "I'm still writing this one — check back soon."}</div>
+    </div>
+    ${p.photo ? `<img class="prompt-photo" src="${p.photo}" alt="">` : ''}
+  `).join('');
+  return mandatory + optional;
+}
+
+function traitPillsHtml(t) {
+  const traits = [];
+  const styleLabel = { gentle: 'Gentle', balanced: 'Balanced', direct: 'Direct' }[t.style];
+  if (styleLabel) traits.push(styleLabel);
+  if (t.identity.lgbtqAffirming) traits.push('LGBTQ+ Affirming');
+  if (t.practiceType === 'generalist') traits.push('Generalist');
+  if (!traits.length) return '';
+  return `<div class="trait-pill-row">${traits.map(tr => `<span class="trait-pill">${tr}</span>`).join('')}</div>`;
+}
+
+function whyYouMatchHtml(t) {
+  const reasons = getMatchReasons(t);
+  if (!reasons.length) return '';
+  return `
+    <div class="why-match-label">Why you match</div>
+    <ul class="why-match-list">${reasons.map(r => `<li>✓ ${r}</li>`).join('')}</ul>
+  `;
+}
+
+function capabilityRowHtml(t) {
+  const acceptingLabel = t.acceptingOngoing ? 'Accepting new clients' : 'Not accepting new clients';
+  return `
+    <div class="capability-row">
+      <div class="capability-item"><span>🌿</span>${acceptingLabel}</div>
+      <div class="capability-item"><span>🕐</span>${t.nextAvailableLabel}</div>
+    </div>
+  `;
 }
 
 function buildCard(t) {
@@ -656,19 +726,20 @@ function buildCard(t) {
       <div class="initials">${t.initials}</div>
       <div class="stamp like">Like</div>
       <div class="stamp pass">Pass</div>
+      <div class="compatible-badge">✓ Compatible Match</div>
       ${languageBadgeHtml(t)}
     </div>
     <div class="card-body">
-      <div class="card-name-row"><h2>${t.name}</h2><span class="creds">${t.creds}</span></div>
+      <div class="card-name-row"><h2 class="serif-name">${displayName(t)}</h2></div>
+      ${(t.showPronouns && t.pronouns) ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
+      <div class="card-subtitle">${[credentialsLabel(t), ...t.tags.slice(0, 2)].join(' • ')}</div>
       <div class="card-meta"><span>📍 ${t.location.city}, ${t.location.state}</span></div>
       <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
       <div class="card-meta"><span>${insuranceDisplayLabel(t)}</span></div>
-      <div class="card-meta"><span>Next available: ${t.nextAvailableLabel}</span></div>
+      ${traitPillsHtml(t)}
       ${t.bestFor ? `<div class="best-for">${t.bestFor}</div>` : ''}
-      <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
-      ${practiceBadgeHtml(t)}
-      ${matchTagsHtml(t)}
-      ${promptBlocksHtml(t)}
+      ${whyYouMatchHtml(t)}
+      ${capabilityRowHtml(t)}
     </div>
   `;
   card.querySelectorAll('[data-info]').forEach(el => {
@@ -779,7 +850,7 @@ function openRequestIntake(therapistId) {
   if (!t) return;
   requestIntakeSheet.innerHTML = `
     <div class="sheet-close"></div>
-    <h2>A quick note for ${t.name}</h2>
+    <h2>A quick note for ${displayName(t)}</h2>
     <div class="intake-sub">This becomes your opening message — keep it short and honest.</div>
     <div class="t-form-label">What brings you to therapy?</div>
     <textarea class="intake-textarea" id="intro-message" rows="3" placeholder="A sentence or two is plenty..."></textarea>
@@ -903,7 +974,8 @@ function openDetail(t, opts = {}) {
       <div class="initials">${t.initials}</div>
       ${preview ? '' : languageBadgeHtml(t)}
     </div>
-    <div class="card-name-row" style="margin-top:14px;"><h2>${t.name}</h2><span class="creds">${t.creds}</span></div>
+    <div class="card-name-row" style="margin-top:14px;"><h2>${displayName(t)}</h2><span class="creds">${credentialsLabel(t)}</span></div>
+    ${t.pronouns ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
     <div class="section-title">Details</div>
     <div class="card-meta"><span>📍 ${t.location.city}, ${t.location.state}</span></div>
     <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
@@ -938,8 +1010,7 @@ detailModal.addEventListener('click', (e) => { if (e.target === detailModal) det
 // ===== MATCH MODAL =====
 const matchModal = document.getElementById('match-modal');
 function showMatchModal(t) {
-  const nameParts = t.name.replace(/^Dr\.\s*/, '').split(' ');
-  document.getElementById('match-name').textContent = nameParts[0];
+  document.getElementById('match-name').textContent = displayName(t);
   const avatar = document.getElementById('match-avatar');
   avatar.style.background = t.gradient;
   avatar.textContent = t.initials;
@@ -967,7 +1038,7 @@ function renderShortlist() {
   shortlistList.innerHTML = shortlist.slice().reverse().map(t => `
     <div class="match-row shortlist-row">
       <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
-      <div><div class="chat-name">${t.name}</div><div class="last-msg">Saved — not yet requested</div></div>
+      <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">Saved — not yet requested</div></div>
       <button class="shortlist-request-btn" data-tid="${t.id}" ${atCap ? 'disabled' : ''}>${atCap ? 'Limit reached' : 'Request Match'}</button>
     </div>
   `).join('');
@@ -989,7 +1060,7 @@ function renderMatches() {
     if (m.status === 'pending') {
       return `<div class="match-row" data-id="${t.id}">
         <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
-        <div><div class="chat-name">${t.name}</div><div class="last-msg">${last ? last.text : 'Waiting on their response…'}</div></div>
+        <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">${last ? last.text : 'Waiting on their response…'}</div></div>
         <span class="pending-tag">Requested</span>
       </div>`;
     }
@@ -997,24 +1068,24 @@ function renderMatches() {
       if (m.paymentStatus !== 'paid') {
         return `<div class="match-row pending" data-id="${t.id}" style="opacity:0.5;">
           <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
-          <div><div class="chat-name">${t.name}</div><div class="last-msg">Cancelled — ${refundStatusLabel(m.paymentStatus)}</div></div>
+          <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">Cancelled — ${refundStatusLabel(m.paymentStatus)}</div></div>
         </div>`;
       }
       return `<div class="match-row pending" data-id="${t.id}">
         <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
-        <div><div class="chat-name">${t.name}</div><div class="last-msg">One-time session booked — ${m.slotLabel} · $${m.amountPaid} paid</div></div>
+        <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">One-time session booked — ${m.slotLabel} · $${m.amountPaid} paid</div></div>
         <button class="cancel-session-btn" data-cancel-ondemand="${t.id}">Cancel</button>
       </div>`;
     }
     if (m.status === 'declined') {
       return `<div class="match-row pending" data-id="${t.id}" style="opacity:0.5;">
         <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
-        <div><div class="chat-name">${t.name}</div><div class="last-msg">Not a fit on their end right now</div></div>
+        <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">Not a fit on their end right now</div></div>
       </div>`;
     }
     return `<div class="match-row" data-id="${t.id}">
       <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
-      <div><div class="chat-name">${t.name}</div><div class="last-msg">${last ? last.text : 'Say hello!'}</div></div>
+      <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">${last ? last.text : 'Say hello!'}</div></div>
     </div>`;
   }).join('');
 
@@ -1046,9 +1117,9 @@ function openChat(t, role) {
     document.getElementById('chat-name').textContent = 'Prospective Client';
     av.style.background = 'linear-gradient(135deg,#9a9088,#6b6560)';
     av.textContent = '?';
-    statusEl.textContent = `Replying as ${t.name}`;
+    statusEl.textContent = `Replying as ${displayName(t)}`;
   } else {
-    document.getElementById('chat-name').textContent = t.name;
+    document.getElementById('chat-name').textContent = displayName(t);
     av.style.background = t.gradient;
     av.textContent = t.initials;
     statusEl.textContent = 'Usually replies within a day';
@@ -1140,7 +1211,7 @@ function renderOndemand() {
     <div class="ondemand-card" data-id="${t.id}">
       <div class="od-header">
         <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
-        <div><div class="od-name">${t.name}</div><div class="od-creds">${t.creds}</div></div>
+        <div><div class="od-name">${displayName(t)}</div><div class="od-creds">${credentialsLabel(t)}</div></div>
       </div>
       ${matchTagsHtml(t)}
       <div class="slot-row">
@@ -1205,7 +1276,7 @@ function openPaymentConfirm(t, slotLabel, btnEl) {
   document.getElementById('confirm-sheet').innerHTML = `
     <div class="sheet-close"></div>
     <h2>Confirm &amp; Pay</h2>
-    <div class="intake-sub">One-time session with ${t.name} — ${slotLabel}</div>
+    <div class="intake-sub">One-time session with ${displayName(t)} — ${slotLabel}</div>
     <div class="payment-amount">$${amount}</div>
     <div class="t-form-label">Cancellation policy</div>
     <ul class="policy-list">
@@ -1253,7 +1324,7 @@ function requestCancelOndemand(therapistId) {
   document.getElementById('confirm-sheet').innerHTML = `
     <div class="sheet-close"></div>
     <h2>Cancel this session?</h2>
-    <div class="intake-sub">Your session with ${m.therapist.name} is ${m.slotLabel}.</div>
+    <div class="intake-sub">Your session with ${displayName(m.therapist)} is ${m.slotLabel}.</div>
     <p class="modality-info-text">Based on our cancellation policy, you'll receive <strong>${tier.label}</strong> (${tier.percent}% of $${m.amountPaid}).</p>
     <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="confirm-cancel-btn">Confirm Cancellation</button>
     <button class="text-btn" id="confirm-cancel-back" style="color:var(--ink-soft);">Never Mind</button>
@@ -1377,13 +1448,25 @@ document.getElementById('login-create-btn').addEventListener('click', () => {
 });
 
 // ===== THERAPIST SIGNUP — brand-new profile from scratch =====
-const THERAPIST_PROMPT_OPTIONS = [
-  'My approach to our first session',
-  "You'll probably click with me if",
-  'A belief I hold as a therapist',
-  'Session with me feels like',
-  "What most people don't expect"
+const MANDATORY_PROMPTS = [
+  'I look forward to helping you with...',
+  'What can you expect in session with me?'
 ];
+const OPTIONAL_PROMPTS = [
+  "You'll probably click with me if...",
+  'Together we could...',
+  'I geek out on...',
+  "We're the same type of weird if...",
+  "I won't shut up about...",
+  "Out of session, you'll find me...",
+  'All I ask is that you...',
+  'I became a therapist because...',
+  'My greatest strength is...',
+  "My favorite thing I've learned...",
+  'I wish I could tell the younger version of myself...',
+  'How I can help...'
+];
+const MAX_OPTIONAL_PROMPTS = 4;
 const NEW_THERAPIST_GRADIENTS = [
   'linear-gradient(135deg,#c97b9e,#a3557a)',
   'linear-gradient(135deg,#7ba7c9,#4f7ea3)',
@@ -1420,14 +1503,16 @@ const signupContent = document.getElementById('therapist-signup-content');
 function startTherapistSignup() {
   signupStep = 0;
   newTherapistDraft = {
-    name: '', creds: '',
+    name: '', credentials: ['', '', ''],
+    pronouns: '', showPronouns: true, useCompanyName: false, companyName: '',
     practiceType: 'specialist',
     bestFor: '',
     tags: [], modalities: [],
     style: 'balanced', gender: 'female', lgbtqAffirming: false, languages: [], showOtherLanguage: false,
     formats: [], insuranceList: [], selfPayNote: '', rateMin: 130,
     city: '', state: '',
-    promptAnswers: THERAPIST_PROMPT_OPTIONS.map(() => ''),
+    mandatoryPromptAnswers: ['', ''],
+    selectedOptionalPrompts: [], optionalPromptAnswers: {}, optionalPromptPhotos: {},
     acceptingOngoing: true, onDemand: false, onDemandSlots: [], agreedToOnDemandPolicy: false
   };
   renderSignupStep();
@@ -1445,8 +1530,24 @@ function renderSignupStep() {
       <div class="intake-sub">This is what clients see first — you can edit all of it later.</div>
       <div class="t-form-label">Full name</div>
       <input type="text" class="t-rate-input" id="ts-name" placeholder="e.g. Dr. Jordan Reyes" value="${d.name}">
-      <div class="t-form-label">Credentials</div>
-      <input type="text" class="t-rate-input" id="ts-creds" placeholder="e.g. LPC, PhD, LMFT" value="${d.creds}">`;
+      <div class="t-form-label">Pronouns (optional)</div>
+      <input type="text" class="t-rate-input" id="ts-pronouns" placeholder="e.g. she/her" value="${d.pronouns}">
+      <div class="must-have-toggle">
+        <div class="toggle-label"><strong>Show pronouns on my swipe card</strong><span>Always visible on your full profile either way</span></div>
+        <div class="switch ${d.showPronouns ? 'on' : ''}" id="ts-show-pronouns-switch"></div>
+      </div>
+      <div class="must-have-toggle">
+        <div class="toggle-label"><strong>List under a practice or company name</strong><span>Shows instead of your personal name to clients</span></div>
+        <div class="switch ${d.useCompanyName ? 'on' : ''}" id="ts-use-company-switch"></div>
+      </div>
+      <div id="ts-company-name-field" style="${d.useCompanyName ? '' : 'display:none;'}">
+        <div class="t-form-label">Company / practice name</div>
+        <input type="text" class="t-rate-input" id="ts-company-name" placeholder="e.g. Bluebird Counseling" value="${d.companyName}">
+      </div>
+      <div class="t-form-label">Credentials (up to 3)</div>
+      <input type="text" class="t-rate-input" id="ts-cred-0" placeholder="e.g. LPC" value="${d.credentials[0]}">
+      <input type="text" class="t-rate-input" id="ts-cred-1" placeholder="e.g. PhD" value="${d.credentials[1]}">
+      <input type="text" class="t-rate-input" id="ts-cred-2" placeholder="e.g. Certified Gottman Therapist" value="${d.credentials[2]}">`;
   } else if (signupStep === 1) {
     html += `
       <h1>What do you specialize in?</h1>
@@ -1516,10 +1617,23 @@ function renderSignupStep() {
   } else if (signupStep === 4) {
     html += `
       <h1>In your words</h1>
-      <div class="intake-sub">These are the first things clients read about you — answer as many as you can in your own voice. They'll scroll through all of them before reaching out.</div>
-      ${THERAPIST_PROMPT_OPTIONS.map((q, i) => `
+      <div class="intake-sub">These two are required — answer in your own voice. Clients will scroll through all of them before reaching out.</div>
+      ${MANDATORY_PROMPTS.map((q, i) => `
         <div class="t-form-label">${q}</div>
-        <textarea class="intake-textarea" data-prompt-index="${i}" rows="2" placeholder="Finish the sentence in your own voice...">${d.promptAnswers[i]}</textarea>
+        <textarea class="intake-textarea" data-mandatory-prompt-index="${i}" rows="2" placeholder="Finish the sentence in your own voice...">${d.mandatoryPromptAnswers[i]}</textarea>
+      `).join('')}
+      <div class="t-form-label" style="margin-top:20px;">Pick up to ${MAX_OPTIONAL_PROMPTS} more to round out your profile</div>
+      <div class="chip-grid" id="ts-optional-prompts-grid">
+        ${OPTIONAL_PROMPTS.map(q => `<div class="chip-option ${d.selectedOptionalPrompts.includes(q) ? 'selected' : ''} ${(!d.selectedOptionalPrompts.includes(q) && d.selectedOptionalPrompts.length >= MAX_OPTIONAL_PROMPTS) ? 'chip-disabled' : ''}" data-optional-prompt="${q}">${q}</div>`).join('')}
+      </div>
+      ${d.selectedOptionalPrompts.map(q => `
+        <div class="t-form-label">${q}</div>
+        <textarea class="intake-textarea" data-optional-prompt-answer="${q}" rows="2" placeholder="Finish the sentence in your own voice...">${d.optionalPromptAnswers[q] || ''}</textarea>
+        <div class="prompt-photo-row">
+          ${d.optionalPromptPhotos[q] ? `<img class="prompt-photo-thumb" src="${d.optionalPromptPhotos[q]}">` : ''}
+          <input type="file" accept="image/*" data-optional-prompt-photo="${q}">
+        </div>
+        <button type="button" class="text-btn" data-remove-optional-prompt="${q}">Remove this prompt</button>
       `).join('')}`;
   } else if (signupStep === 5) {
     html += `
@@ -1548,6 +1662,7 @@ function renderSignupStep() {
   let canProceed = true;
   if (signupStep === 0) canProceed = d.name.trim().length > 0;
   else if (signupStep === 3) canProceed = d.city.trim() !== '' && d.state !== '';
+  else if (signupStep === 4) canProceed = d.mandatoryPromptAnswers.every(a => a.trim().length > 0);
   html += `
     <div class="intake-footer">
       ${signupStep > 0 ? `<button class="btn-back" id="ts-back">Back</button>` : ''}
@@ -1566,8 +1681,18 @@ function attachSignupHandlers() {
     d.name = nameInput.value;
     document.getElementById('ts-next').disabled = d.name.trim().length === 0;
   });
-  const credsInput = document.getElementById('ts-creds');
-  if (credsInput) credsInput.addEventListener('input', () => { d.creds = credsInput.value; });
+  const pronounsInput = document.getElementById('ts-pronouns');
+  if (pronounsInput) pronounsInput.addEventListener('input', () => { d.pronouns = pronounsInput.value; });
+  const showPronounsSwitch = document.getElementById('ts-show-pronouns-switch');
+  if (showPronounsSwitch) showPronounsSwitch.addEventListener('click', () => { d.showPronouns = !d.showPronouns; renderSignupStep(); });
+  const useCompanySwitch = document.getElementById('ts-use-company-switch');
+  if (useCompanySwitch) useCompanySwitch.addEventListener('click', () => { d.useCompanyName = !d.useCompanyName; renderSignupStep(); });
+  const companyNameInput = document.getElementById('ts-company-name');
+  if (companyNameInput) companyNameInput.addEventListener('input', () => { d.companyName = companyNameInput.value; });
+  [0, 1, 2].forEach(i => {
+    const credInput = document.getElementById(`ts-cred-${i}`);
+    if (credInput) credInput.addEventListener('input', () => { d.credentials[i] = credInput.value; });
+  });
 
   document.querySelectorAll('#ts-practice-type-list .option-row').forEach(el => {
     el.addEventListener('click', () => { d.practiceType = el.dataset.practice; renderSignupStep(); });
@@ -1657,8 +1782,45 @@ function attachSignupHandlers() {
     });
   }
 
-  document.querySelectorAll('textarea[data-prompt-index]').forEach(el => {
-    el.addEventListener('input', () => { d.promptAnswers[Number(el.dataset.promptIndex)] = el.value; });
+  document.querySelectorAll('textarea[data-mandatory-prompt-index]').forEach(el => {
+    el.addEventListener('input', () => {
+      d.mandatoryPromptAnswers[Number(el.dataset.mandatoryPromptIndex)] = el.value;
+      document.getElementById('ts-next').disabled = !d.mandatoryPromptAnswers.every(a => a.trim().length > 0);
+    });
+  });
+  document.querySelectorAll('#ts-optional-prompts-grid .chip-option').forEach(el => {
+    el.addEventListener('click', () => {
+      const q = el.dataset.optionalPrompt;
+      const i = d.selectedOptionalPrompts.indexOf(q);
+      if (i !== -1) {
+        d.selectedOptionalPrompts.splice(i, 1);
+      } else if (d.selectedOptionalPrompts.length < MAX_OPTIONAL_PROMPTS) {
+        d.selectedOptionalPrompts.push(q);
+      }
+      renderSignupStep();
+    });
+  });
+  document.querySelectorAll('textarea[data-optional-prompt-answer]').forEach(el => {
+    el.addEventListener('input', () => { d.optionalPromptAnswers[el.dataset.optionalPromptAnswer] = el.value; });
+  });
+  document.querySelectorAll('input[data-optional-prompt-photo]').forEach(el => {
+    el.addEventListener('change', () => {
+      const file = el.files[0];
+      if (!file) return;
+      const q = el.dataset.optionalPromptPhoto;
+      const reader = new FileReader();
+      reader.onload = () => { d.optionalPromptPhotos[q] = reader.result; renderSignupStep(); };
+      reader.readAsDataURL(file);
+    });
+  });
+  document.querySelectorAll('[data-remove-optional-prompt]').forEach(el => {
+    el.addEventListener('click', () => {
+      const q = el.dataset.removeOptionalPrompt;
+      d.selectedOptionalPrompts = d.selectedOptionalPrompts.filter(p => p !== q);
+      delete d.optionalPromptAnswers[q];
+      delete d.optionalPromptPhotos[q];
+      renderSignupStep();
+    });
   });
 
   const ongoingSwitch = document.getElementById('ts-ongoing-switch');
@@ -1713,13 +1875,22 @@ function finishTherapistSignup() {
   const initials = nameWords.map(w => w[0]).join('').slice(0, 2).toUpperCase() || '??';
   const gradient = NEW_THERAPIST_GRADIENTS[THERAPISTS.length % NEW_THERAPIST_GRADIENTS.length];
 
+  const trimmedCredentials = d.credentials.map(c => c.trim()).filter(Boolean);
   THERAPISTS.push({
-    id, name: d.name.trim(), creds: d.creds.trim() || 'Licensed Therapist',
+    id, name: d.name.trim(),
+    credentials: trimmedCredentials.length ? trimmedCredentials : ['Licensed Therapist'],
+    pronouns: d.pronouns.trim(), showPronouns: d.showPronouns,
+    useCompanyName: d.useCompanyName, companyName: d.companyName.trim(),
     initials, gradient,
     meta: buildTherapistMeta(d),
     bestFor: d.bestFor.trim(), selfPayNote: d.selfPayNote.trim(),
     tags: d.tags, practiceType: d.practiceType, externalAppointments: [],
-    promptAnswers: d.promptAnswers.map(a => a.trim()),
+    mandatoryPromptAnswers: d.mandatoryPromptAnswers.map(a => a.trim()),
+    optionalPrompts: d.selectedOptionalPrompts.map(q => ({
+      question: q,
+      answer: (d.optionalPromptAnswers[q] || '').trim(),
+      photo: d.optionalPromptPhotos[q] || null
+    })),
     modalities: d.modalities, style: d.style,
     identity: { gender: d.gender, lgbtqAffirming: d.lgbtqAffirming }, languages: d.languages,
     formats: d.formats, rateMin: d.rateMin, insuranceList: d.insuranceList,
@@ -1919,8 +2090,27 @@ function renderTherapistProfile() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
   const container = document.getElementById('t-profile-content');
   container.innerHTML = `
-    <div class="t-form-name">${t.name} <span class="t-form-creds">${t.creds}</span></div>
+    <div class="t-form-name">${t.name} <span class="t-form-creds">${credentialsLabel(t)}</span></div>
     <button class="primary-btn" style="background:white;border:1.5px solid var(--coral);color:var(--coral-dark);margin-bottom:20px;" id="preview-profile-btn">👀 Preview My Profile as a Client</button>
+
+    <div class="t-form-label">Pronouns (optional)</div>
+    <input type="text" class="t-rate-input" id="t-pronouns-input" placeholder="e.g. she/her" value="${t.pronouns || ''}">
+    <div class="must-have-toggle">
+      <div class="toggle-label"><strong>Show pronouns on my swipe card</strong><span>Always visible on your full profile either way</span></div>
+      <div class="switch ${t.showPronouns ? 'on' : ''}" id="t-show-pronouns-switch"></div>
+    </div>
+    <div class="must-have-toggle">
+      <div class="toggle-label"><strong>List under a practice or company name</strong><span>Shows instead of your personal name to clients</span></div>
+      <div class="switch ${t.useCompanyName ? 'on' : ''}" id="t-use-company-switch"></div>
+    </div>
+    <div id="t-company-name-field" style="${t.useCompanyName ? '' : 'display:none;'}">
+      <div class="t-form-label">Company / practice name</div>
+      <input type="text" class="t-rate-input" id="t-company-name-input" placeholder="e.g. Bluebird Counseling" value="${t.companyName || ''}">
+    </div>
+    <div class="t-form-label">Credentials (up to 3)</div>
+    <input type="text" class="t-rate-input" id="t-cred-0-input" placeholder="e.g. LPC" value="${t.credentials[0] || ''}">
+    <input type="text" class="t-rate-input" id="t-cred-1-input" placeholder="e.g. PhD" value="${t.credentials[1] || ''}">
+    <input type="text" class="t-rate-input" id="t-cred-2-input" placeholder="e.g. Certified Gottman Therapist" value="${t.credentials[2] || ''}">
 
     <div class="t-form-label">Practice type</div>
     <div class="chip-grid">
@@ -1976,9 +2166,26 @@ function renderTherapistProfile() {
     <input type="number" class="t-rate-input" id="t-rate-input" value="${t.rateMin}">
 
     <div class="t-form-label" style="margin-top:20px;">In your words</div>
-    ${THERAPIST_PROMPT_OPTIONS.map((q, i) => `
+    ${MANDATORY_PROMPTS.map((q, i) => `
       <div class="t-form-label">${q}</div>
-      <textarea class="intake-textarea" data-edit-prompt-index="${i}" rows="2">${t.promptAnswers[i] || ''}</textarea>
+      <textarea class="intake-textarea" data-edit-mandatory-prompt-index="${i}" rows="2">${t.mandatoryPromptAnswers[i] || ''}</textarea>
+    `).join('')}
+    <div class="t-form-label" style="margin-top:12px;">Pick up to ${MAX_OPTIONAL_PROMPTS} more (${t.optionalPrompts.length}/${MAX_OPTIONAL_PROMPTS} selected)</div>
+    <div class="chip-grid">
+      ${OPTIONAL_PROMPTS.map(q => {
+        const selected = t.optionalPrompts.some(p => p.question === q);
+        const disabled = !selected && t.optionalPrompts.length >= MAX_OPTIONAL_PROMPTS;
+        return `<div class="chip-option ${selected ? 'selected' : ''} ${disabled ? 'chip-disabled' : ''}" data-toggle-optional-prompt="${q}">${q}</div>`;
+      }).join('')}
+    </div>
+    ${t.optionalPrompts.map((p, i) => `
+      <div class="t-form-label">${p.question}</div>
+      <textarea class="intake-textarea" data-edit-optional-prompt-answer="${i}" rows="2">${p.answer || ''}</textarea>
+      <div class="prompt-photo-row">
+        ${p.photo ? `<img class="prompt-photo-thumb" src="${p.photo}">` : ''}
+        <input type="file" accept="image/*" data-edit-optional-prompt-photo="${i}">
+      </div>
+      <button type="button" class="text-btn" data-remove-edit-optional-prompt="${i}">Remove this prompt</button>
     `).join('')}
 
     <div class="must-have-toggle" style="margin-top:20px;">
@@ -2007,6 +2214,20 @@ function renderTherapistProfile() {
 
 function attachTherapistProfileHandlers(t) {
   document.getElementById('preview-profile-btn').addEventListener('click', () => openDetail(t, { preview: true }));
+  const tPronounsInput = document.getElementById('t-pronouns-input');
+  if (tPronounsInput) tPronounsInput.addEventListener('input', () => { t.pronouns = tPronounsInput.value; });
+  const tShowPronounsSwitch = document.getElementById('t-show-pronouns-switch');
+  if (tShowPronounsSwitch) tShowPronounsSwitch.addEventListener('click', () => { t.showPronouns = !t.showPronouns; renderTherapistProfile(); });
+  const tUseCompanySwitch = document.getElementById('t-use-company-switch');
+  if (tUseCompanySwitch) tUseCompanySwitch.addEventListener('click', () => { t.useCompanyName = !t.useCompanyName; renderTherapistProfile(); });
+  const tCompanyNameInput = document.getElementById('t-company-name-input');
+  if (tCompanyNameInput) tCompanyNameInput.addEventListener('input', () => { t.companyName = tCompanyNameInput.value; });
+  [0, 1, 2].forEach(i => {
+    const credInput = document.getElementById(`t-cred-${i}-input`);
+    if (credInput) credInput.addEventListener('input', () => {
+      t.credentials[i] = credInput.value;
+    });
+  });
   document.querySelectorAll('[data-set-practice]').forEach(el => el.addEventListener('click', () => {
     t.practiceType = el.dataset.setPractice;
     renderTherapistProfile();
@@ -2067,9 +2288,36 @@ function attachTherapistProfileHandlers(t) {
   const tSelfPayNoteInput = document.getElementById('t-selfpaynote-input');
   if (tSelfPayNoteInput) tSelfPayNoteInput.addEventListener('input', () => { t.selfPayNote = tSelfPayNoteInput.value; });
   document.getElementById('t-rate-input').addEventListener('change', (e) => { t.rateMin = Number(e.target.value) || 0; });
-  document.querySelectorAll('textarea[data-edit-prompt-index]').forEach(el => {
-    el.addEventListener('input', () => { t.promptAnswers[Number(el.dataset.editPromptIndex)] = el.value; });
+  document.querySelectorAll('textarea[data-edit-mandatory-prompt-index]').forEach(el => {
+    el.addEventListener('input', () => { t.mandatoryPromptAnswers[Number(el.dataset.editMandatoryPromptIndex)] = el.value; });
   });
+  document.querySelectorAll('[data-toggle-optional-prompt]').forEach(el => el.addEventListener('click', () => {
+    const q = el.dataset.toggleOptionalPrompt;
+    const i = t.optionalPrompts.findIndex(p => p.question === q);
+    if (i !== -1) {
+      t.optionalPrompts.splice(i, 1);
+    } else if (t.optionalPrompts.length < MAX_OPTIONAL_PROMPTS) {
+      t.optionalPrompts.push({ question: q, answer: '', photo: null });
+    }
+    renderTherapistProfile();
+  }));
+  document.querySelectorAll('textarea[data-edit-optional-prompt-answer]').forEach(el => {
+    el.addEventListener('input', () => { t.optionalPrompts[Number(el.dataset.editOptionalPromptAnswer)].answer = el.value; });
+  });
+  document.querySelectorAll('input[data-edit-optional-prompt-photo]').forEach(el => {
+    el.addEventListener('change', () => {
+      const file = el.files[0];
+      if (!file) return;
+      const idx = Number(el.dataset.editOptionalPromptPhoto);
+      const reader = new FileReader();
+      reader.onload = () => { t.optionalPrompts[idx].photo = reader.result; renderTherapistProfile(); };
+      reader.readAsDataURL(file);
+    });
+  });
+  document.querySelectorAll('[data-remove-edit-optional-prompt]').forEach(el => el.addEventListener('click', () => {
+    t.optionalPrompts.splice(Number(el.dataset.removeEditOptionalPrompt), 1);
+    renderTherapistProfile();
+  }));
   document.getElementById('t-ongoing-switch').addEventListener('click', () => { t.acceptingOngoing = !t.acceptingOngoing; renderTherapistProfile(); });
   document.getElementById('t-ondemand-switch').addEventListener('click', () => {
     if (!t.onDemand && !t.agreedToOnDemandPolicy) {
