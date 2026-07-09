@@ -56,10 +56,36 @@
     <div class="intake-content" id="intake-content"></div>
   </section>
 
+  <!-- ===== EXPLORE KINDRED (app version of the website) ===== -->
+  <section class="screen hidden" id="screen-explore">
+    <header class="top-bar explore-bar">
+      <div class="logo">Kindred</div>
+      <button class="experience-switch-btn" id="explore-to-match-btn">Match with a Therapist →</button>
+    </header>
+    <div class="explore-content">
+      <img class="explore-lockup" src="brand-lockup.png" alt="Kindred — Therapy, matched to you">
+      <h1 class="explore-headline">Find someone who gets you.</h1>
+      <p class="explore-sub">Kindred makes finding a therapist feel less like searching a database and more like recognizing a person you can actually talk to.</p>
+      <div class="explore-block">
+        <div class="explore-block-title">Credentials matter. Connection does too.</div>
+        <p>Every Kindred therapist is licensed and vetted. Then we go further — matching you by style, specialty, identity preferences, and the emotional feel of the relationship.</p>
+      </div>
+      <div class="explore-block">
+        <div class="explore-block-title">Stop scrolling directories. Start with fit.</div>
+        <p>Tell us what you need emotionally, practically, and logistically. We'll show you a focused set of therapists with clear reasons why each one fits.</p>
+      </div>
+      <div class="explore-block explore-placeholder">
+        <p>🌿 More of the Kindred site is coming to the app soon — stories, guides, and what to expect from your first session.</p>
+      </div>
+      <button class="primary-btn" style="background:var(--coral);color:white;margin-top:8px;" id="explore-cta-btn">Match with a Therapist</button>
+    </div>
+  </section>
+
   <!-- ===== DISCOVER SCREEN ===== -->
   <section class="screen hidden" id="screen-discover">
     <header class="top-bar">
       <div class="logo">Kindred</div>
+      <button class="experience-switch-btn discover-explore-btn" id="discover-to-explore-btn">Explore</button>
     </header>
 
     <div class="card-stack" id="card-stack"></div>
@@ -174,6 +200,22 @@
   <!-- ===== GENERIC CONFIRM MODAL (payment / cancellation) ===== -->
   <div class="modal-overlay hidden" id="confirm-modal">
     <div class="modal-sheet" id="confirm-sheet"></div>
+  </div>
+
+  <!-- ===== EXPERIENCE CHOICE MODAL (matching vs explore) ===== -->
+  <div class="modal-overlay hidden" id="experience-modal">
+    <div class="experience-card">
+      <div class="experience-title">Welcome back</div>
+      <div class="experience-sub">Where would you like to start today?</div>
+      <button class="welcome-card" id="exp-match-btn">
+        <span class="welcome-card-icon">💜</span>
+        <span class="welcome-card-text"><span class="welcome-card-label">Match with a Therapist</span><span class="welcome-card-desc">Browse your curated matches</span></span>
+      </button>
+      <button class="welcome-card" id="exp-explore-btn">
+        <span class="welcome-card-icon">🌿</span>
+        <span class="welcome-card-text"><span class="welcome-card-label">Explore Kindred</span><span class="welcome-card-desc">Learn how Kindred works and what to expect</span></span>
+      </button>
+    </div>
   </div>
 
   <!-- ===== MODALITY INFO MODAL ===== -->

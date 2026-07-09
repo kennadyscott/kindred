@@ -1485,12 +1485,9 @@ document.getElementById('login-back').addEventListener('click', () => {
 // and always landed on the existing-profile picker instead.
 document.getElementById('login-submit-btn').addEventListener('click', () => {
   if (accountType === 'client') {
-    if (intake.completed) {
-      finishIntake();
-      checkForNewMatches();
-    } else {
-      startIntake();
-    }
+    // Clients don't land straight in the deck — they pick which side of
+    // Kindred they want first: the matching app or the explore/site side.
+    openExperienceModal();
   } else {
     // No real per-account passwords in this prototype, so "Log In" just
     // takes you into whichever therapist account is currently active —
@@ -1508,6 +1505,36 @@ document.getElementById('login-create-btn').addEventListener('click', () => {
     startTherapistSignup();
   }
 });
+
+// ===== EXPERIENCE SWITCHING (matching app <-> explore/website) =====
+const experienceModal = document.getElementById('experience-modal');
+
+function openExperienceModal() {
+  experienceModal.classList.remove('hidden');
+}
+
+function enterMatchingExperience() {
+  experienceModal.classList.add('hidden');
+  if (intake.completed) {
+    finishIntake();
+    checkForNewMatches();
+  } else {
+    startIntake();
+  }
+}
+
+function showExploreScreen() {
+  experienceModal.classList.add('hidden');
+  document.getElementById('bottom-nav').classList.add('hidden');
+  document.getElementById('therapist-nav').classList.add('hidden');
+  showScreen('explore');
+}
+
+document.getElementById('exp-match-btn').addEventListener('click', enterMatchingExperience);
+document.getElementById('exp-explore-btn').addEventListener('click', showExploreScreen);
+document.getElementById('explore-to-match-btn').addEventListener('click', enterMatchingExperience);
+document.getElementById('explore-cta-btn').addEventListener('click', enterMatchingExperience);
+document.getElementById('discover-to-explore-btn').addEventListener('click', showExploreScreen);
 
 // ===== THERAPIST SIGNUP — brand-new profile from scratch =====
 const MANDATORY_PROMPTS = [

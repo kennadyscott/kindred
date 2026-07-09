@@ -73,7 +73,99 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   color: var(--coral-dark);
   letter-spacing: 0.2px;
 }
-#screen-discover .top-bar { justify-content: center; }
+#screen-discover .top-bar { justify-content: center; position: relative; }
+
+/* ===== EXPERIENCE SWITCHING (matching app <-> explore/website) ===== */
+.experience-switch-btn {
+  background: white;
+  border: 1.5px solid var(--line);
+  color: var(--coral);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 13px;
+  border-radius: 20px;
+  cursor: pointer;
+}
+.discover-explore-btn {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.experience-card {
+  background: var(--cream);
+  border-radius: 26px;
+  padding: 28px 24px;
+  width: calc(100% - 48px);
+  max-width: 340px;
+  margin: auto;
+}
+.experience-title {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--coral-dark);
+  text-align: center;
+}
+.experience-sub {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: 6px 0 20px;
+}
+.explore-bar { border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+.explore-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.explore-lockup {
+  width: 210px;
+  margin: -6px auto -10px;
+  mix-blend-mode: multiply;
+}
+.explore-headline {
+  font-family: 'Fraunces', serif;
+  font-size: 27px;
+  font-weight: 600;
+  color: var(--coral-dark);
+  text-align: center;
+  line-height: 1.2;
+}
+.explore-sub {
+  font-size: 14px;
+  color: var(--ink-soft);
+  text-align: center;
+  line-height: 1.55;
+  margin-bottom: 4px;
+}
+.explore-block {
+  background: white;
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+}
+.explore-block-title {
+  font-family: 'Fraunces', serif;
+  font-size: 16.5px;
+  font-weight: 600;
+  color: var(--coral-dark);
+  margin-bottom: 6px;
+}
+.explore-block p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.explore-placeholder {
+  background: var(--teal-light);
+  box-shadow: none;
+}
+.explore-placeholder p { color: var(--teal); font-weight: 500; text-align: center; }
 
 .icon-btn {
   background: var(--sand);
@@ -1359,7 +1451,7 @@ select.t-rate-input,
 }
 /* The lockup PNG has its own baked-in cream (#fef7ec, sampled) — the welcome
    screen adopts that exact color so the image edge is invisible. */
-#screen-account-type { background: #fef7ec; }
+#screen-account-type, #screen-explore { background: #fef7ec; }
 .brand-lockup-img {
   display: block;
   width: 300px;
