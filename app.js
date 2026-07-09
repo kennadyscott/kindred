@@ -2,7 +2,8 @@ const THERAPISTS = [
   {
     id: 't1', name: 'Dr. Maya Chen', credentials: ['PhD', 'Clinical Psychologist'],
     pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
-    initials: 'MC', gradient: 'linear-gradient(135deg,#4a9d96,#2e7d76)',
+    photo: 'https://randomuser.me/api/portraits/women/90.jpg',
+    initials: 'MC', gradient: 'linear-gradient(135deg,#8a63a8,#5c3766)',
     meta: ['Video & In-person', '$140–180/session'],
     bestFor: 'I work best with high-achievers who are quietly running on empty.',
     tags: ['Anxiety', 'Life Transitions', 'CBT', 'LGBTQ+ Affirming'],
@@ -27,7 +28,8 @@ const THERAPISTS = [
   {
     id: 't2', name: 'James Okafor', credentials: ['LMFT'],
     pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
-    initials: 'JO', gradient: 'linear-gradient(135deg,#e8836b,#c85a41)',
+    photo: 'https://randomuser.me/api/portraits/men/83.jpg',
+    initials: 'JO', gradient: 'linear-gradient(135deg,#bf7350,#9c5535)',
     meta: ['Video only', '$110–130/session'],
     selfPayNote: 'Sliding scale available',
     bestFor: "I work best with couples who still want to fight for the relationship, not just survive it.",
@@ -53,6 +55,7 @@ const THERAPISTS = [
   {
     id: 't3', name: 'Priya Raman', credentials: ['LPC', 'Trauma Specialist'],
     pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
+    photo: 'https://randomuser.me/api/portraits/women/8.jpg',
     initials: 'PR', gradient: 'linear-gradient(135deg,#a68fc9,#7a5fa8)',
     meta: ['In-person, Downtown', '$150/session'],
     selfPayNote: 'Out-of-network',
@@ -79,6 +82,7 @@ const THERAPISTS = [
   {
     id: 't4', name: 'Dr. Sam Alvarez', credentials: ['PsyD'],
     pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
+    photo: 'https://randomuser.me/api/portraits/men/11.jpg',
     initials: 'SA', gradient: 'linear-gradient(135deg,#d4a24e,#b57e2f)',
     meta: ['Video & In-person', '$160/session'],
     bestFor: "I work best with men who are burnt out and tired of being told to 'just relax.'",
@@ -104,6 +108,7 @@ const THERAPISTS = [
   {
     id: 't5', name: 'Dr. Leah Fitzgerald', credentials: ['PhD', 'Perinatal Specialist'],
     pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
+    photo: 'https://randomuser.me/api/portraits/women/63.jpg',
     initials: 'LF', gradient: 'linear-gradient(135deg,#6ba4c9,#4278a0)',
     meta: ['Video only', '$135/session'],
     bestFor: 'I work best with new parents who feel like they should be coping better than they are.',
@@ -129,6 +134,7 @@ const THERAPISTS = [
   {
     id: 't6', name: 'Marcus Webb', credentials: ['LCSW'],
     pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
+    photo: 'https://randomuser.me/api/portraits/men/22.jpg',
     initials: 'MW', gradient: 'linear-gradient(135deg,#8a9b6e,#647a4a)',
     meta: ['In-person & Video', '$120/session'],
     selfPayNote: 'Sliding scale',
@@ -646,6 +652,57 @@ function displayName(t) {
   return (t.useCompanyName && t.companyName) ? t.companyName : t.name;
 }
 
+function avatarHtml(t, sizeClass) {
+  return t.photo
+    ? `<div class="${sizeClass} photo" style="background-image:url('${t.photo}')"></div>`
+    : `<div class="${sizeClass}" style="background:${t.gradient}">${t.initials}</div>`;
+}
+
+// A percentage of how directly the client's own stated preferences line up
+// with this therapist — never reviews or ratings, and no invented number:
+// if the client expressed no preferences at all, this returns null and the
+// badge renders without a percent.
+function matchPercent(t) {
+  let earned = 0, possible = 0;
+  if (intake.needs.length) {
+    possible += 40;
+    const overlap = t.tags.filter(tag => intake.needs.includes(tag)).length;
+    if (overlap) earned += Math.min(40, 24 + overlap * 8);
+    else if (t.practiceType === 'generalist') earned += 22;
+  }
+  const prefs = [
+    [intake.modality !== 'open', t.modalities.includes(intake.modality)],
+    [intake.stylePref !== 'balanced', t.style === intake.stylePref],
+    [intake.genderPref !== 'no-preference', t.identity.gender === intake.genderPref],
+    [intake.lgbtqRequired, t.identity.lgbtqAffirming],
+    [intake.languagePref !== 'any', t.languages.includes(intake.languagePref)],
+    [intake.format !== 'no-preference', t.formats.includes(intake.format)],
+    [intake.insurance !== 'any', t.insuranceList.includes(intake.insurance)]
+  ];
+  prefs.forEach(([applies, ok]) => { if (applies) { possible += 10; if (ok) earned += 10; } });
+  if (!possible) return null;
+  return Math.min(98, Math.round(62 + (earned / possible) * 36));
+}
+
+function matchBadgeHtml(t) {
+  const pct = matchPercent(t);
+  return `<div class="match-pct-badge"><span class="badge-dot">K</span>${pct !== null ? `${pct}% ` : ''}Kindred Match</div>`;
+}
+
+const LEAF_SVG = `<svg width="11" height="11" viewBox="0 0 11 11"><path d="M1.5 9.5C1.5 4.5 4.5 1.5 9.5 1.5C9.5 6.5 6.5 9.5 1.5 9.5Z" fill="currentColor"/></svg>`;
+
+function traitChipsHtml(t) {
+  const styleTraits = {
+    direct: ['Direct', 'Goal-oriented'],
+    gentle: ['Warm', 'Patient'],
+    balanced: ['Warm', 'Collaborative']
+  }[t.style] || [];
+  const traits = [...styleTraits];
+  if (t.identity.lgbtqAffirming) traits.push('LGBTQ+ Affirming');
+  if (!traits.length) return '';
+  return `<div class="trait-chip-row">${traits.map((tr, i) => `<span class="trait-chip tc-${i % 3}">${LEAF_SVG} ${tr}</span>`).join('')}</div>`;
+}
+
 function credentialsLabel(t) {
   const filled = t.credentials.filter(Boolean);
   return filled.length ? filled.join(' • ') : 'Licensed Therapist';
@@ -688,22 +745,12 @@ function promptBlocksHtml(t) {
   return mandatory + optional;
 }
 
-function traitPillsHtml(t) {
-  const traits = [];
-  const styleLabel = { gentle: 'Gentle', balanced: 'Balanced', direct: 'Direct' }[t.style];
-  if (styleLabel) traits.push(styleLabel);
-  if (t.identity.lgbtqAffirming) traits.push('LGBTQ+ Affirming');
-  if (t.practiceType === 'generalist') traits.push('Generalist');
-  if (!traits.length) return '';
-  return `<div class="trait-pill-row">${traits.map(tr => `<span class="trait-pill">${tr}</span>`).join('')}</div>`;
-}
-
 function whyYouMatchHtml(t) {
   const reasons = getMatchReasons(t);
   if (!reasons.length) return '';
   return `
     <div class="why-match-label">Why you match</div>
-    <ul class="why-match-list">${reasons.map(r => `<li>✓ ${r}</li>`).join('')}</ul>
+    <ul class="why-match-list">${reasons.map(r => `<li>${r}</li>`).join('')}</ul>
   `;
 }
 
@@ -711,8 +758,9 @@ function capabilityRowHtml(t) {
   const acceptingLabel = t.acceptingOngoing ? 'Accepting new clients' : 'Not accepting new clients';
   return `
     <div class="capability-row">
-      <div class="capability-item"><span>🌿</span>${acceptingLabel}</div>
-      <div class="capability-item"><span>🕐</span>${t.nextAvailableLabel}</div>
+      <div class="capability-item"><span class="cap-icon">🎥</span>${t.meta[0]}</div>
+      <div class="capability-item"><span class="cap-icon">🌿</span>${acceptingLabel}</div>
+      <div class="capability-item"><span class="cap-icon">🕐</span>${t.nextAvailableLabel}</div>
     </div>
   `;
 }
@@ -723,21 +771,18 @@ function buildCard(t) {
   card.dataset.id = t.id;
   card.innerHTML = `
     <div class="card-photo" style="background:${t.gradient}">
-      <div class="initials">${t.initials}</div>
+      ${t.photo ? `<img class="card-photo-img" src="${t.photo}" alt="">` : `<div class="initials">${t.initials}</div>`}
       <div class="stamp like">Like</div>
       <div class="stamp pass">Pass</div>
-      <div class="compatible-badge">✓ Compatible Match</div>
+      ${matchBadgeHtml(t)}
       ${languageBadgeHtml(t)}
     </div>
     <div class="card-body">
       <div class="card-name-row"><h2 class="serif-name">${displayName(t)}</h2></div>
       ${(t.showPronouns && t.pronouns) ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
       <div class="card-subtitle">${[credentialsLabel(t), ...t.tags.slice(0, 2)].join(' • ')}</div>
-      <div class="card-meta"><span>📍 ${t.location.city}, ${t.location.state}</span></div>
-      <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
-      <div class="card-meta"><span>${insuranceDisplayLabel(t)}</span></div>
-      ${traitPillsHtml(t)}
-      ${t.bestFor ? `<div class="best-for">${t.bestFor}</div>` : ''}
+      ${traitChipsHtml(t)}
+      ${t.bestFor ? `<div class="quote-block">${t.bestFor}</div>` : ''}
       ${whyYouMatchHtml(t)}
       ${capabilityRowHtml(t)}
     </div>
@@ -971,7 +1016,8 @@ function openDetail(t, opts = {}) {
     <div class="sheet-close"></div>
     ${preview ? `<div class="preview-banner">👀 This is what clients see when they view your profile</div>` : ''}
     <div class="card-photo detail-photo" style="background:${t.gradient};">
-      <div class="initials">${t.initials}</div>
+      ${t.photo ? `<img class="card-photo-img" src="${t.photo}" alt="">` : `<div class="initials">${t.initials}</div>`}
+      ${preview ? '' : matchBadgeHtml(t)}
       ${preview ? '' : languageBadgeHtml(t)}
     </div>
     <div class="card-name-row" style="margin-top:14px;"><h2>${displayName(t)}</h2><span class="creds">${credentialsLabel(t)}</span></div>
@@ -1012,8 +1058,15 @@ const matchModal = document.getElementById('match-modal');
 function showMatchModal(t) {
   document.getElementById('match-name').textContent = displayName(t);
   const avatar = document.getElementById('match-avatar');
-  avatar.style.background = t.gradient;
-  avatar.textContent = t.initials;
+  if (t.photo) {
+    avatar.classList.add('photo');
+    avatar.style.background = `url('${t.photo}') center top / cover`;
+    avatar.textContent = '';
+  } else {
+    avatar.classList.remove('photo');
+    avatar.style.background = t.gradient;
+    avatar.textContent = t.initials;
+  }
   matchModal.classList.remove('hidden');
   matchModal.dataset.tid = t.id;
 }
@@ -1037,7 +1090,7 @@ function renderShortlist() {
   }
   shortlistList.innerHTML = shortlist.slice().reverse().map(t => `
     <div class="match-row shortlist-row">
-      <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
+      ${avatarHtml(t, 'avatar-md')}
       <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">Saved — not yet requested</div></div>
       <button class="shortlist-request-btn" data-tid="${t.id}" ${atCap ? 'disabled' : ''}>${atCap ? 'Limit reached' : 'Request Match'}</button>
     </div>
@@ -1059,7 +1112,7 @@ function renderMatches() {
     const last = log[log.length - 1];
     if (m.status === 'pending') {
       return `<div class="match-row" data-id="${t.id}">
-        <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
+        ${avatarHtml(t, 'avatar-md')}
         <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">${last ? last.text : 'Waiting on their response…'}</div></div>
         <span class="pending-tag">Requested</span>
       </div>`;
@@ -1067,24 +1120,24 @@ function renderMatches() {
     if (m.status === 'ondemand') {
       if (m.paymentStatus !== 'paid') {
         return `<div class="match-row pending" data-id="${t.id}" style="opacity:0.5;">
-          <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
+          ${avatarHtml(t, 'avatar-md')}
           <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">Cancelled — ${refundStatusLabel(m.paymentStatus)}</div></div>
         </div>`;
       }
       return `<div class="match-row pending" data-id="${t.id}">
-        <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
+        ${avatarHtml(t, 'avatar-md')}
         <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">One-time session booked — ${m.slotLabel} · $${m.amountPaid} paid</div></div>
         <button class="cancel-session-btn" data-cancel-ondemand="${t.id}">Cancel</button>
       </div>`;
     }
     if (m.status === 'declined') {
       return `<div class="match-row pending" data-id="${t.id}" style="opacity:0.5;">
-        <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
+        ${avatarHtml(t, 'avatar-md')}
         <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">Not a fit on their end right now</div></div>
       </div>`;
     }
     return `<div class="match-row" data-id="${t.id}">
-      <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
+      ${avatarHtml(t, 'avatar-md')}
       <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">${last ? last.text : 'Say hello!'}</div></div>
     </div>`;
   }).join('');
@@ -1115,13 +1168,22 @@ function openChat(t, role) {
   const statusEl = document.querySelector('#screen-chat .chat-status');
   if (chatRole === 'therapist') {
     document.getElementById('chat-name').textContent = 'Prospective Client';
+    av.classList.remove('photo');
+    av.style.backgroundImage = '';
     av.style.background = 'linear-gradient(135deg,#9a9088,#6b6560)';
     av.textContent = '?';
     statusEl.textContent = `Replying as ${displayName(t)}`;
   } else {
     document.getElementById('chat-name').textContent = displayName(t);
-    av.style.background = t.gradient;
-    av.textContent = t.initials;
+    if (t.photo) {
+      av.classList.add('photo');
+      av.style.background = `url('${t.photo}') center top / cover`;
+      av.textContent = '';
+    } else {
+      av.classList.remove('photo');
+      av.style.background = t.gradient;
+      av.textContent = t.initials;
+    }
     statusEl.textContent = 'Usually replies within a day';
   }
   document.getElementById('chat-input').dataset.tid = t.id;
@@ -1210,7 +1272,7 @@ function renderOndemand() {
   ondemandList.innerHTML = list.map(t => `
     <div class="ondemand-card" data-id="${t.id}">
       <div class="od-header">
-        <div class="avatar-md" style="background:${t.gradient}">${t.initials}</div>
+        ${avatarHtml(t, 'avatar-md')}
         <div><div class="od-name">${displayName(t)}</div><div class="od-creds">${credentialsLabel(t)}</div></div>
       </div>
       ${matchTagsHtml(t)}
@@ -1881,6 +1943,7 @@ function finishTherapistSignup() {
     credentials: trimmedCredentials.length ? trimmedCredentials : ['Licensed Therapist'],
     pronouns: d.pronouns.trim(), showPronouns: d.showPronouns,
     useCompanyName: d.useCompanyName, companyName: d.companyName.trim(),
+    photo: null,
     initials, gradient,
     meta: buildTherapistMeta(d),
     bestFor: d.bestFor.trim(), selfPayNote: d.selfPayNote.trim(),
