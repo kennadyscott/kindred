@@ -991,6 +991,17 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   font-family: 'Inter', sans-serif;
   font-size: 14px;
 }
+select.t-rate-input,
+#intake-state, #ts-state, #t-state-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  background: white;
+  margin-bottom: 14px;
+}
 .intake-textarea {
   width: 100%;
   padding: 12px 14px;

@@ -16,7 +16,8 @@ const THERAPISTS = [
     formats: ['video', 'in-person'], rateMin: 140, insuranceList: ['Aetna', 'BCBS'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
-    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false,
+    location: { city: 'Austin', state: 'TX' }
   },
   {
     id: 't2', name: 'James Okafor', creds: 'LMFT',
@@ -35,7 +36,8 @@ const THERAPISTS = [
     formats: ['video'], rateMin: 110, insuranceList: [],
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Thu 4:00pm', rank: 2 }],
     nextAvailableRank: 3, nextAvailableLabel: 'Next week',
-    practiceType: 'generalist', externalAppointments: [], agreedToOnDemandPolicy: true
+    practiceType: 'generalist', externalAppointments: [], agreedToOnDemandPolicy: true,
+    location: { city: 'Chicago', state: 'IL' }
   },
   {
     id: 't3', name: 'Priya Raman', creds: 'LPC, Trauma Specialist',
@@ -54,7 +56,8 @@ const THERAPISTS = [
     formats: ['in-person'], rateMin: 150, insuranceList: [],
     acceptingOngoing: false, onDemand: true, onDemandSlots: [{ label: 'Wed 1:00pm', rank: 1 }, { label: 'Fri 11:00am', rank: 3 }],
     nextAvailableRank: null, nextAvailableLabel: 'Not accepting new ongoing clients',
-    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: true
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: true,
+    location: { city: 'Austin', state: 'TX' }
   },
   {
     id: 't4', name: 'Dr. Sam Alvarez', creds: 'PsyD',
@@ -73,7 +76,8 @@ const THERAPISTS = [
     formats: ['video', 'in-person'], rateMin: 160, insuranceList: ['Cigna'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
-    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false,
+    location: { city: 'Chicago', state: 'IL' }
   },
   {
     id: 't5', name: 'Dr. Leah Fitzgerald', creds: 'PhD, Perinatal Specialist',
@@ -92,7 +96,8 @@ const THERAPISTS = [
     formats: ['video'], rateMin: 135, insuranceList: ['United'],
     acceptingOngoing: false, onDemand: false, onDemandSlots: [],
     nextAvailableRank: null, nextAvailableLabel: 'Paused',
-    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false,
+    location: { city: 'Denver', state: 'CO' }
   },
   {
     id: 't6', name: 'Marcus Webb', creds: 'LCSW',
@@ -111,12 +116,22 @@ const THERAPISTS = [
     formats: ['video', 'in-person'], rateMin: 120, insuranceList: [],
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Tue 9:00am', rank: 1 }],
     nextAvailableRank: 4, nextAvailableLabel: 'In 2 weeks',
-    practiceType: 'generalist', externalAppointments: [], agreedToOnDemandPolicy: true
+    practiceType: 'generalist', externalAppointments: [], agreedToOnDemandPolicy: true,
+    location: { city: 'Austin', state: 'TX' }
   }
 ];
 
 const NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
 const MODALITY_OPTIONS = ['CBT', 'EMDR', 'ACT', 'EFT', 'Motivational Interviewing'];
+const US_STATES = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'];
+
+// Physical proximity isn't a soft preference the way gender or language are —
+// two locations either match or they don't, so this is a plain equality
+// check used as a hard filter, not a must-have toggle.
+function locationsMatch(a, b) {
+  if (!a || !b || !a.city || !a.state || !b.city || !b.state) return false;
+  return a.state === b.state && a.city.trim().toLowerCase() === b.city.trim().toLowerCase();
+}
 const MODALITY_INFO = {
   'CBT': "Cognitive Behavioral Therapy. Focuses on identifying and changing unhelpful thought patterns and behaviors — often structured, with exercises to practice between sessions.",
   'EMDR': "Eye Movement Desensitization and Reprocessing. A structured approach often used for trauma, using guided eye movements or other bilateral stimulation to help the brain reprocess difficult memories.",
@@ -194,6 +209,7 @@ let intake = {
   lgbtqRequired: false,
   languagePref: 'any', languageRequired: false, languageOtherOpen: false,
   format: 'no-preference',
+  city: '', state: '',
   insurance: 'any',
   budgetMax: 300, // slider defaults to the top of the range so no one is filtered out until the client actually narrows it
   completed: false
@@ -232,6 +248,8 @@ function isCompatible(t, mode) {
 
   if (intake.format !== 'no-preference' && !t.formats.includes(intake.format)) return false;
 
+  if (intake.format === 'in-person' && !locationsMatch(t.location, { city: intake.city, state: intake.state })) return false;
+
   if (intake.insurance !== 'any' && !t.insuranceList.includes(intake.insurance)) return false;
 
   if (intake.budgetMax && t.rateMin > intake.budgetMax) return false;
@@ -249,6 +267,9 @@ function getMatchReasons(t) {
   if (intake.modality !== 'open' && t.modalities.includes(intake.modality)) reasons.push(intake.modality);
   if (intake.format !== 'no-preference' && t.formats.includes(intake.format)) {
     reasons.push(intake.format === 'video' ? 'Video sessions' : 'In-person sessions');
+  }
+  if (intake.format === 'in-person' && locationsMatch(t.location, { city: intake.city, state: intake.state })) {
+    reasons.push(`Located in ${t.location.city}, ${t.location.state}`);
   }
   if (intake.insurance !== 'any' && t.insuranceList.includes(intake.insurance)) reasons.push(`Accepts ${intake.insurance}`);
   if (intake.lgbtqRequired && t.identity.lgbtqAffirming) reasons.push('LGBTQ+ Affirming');
@@ -381,6 +402,16 @@ function renderIntakeStep() {
         <div class="option-row ${intake.format === 'video' ? 'selected' : ''}" data-format="video">Video</div>
         <div class="option-row ${intake.format === 'in-person' ? 'selected' : ''}" data-format="in-person">In-person</div>
       </div>
+      <div id="location-fields" style="${intake.format === 'in-person' ? '' : 'display:none;'}">
+        <div class="t-form-label">Your city</div>
+        <input type="text" class="t-rate-input" id="intake-city" placeholder="e.g. Austin" value="${intake.city}">
+        <div class="t-form-label">Your state</div>
+        <select id="intake-state">
+          <option value="">Select a state</option>
+          ${US_STATES.map(s => `<option value="${s}" ${intake.state === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+        <div class="intake-sub" style="margin-top:6px;">In-person only works if we can find a therapist actually located near you.</div>
+      </div>
       <div class="match-tag-label">Insurance</div>
       <div class="chip-grid" id="insurance-grid">
         ${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${intake.insurance === i ? 'selected' : ''}" data-insurance="${i}">${i === 'any' ? 'Self-pay / any' : i}</div>`).join('')}
@@ -398,6 +429,7 @@ function renderIntakeStep() {
   // The "not sure" path never blocks on a minimum selection — someone who
   // doesn't know what's going on yet shouldn't be stuck because none of the
   // options quite fit.
+  else if (intakeStep === 5 && intake.format === 'in-person') canProceed = intake.city.trim() !== '' && intake.state !== '';
   html += `
     <div class="intake-footer">
       ${intakeStep > 0 ? `<button class="btn-back" id="intake-back">Back</button>` : ''}
@@ -478,6 +510,13 @@ function attachIntakeHandlers() {
   document.querySelectorAll('#format-list .option-row').forEach(el => {
     el.addEventListener('click', () => { intake.format = el.dataset.format; renderIntakeStep(); });
   });
+  const intakeCityInput = document.getElementById('intake-city');
+  if (intakeCityInput) intakeCityInput.addEventListener('input', () => {
+    intake.city = intakeCityInput.value;
+    document.getElementById('intake-next').disabled = !(intake.city.trim() && intake.state);
+  });
+  const intakeStateSelect = document.getElementById('intake-state');
+  if (intakeStateSelect) intakeStateSelect.addEventListener('change', () => { intake.state = intakeStateSelect.value; renderIntakeStep(); });
   document.querySelectorAll('#insurance-grid .chip-option').forEach(el => {
     el.addEventListener('click', () => { intake.insurance = el.dataset.insurance; renderIntakeStep(); });
   });
@@ -602,6 +641,7 @@ function buildCard(t) {
     <div class="card-body">
       <div class="card-name-row"><h2>${t.name}</h2><span class="creds">${t.creds}</span></div>
       <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
+      <div class="card-meta"><span>📍 ${t.location.city}, ${t.location.state}</span></div>
       <div class="card-meta"><span>Next available: ${t.nextAvailableLabel}</span></div>
       <div class="card-meta"><span>${languagesLabel(t)}</span></div>
       <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
@@ -843,6 +883,7 @@ function openDetail(t) {
     <div class="card-meta" style="margin-top:4px;">${t.creds}</div>
     <div class="section-title">Details</div>
     <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
+    <div class="card-meta"><span>📍 ${t.location.city}, ${t.location.state}</span></div>
     <div class="card-meta"><span>${languagesLabel(t)}</span></div>
     <div class="section-title">Specialties</div>
     <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
@@ -1354,6 +1395,7 @@ function startTherapistSignup() {
     tags: [], modalities: [],
     style: 'balanced', gender: 'female', lgbtqAffirming: false, languages: [], showOtherLanguage: false,
     formats: [], insuranceList: [], rateMin: 130,
+    city: '', state: '',
     promptAnswers: THERAPIST_PROMPT_OPTIONS.map(() => ''),
     acceptingOngoing: true, onDemand: false, onDemandSlots: [], agreedToOnDemandPolicy: false
   };
@@ -1419,6 +1461,14 @@ function renderSignupStep() {
         <div class="chip-option ${d.formats.includes('video') ? 'selected' : ''}" data-format="video">Video</div>
         <div class="chip-option ${d.formats.includes('in-person') ? 'selected' : ''}" data-format="in-person">In-person</div>
       </div>
+      <div class="t-form-label">City</div>
+      <input type="text" class="t-rate-input" id="ts-city" placeholder="e.g. Austin" value="${d.city}">
+      <div class="t-form-label">State</div>
+      <select id="ts-state">
+        <option value="">Select a state</option>
+        ${US_STATES.map(s => `<option value="${s}" ${d.state === s ? 'selected' : ''}>${s}</option>`).join('')}
+      </select>
+      <div class="intake-sub" style="margin-top:6px;">Clients looking for in-person sessions only see therapists located in their city/state.</div>
       <div class="t-form-label">Insurance accepted</div>
       <div class="chip-grid" id="ts-insurance-grid">
         ${['Aetna', 'BCBS', 'Cigna', 'United'].map(i => `<div class="chip-option ${d.insuranceList.includes(i) ? 'selected' : ''}" data-insurance="${i}">${i}</div>`).join('')}
@@ -1460,7 +1510,9 @@ function renderSignupStep() {
       </div>`;
   }
 
-  const canProceed = signupStep !== 0 || d.name.trim().length > 0;
+  let canProceed = true;
+  if (signupStep === 0) canProceed = d.name.trim().length > 0;
+  else if (signupStep === 3) canProceed = d.city.trim() !== '' && d.state !== '';
   html += `
     <div class="intake-footer">
       ${signupStep > 0 ? `<button class="btn-back" id="ts-back">Back</button>` : ''}
@@ -1543,6 +1595,13 @@ function attachSignupHandlers() {
       renderSignupStep();
     });
   });
+  const tsCityInput = document.getElementById('ts-city');
+  if (tsCityInput) tsCityInput.addEventListener('input', () => {
+    d.city = tsCityInput.value;
+    document.getElementById('ts-next').disabled = !(d.city.trim() && d.state);
+  });
+  const tsStateSelect = document.getElementById('ts-state');
+  if (tsStateSelect) tsStateSelect.addEventListener('change', () => { d.state = tsStateSelect.value; renderSignupStep(); });
   document.querySelectorAll('#ts-insurance-grid .chip-option').forEach(el => {
     el.addEventListener('click', () => {
       const ins = el.dataset.insurance;
@@ -1625,6 +1684,7 @@ function finishTherapistSignup() {
     modalities: d.modalities, style: d.style,
     identity: { gender: d.gender, lgbtqAffirming: d.lgbtqAffirming }, languages: d.languages,
     formats: d.formats, rateMin: d.rateMin, insuranceList: d.insuranceList,
+    location: { city: d.city.trim(), state: d.state },
     acceptingOngoing: d.acceptingOngoing, onDemand: d.onDemand, onDemandSlots: d.onDemandSlots,
     agreedToOnDemandPolicy: d.agreedToOnDemandPolicy,
     nextAvailableRank: d.acceptingOngoing ? 1 : null,
@@ -1854,6 +1914,15 @@ function renderTherapistProfile() {
       <div class="chip-option ${t.formats.includes('in-person') ? 'selected' : ''}" data-toggle-format="in-person">In-person</div>
     </div>
 
+    <div class="t-form-label">City</div>
+    <input type="text" class="t-rate-input" id="t-city-input" placeholder="e.g. Austin" value="${t.location.city}">
+    <div class="t-form-label">State</div>
+    <select id="t-state-input">
+      <option value="">Select a state</option>
+      ${US_STATES.map(s => `<option value="${s}" ${t.location.state === s ? 'selected' : ''}>${s}</option>`).join('')}
+    </select>
+    <div class="intake-sub" style="margin-top:6px;">Clients looking for in-person sessions only see therapists located in their city/state.</div>
+
     <div class="t-form-label">Insurance accepted</div>
     <div class="chip-grid">${['Aetna', 'BCBS', 'Cigna', 'United'].map(i => `<div class="chip-option ${t.insuranceList.includes(i) ? 'selected' : ''}" data-toggle-insurance="${i}">${i}</div>`).join('')}</div>
 
@@ -1936,6 +2005,10 @@ function attachTherapistProfileHandlers(t) {
     if (i === -1) t.formats.push(f); else t.formats.splice(i, 1);
     renderTherapistProfile();
   }));
+  const tCityInput = document.getElementById('t-city-input');
+  if (tCityInput) tCityInput.addEventListener('input', () => { t.location.city = tCityInput.value; });
+  const tStateInput = document.getElementById('t-state-input');
+  if (tStateInput) tStateInput.addEventListener('change', () => { t.location.state = tStateInput.value; });
   document.querySelectorAll('[data-toggle-insurance]').forEach(el => el.addEventListener('click', () => {
     const ins = el.dataset.toggleInsurance;
     const i = t.insuranceList.indexOf(ins);
