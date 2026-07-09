@@ -1,21 +1,24 @@
-/* Plum + warm cream palette (2026-07 rebrand to match design mockup).
+/* Official Kindred brand palette (from kindred_brand_deck.pptx, slide 7):
+   Aubergine #422448 · Cream #FFF8EF · Clay #BE765F · Lilac #B8A3C4 · Moss #687A65.
    Variable NAMES are kept from the original coral/teal theme so every
    existing rule and inline style remaps automatically:
-   --coral is now the primary plum, --teal the lavender accent. */
+   --coral is now the interactive plum, --teal the muted-plum accent. */
 :root {
-  --cream: #faf3ea;
-  --ink: #3b2a40;
-  --ink-soft: #82718b;
-  --coral: #5c3766;
-  --coral-dark: #472a52;
-  --teal: #8a63a8;
-  --teal-light: #efe6f6;
-  --lavender: #a68fc9;
-  --rust: #bf7350;
-  --rust-light: #f8e7dc;
-  --sand: #f4e8db;
-  --line: #eadfd2;
-  --shadow: 0 10px 30px rgba(59, 42, 64, 0.12);
+  --cream: #FFF8EF;
+  --ink: #2C1A30;
+  --ink-soft: #765D74;
+  --coral: #5E3862;
+  --coral-dark: #422448;
+  --teal: #765D74;
+  --teal-light: #EFE7F2;
+  --lavender: #B8A3C4;
+  --rust: #BE765F;
+  --rust-light: #F3E4D8;
+  --moss: #687A65;
+  --moss-light: #E9EDE7;
+  --sand: #F7E8DB;
+  --line: #EBDAC9;
+  --shadow: 0 10px 30px rgba(44, 26, 48, 0.12);
   --radius: 22px;
 }
 
@@ -910,14 +913,12 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   height: 20px;
   border-radius: 50%;
   background: white;
-  color: var(--coral-dark);
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
+.match-pct-badge .badge-dot svg { width: 12px; height: 13px; }
 .trait-chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -935,7 +936,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 .trait-chip svg { flex-shrink: 0; }
 .tc-0 { background: var(--rust-light); color: var(--rust); }
 .tc-1 { background: var(--teal-light); color: var(--teal); }
-.tc-2 { background: #fbe9e2; color: #bf5b4d; }
+.tc-2 { background: var(--moss-light); color: var(--moss); }
 .quote-block {
   position: relative;
   font-family: 'Fraunces', serif;
@@ -1370,13 +1371,30 @@ select.t-rate-input,
   justify-content: center;
   padding: 0 28px;
 }
+.brand-lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 36px;
+}
+.brand-emblem { width: 46px; height: 52px; }
+.brand-tagline {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2.2px;
+  text-transform: uppercase;
+  color: var(--rust);
+}
+.logo-lockup { display: flex; align-items: center; gap: 8px; }
+.logo-emblem { width: 22px; height: 24px; }
 .welcome-logo {
   font-family: 'Fraunces', serif;
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 600;
   color: var(--coral-dark);
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 0;
 }
 .welcome-content h1 {
   font-size: 26px;

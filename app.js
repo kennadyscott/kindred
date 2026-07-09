@@ -684,9 +684,11 @@ function matchPercent(t) {
   return Math.min(98, Math.round(62 + (earned / possible) * 36));
 }
 
+const KINDRED_MARK_SVG = `<svg viewBox="0 0 40 44" aria-hidden="true"><path d="M16 2 C7 2 4 9 4 16 L4 30 C4 38 9 42 16 42 Z" fill="#422448"/><path d="M20 20 C20 11 26 4 36 4 C36 13 29 20 20 20 Z" fill="#B8A3C4"/><path d="M20 24 C29 24 36 31 36 40 C26 40 20 33 20 24 Z" fill="#BE765F"/></svg>`;
+
 function matchBadgeHtml(t) {
   const pct = matchPercent(t);
-  return `<div class="match-pct-badge"><span class="badge-dot">K</span>${pct !== null ? `${pct}% ` : ''}Kindred Match</div>`;
+  return `<div class="match-pct-badge"><span class="badge-dot">${KINDRED_MARK_SVG}</span>${pct !== null ? `${pct}% ` : ''}Kindred Match</div>`;
 }
 
 const LEAF_SVG = `<svg width="11" height="11" viewBox="0 0 11 11"><path d="M1.5 9.5C1.5 4.5 4.5 1.5 9.5 1.5C9.5 6.5 6.5 9.5 1.5 9.5Z" fill="currentColor"/></svg>`;
