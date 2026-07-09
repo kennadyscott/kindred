@@ -87,12 +87,12 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   border-radius: 20px;
   cursor: pointer;
 }
-.discover-explore-btn {
-  position: absolute;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
+.nav-emblem {
+  height: 17px;
+  display: block;
+  filter: grayscale(1) opacity(0.55);
 }
+.nav-btn.active .nav-emblem { filter: none; }
 .experience-card {
   background: var(--cream);
   border-radius: 26px;
@@ -124,9 +124,8 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   gap: 14px;
 }
 .explore-lockup {
-  width: 210px;
-  margin: -6px auto -10px;
-  mix-blend-mode: multiply;
+  width: 190px;
+  margin: 4px auto 2px;
 }
 .explore-headline {
   font-family: 'Fraunces', serif;
@@ -1449,13 +1448,10 @@ select.t-rate-input,
   justify-content: center;
   padding: 0 28px;
 }
-/* The lockup PNG has its own baked-in cream (#fef7ec, sampled) — the welcome
-   screen adopts that exact color so the image edge is invisible. */
-#screen-account-type, #screen-explore { background: #fef7ec; }
 .brand-lockup-img {
   display: block;
-  width: 300px;
-  margin: -30px auto -20px;
+  width: 235px;
+  margin: 0 auto 30px;
 }
 .welcome-logo {
   font-family: 'Fraunces', serif;

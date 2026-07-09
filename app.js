@@ -1525,8 +1525,11 @@ function enterMatchingExperience() {
 
 function showExploreScreen() {
   experienceModal.classList.add('hidden');
-  document.getElementById('bottom-nav').classList.add('hidden');
   document.getElementById('therapist-nav').classList.add('hidden');
+  // The Kindred tab in the bottom nav only makes sense once the client has
+  // a working matching experience to tab back to — before intake, Explore
+  // is a full-screen page whose only exit is "Match with a Therapist".
+  document.getElementById('bottom-nav').classList.toggle('hidden', !intake.completed);
   showScreen('explore');
 }
 
@@ -1534,7 +1537,6 @@ document.getElementById('exp-match-btn').addEventListener('click', enterMatching
 document.getElementById('exp-explore-btn').addEventListener('click', showExploreScreen);
 document.getElementById('explore-to-match-btn').addEventListener('click', enterMatchingExperience);
 document.getElementById('explore-cta-btn').addEventListener('click', enterMatchingExperience);
-document.getElementById('discover-to-explore-btn').addEventListener('click', showExploreScreen);
 
 // ===== THERAPIST SIGNUP — brand-new profile from scratch =====
 const MANDATORY_PROMPTS = [
