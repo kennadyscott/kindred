@@ -873,9 +873,11 @@ function updateNavBadge() {
 const detailModal = document.getElementById('detail-modal');
 const detailSheet = document.getElementById('detail-sheet');
 
-function openDetail(t) {
+function openDetail(t, opts = {}) {
+  const preview = opts.preview === true;
   detailSheet.innerHTML = `
     <div class="sheet-close"></div>
+    ${preview ? `<div class="preview-banner">👀 This is what clients see when they view your profile</div>` : ''}
     <div class="card-photo" style="background:${t.gradient};height:160px;border-radius:16px;margin-bottom:14px;">
       <div class="initials">${t.initials}</div>
     </div>
@@ -888,20 +890,26 @@ function openDetail(t) {
     <div class="section-title">Specialties</div>
     <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
     ${practiceBadgeHtml(t)}
-    ${matchTagsHtml(t)}
+    ${preview ? '' : matchTagsHtml(t)}
     <div class="section-title">In their words</div>
     ${promptBlocksHtml(t)}
-    <button class="primary-btn" style="margin-top:20px;background:var(--coral);color:white;" id="detail-like-btn">Add to Shortlist</button>
+    ${preview
+      ? `<button class="primary-btn" style="margin-top:20px;background:white;border:1.5px solid var(--coral);color:var(--coral-dark);" id="detail-close-btn">Close Preview</button>`
+      : `<button class="primary-btn" style="margin-top:20px;background:var(--coral);color:white;" id="detail-like-btn">Add to Shortlist</button>`}
   `;
   detailModal.classList.remove('hidden');
   detailSheet.querySelectorAll('[data-info]').forEach(el => {
     el.addEventListener('click', (e) => { e.stopPropagation(); openModalityInfo(el.dataset.info); });
   });
-  document.getElementById('detail-like-btn').addEventListener('click', () => {
-    detailModal.classList.add('hidden');
-    const topCard = cardStack.lastElementChild;
-    if (topCard && topCard.dataset.id === t.id && topCard._forceSwipe) topCard._forceSwipe('like');
-  });
+  if (preview) {
+    document.getElementById('detail-close-btn').addEventListener('click', () => detailModal.classList.add('hidden'));
+  } else {
+    document.getElementById('detail-like-btn').addEventListener('click', () => {
+      detailModal.classList.add('hidden');
+      const topCard = cardStack.lastElementChild;
+      if (topCard && topCard.dataset.id === t.id && topCard._forceSwipe) topCard._forceSwipe('like');
+    });
+  }
 }
 detailModal.addEventListener('click', (e) => { if (e.target === detailModal) detailModal.classList.add('hidden'); });
 
@@ -1881,6 +1889,7 @@ function renderTherapistProfile() {
   const container = document.getElementById('t-profile-content');
   container.innerHTML = `
     <div class="t-form-name">${t.name} <span class="t-form-creds">${t.creds}</span></div>
+    <button class="primary-btn" style="background:white;border:1.5px solid var(--coral);color:var(--coral-dark);margin-bottom:20px;" id="preview-profile-btn">👀 Preview My Profile as a Client</button>
 
     <div class="t-form-label">Practice type</div>
     <div class="chip-grid">
@@ -1960,6 +1969,7 @@ function renderTherapistProfile() {
 }
 
 function attachTherapistProfileHandlers(t) {
+  document.getElementById('preview-profile-btn').addEventListener('click', () => openDetail(t, { preview: true }));
   document.querySelectorAll('[data-set-practice]').forEach(el => el.addEventListener('click', () => {
     t.practiceType = el.dataset.setPractice;
     renderTherapistProfile();

@@ -408,6 +408,18 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   margin: 0 auto 16px;
 }
 .modal-sheet .prompt-block { margin-bottom: 4px; }
+.preview-banner {
+  background: var(--cream, #f4ede3);
+  border: 1.5px dashed var(--coral);
+  color: var(--coral-dark);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
 .modal-sheet .section-title {
   font-size: 12px;
   text-transform: uppercase;
