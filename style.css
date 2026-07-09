@@ -901,24 +901,10 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   color: white;
   font-size: 12px;
   font-weight: 600;
-  padding: 5px 13px 5px 6px;
+  padding: 7px 14px;
   border-radius: 20px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
   box-shadow: 0 3px 10px rgba(0,0,0,0.22);
 }
-.match-pct-badge .badge-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.match-pct-badge .badge-dot svg { width: 12px; height: 13px; }
 .trait-chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -1371,23 +1357,14 @@ select.t-rate-input,
   justify-content: center;
   padding: 0 28px;
 }
-.brand-lockup {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 36px;
+/* The lockup PNG has its own baked-in cream (#fef7ec, sampled) — the welcome
+   screen adopts that exact color so the image edge is invisible. */
+#screen-account-type { background: #fef7ec; }
+.brand-lockup-img {
+  display: block;
+  width: 300px;
+  margin: -30px auto -20px;
 }
-.brand-emblem { width: 46px; height: 52px; }
-.brand-tagline {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 2.2px;
-  text-transform: uppercase;
-  color: var(--rust);
-}
-.logo-lockup { display: flex; align-items: center; gap: 8px; }
-.logo-emblem { width: 22px; height: 24px; }
 .welcome-logo {
   font-family: 'Fraunces', serif;
   font-size: 30px;
