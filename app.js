@@ -2,7 +2,8 @@ const THERAPISTS = [
   {
     id: 't1', name: 'Dr. Maya Chen', creds: 'PhD, Clinical Psychologist',
     initials: 'MC', gradient: 'linear-gradient(135deg,#4a9d96,#2e7d76)',
-    meta: ['Video & In-person', '$140–180/session', 'Accepts Aetna, BCBS'],
+    meta: ['Video & In-person', '$140–180/session'],
+    bestFor: 'I work best with high-achievers who are quietly running on empty.',
     tags: ['Anxiety', 'Life Transitions', 'CBT', 'LGBTQ+ Affirming'],
     promptAnswers: [
       "We'll skip the small talk. I want to know what's actually been sitting heavy on you lately, and what you're hoping is different a few months from now.",
@@ -22,7 +23,9 @@ const THERAPISTS = [
   {
     id: 't2', name: 'James Okafor', creds: 'LMFT',
     initials: 'JO', gradient: 'linear-gradient(135deg,#e8836b,#c85a41)',
-    meta: ['Video only', '$110–130/session', 'Sliding scale available'],
+    meta: ['Video only', '$110–130/session'],
+    selfPayNote: 'Sliding scale available',
+    bestFor: "I work best with couples who still want to fight for the relationship, not just survive it.",
     tags: ['Couples', 'Family Conflict', 'EFT'],
     promptAnswers: [
       "I want to hear both sides before either of you starts defending yours. First sessions are for understanding the pattern, not assigning blame.",
@@ -42,7 +45,9 @@ const THERAPISTS = [
   {
     id: 't3', name: 'Priya Raman', creds: 'LPC, Trauma Specialist',
     initials: 'PR', gradient: 'linear-gradient(135deg,#a68fc9,#7a5fa8)',
-    meta: ['In-person, Downtown', '$150/session', 'Out-of-network'],
+    meta: ['In-person, Downtown', '$150/session'],
+    selfPayNote: 'Out-of-network',
+    bestFor: "I work best with people carrying trauma they've never had the space to fully unpack.",
     tags: ['Trauma', 'EMDR', 'PTSD', 'Grief'],
     promptAnswers: [
       "There's no pressure to tell the whole story right away. We'll go at whatever pace actually feels safe for you.",
@@ -62,7 +67,8 @@ const THERAPISTS = [
   {
     id: 't4', name: 'Dr. Sam Alvarez', creds: 'PsyD',
     initials: 'SA', gradient: 'linear-gradient(135deg,#d4a24e,#b57e2f)',
-    meta: ['Video & In-person', '$160/session', 'Accepts Cigna'],
+    meta: ['Video & In-person', '$160/session'],
+    bestFor: "I work best with men who are burnt out and tired of being told to 'just relax.'",
     tags: ['ADHD', 'Burnout', "Men's Issues", 'ACT'],
     promptAnswers: [
       "I'll ask a lot of direct questions and probably crack a joke or two. I want to know what's actually going on, not the polished version.",
@@ -82,7 +88,8 @@ const THERAPISTS = [
   {
     id: 't5', name: 'Dr. Leah Fitzgerald', creds: 'PhD, Perinatal Specialist',
     initials: 'LF', gradient: 'linear-gradient(135deg,#6ba4c9,#4278a0)',
-    meta: ['Video only', '$135/session', 'Accepts United'],
+    meta: ['Video only', '$135/session'],
+    bestFor: 'I work best with new parents who feel like they should be coping better than they are.',
     tags: ['Postpartum', 'Anxiety', 'New Parents'],
     promptAnswers: [
       "I want to know how you're actually sleeping, eating, and coping — not just how the baby's doing. You matter here too.",
@@ -102,7 +109,9 @@ const THERAPISTS = [
   {
     id: 't6', name: 'Marcus Webb', creds: 'LCSW',
     initials: 'MW', gradient: 'linear-gradient(135deg,#8a9b6e,#647a4a)',
-    meta: ['In-person & Video', '$120/session', 'Sliding scale'],
+    meta: ['In-person & Video', '$120/session'],
+    selfPayNote: 'Sliding scale',
+    bestFor: 'I work best with young adults who are ambivalent about change and sick of being lectured.',
     tags: ['Substance Use', 'Young Adults', 'Motivational Interviewing'],
     promptAnswers: [
       "No lectures, no judgment. I want to understand what role this has been playing in your life before we talk about changing anything.",
@@ -609,8 +618,18 @@ function practiceBadgeHtml(t) {
   return t.practiceType === 'generalist' ? `<div class="practice-badge">🌐 General Practice</div>` : '';
 }
 
-function languagesLabel(t) {
-  return `Speaks: ${t.languages.join(', ')}`;
+function insuranceDisplayLabel(t, opts = {}) {
+  if (!opts.preview && intake.insurance !== 'any') return `Accepts ${intake.insurance}`;
+  if (t.insuranceList.length) return `Accepts ${t.insuranceList.join(', ')}`;
+  return t.selfPayNote || 'Self-pay';
+}
+
+// Only surfaced when it's actually the reason this therapist is showing up —
+// a client who didn't ask for a specific language shouldn't see one at all.
+function languageBadgeHtml(t) {
+  if (intake.languagePref === 'any' || intake.languagePref === 'English') return '';
+  if (!t.languages.includes(intake.languagePref)) return '';
+  return `<div class="language-badge">🗣️ I speak ${intake.languagePref}</div>`;
 }
 
 function tagHtml(tag) {
@@ -637,13 +656,15 @@ function buildCard(t) {
       <div class="initials">${t.initials}</div>
       <div class="stamp like">Like</div>
       <div class="stamp pass">Pass</div>
+      ${languageBadgeHtml(t)}
     </div>
     <div class="card-body">
       <div class="card-name-row"><h2>${t.name}</h2><span class="creds">${t.creds}</span></div>
-      <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
       <div class="card-meta"><span>📍 ${t.location.city}, ${t.location.state}</span></div>
+      <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
+      <div class="card-meta"><span>${insuranceDisplayLabel(t)}</span></div>
       <div class="card-meta"><span>Next available: ${t.nextAvailableLabel}</span></div>
-      <div class="card-meta"><span>${languagesLabel(t)}</span></div>
+      ${t.bestFor ? `<div class="best-for">${t.bestFor}</div>` : ''}
       <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
       ${practiceBadgeHtml(t)}
       ${matchTagsHtml(t)}
@@ -878,15 +899,16 @@ function openDetail(t, opts = {}) {
   detailSheet.innerHTML = `
     <div class="sheet-close"></div>
     ${preview ? `<div class="preview-banner">👀 This is what clients see when they view your profile</div>` : ''}
-    <div class="card-photo" style="background:${t.gradient};height:160px;border-radius:16px;margin-bottom:14px;">
+    <div class="card-photo detail-photo" style="background:${t.gradient};">
       <div class="initials">${t.initials}</div>
+      ${preview ? '' : languageBadgeHtml(t)}
     </div>
-    <div class="card-name-row"><h2>${t.name}</h2></div>
-    <div class="card-meta" style="margin-top:4px;">${t.creds}</div>
+    <div class="card-name-row" style="margin-top:14px;"><h2>${t.name}</h2><span class="creds">${t.creds}</span></div>
     <div class="section-title">Details</div>
-    <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
     <div class="card-meta"><span>📍 ${t.location.city}, ${t.location.state}</span></div>
-    <div class="card-meta"><span>${languagesLabel(t)}</span></div>
+    <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
+    <div class="card-meta"><span>${insuranceDisplayLabel(t, { preview })}</span></div>
+    ${t.bestFor ? `<div class="best-for">${t.bestFor}</div>` : ''}
     <div class="section-title">Specialties</div>
     <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
     ${practiceBadgeHtml(t)}
@@ -1400,9 +1422,10 @@ function startTherapistSignup() {
   newTherapistDraft = {
     name: '', creds: '',
     practiceType: 'specialist',
+    bestFor: '',
     tags: [], modalities: [],
     style: 'balanced', gender: 'female', lgbtqAffirming: false, languages: [], showOtherLanguage: false,
-    formats: [], insuranceList: [], rateMin: 130,
+    formats: [], insuranceList: [], selfPayNote: '', rateMin: 130,
     city: '', state: '',
     promptAnswers: THERAPIST_PROMPT_OPTIONS.map(() => ''),
     acceptingOngoing: true, onDemand: false, onDemandSlots: [], agreedToOnDemandPolicy: false
@@ -1439,7 +1462,9 @@ function renderSignupStep() {
       <div class="t-form-label">Modalities you're certified in</div>
       <div class="chip-grid" id="ts-modalities-grid">
         ${MODALITY_OPTIONS.map(m => `<div class="chip-option ${d.modalities.includes(m) ? 'selected' : ''}" data-modality="${m}">${m}</div>`).join('')}
-      </div>`;
+      </div>
+      <div class="t-form-label">In one line, who do you work best with?</div>
+      <input type="text" class="t-rate-input" id="ts-bestfor" placeholder="e.g. I work best with new parents navigating postpartum anxiety" value="${d.bestFor}">`;
   } else if (signupStep === 2) {
     html += `
       <h1>How would you describe yourself?</h1>
@@ -1481,6 +1506,8 @@ function renderSignupStep() {
       <div class="chip-grid" id="ts-insurance-grid">
         ${['Aetna', 'BCBS', 'Cigna', 'United'].map(i => `<div class="chip-option ${d.insuranceList.includes(i) ? 'selected' : ''}" data-insurance="${i}">${i}</div>`).join('')}
       </div>
+      <div class="t-form-label">If you don't take insurance, what should clients know? (optional)</div>
+      <input type="text" class="t-rate-input" id="ts-selfpaynote" placeholder="e.g. Sliding scale available" value="${d.selfPayNote}">
       <div class="t-form-label">Your rate per session</div>
       <div class="budget-slider-row">
         <input type="range" id="ts-rate-slider" min="80" max="250" step="10" value="${d.rateMin}">
@@ -1562,6 +1589,8 @@ function attachSignupHandlers() {
       renderSignupStep();
     });
   });
+  const bestForInput = document.getElementById('ts-bestfor');
+  if (bestForInput) bestForInput.addEventListener('input', () => { d.bestFor = bestForInput.value; });
 
   document.querySelectorAll('#ts-style-list .option-row').forEach(el => {
     el.addEventListener('click', () => { d.style = el.dataset.style; renderSignupStep(); });
@@ -1618,6 +1647,8 @@ function attachSignupHandlers() {
       renderSignupStep();
     });
   });
+  const selfPayNoteInput = document.getElementById('ts-selfpaynote');
+  if (selfPayNoteInput) selfPayNoteInput.addEventListener('input', () => { d.selfPayNote = selfPayNoteInput.value; });
   const rateSlider = document.getElementById('ts-rate-slider');
   if (rateSlider) {
     rateSlider.addEventListener('input', () => {
@@ -1672,8 +1703,7 @@ function buildTherapistMeta(d) {
     : d.formats.includes('video') ? 'Video only'
     : d.formats.includes('in-person') ? 'In-person only'
     : 'Format not set';
-  const insuranceLabel = d.insuranceList.length ? `Accepts ${d.insuranceList.join(', ')}` : 'Self-pay / out-of-network';
-  return [formatLabel, `$${d.rateMin}/session`, insuranceLabel];
+  return [formatLabel, `$${d.rateMin}/session`];
 }
 
 function finishTherapistSignup() {
@@ -1687,6 +1717,7 @@ function finishTherapistSignup() {
     id, name: d.name.trim(), creds: d.creds.trim() || 'Licensed Therapist',
     initials, gradient,
     meta: buildTherapistMeta(d),
+    bestFor: d.bestFor.trim(), selfPayNote: d.selfPayNote.trim(),
     tags: d.tags, practiceType: d.practiceType, externalAppointments: [],
     promptAnswers: d.promptAnswers.map(a => a.trim()),
     modalities: d.modalities, style: d.style,
@@ -1903,6 +1934,9 @@ function renderTherapistProfile() {
     <div class="t-form-label">Modalities you offer</div>
     <div class="chip-grid">${MODALITY_OPTIONS.map(m => `<div class="chip-option ${t.modalities.includes(m) ? 'selected' : ''}" data-toggle-modality="${m}">${m}</div>`).join('')}</div>
 
+    <div class="t-form-label">In one line, who do you work best with?</div>
+    <input type="text" class="t-rate-input" id="t-bestfor-input" placeholder="e.g. I work best with new parents navigating postpartum anxiety" value="${t.bestFor || ''}">
+
     <div class="t-form-label">Gender</div>
     <div class="chip-grid">
       <div class="chip-option ${t.identity.gender === 'female' ? 'selected' : ''}" data-set-gender="female">Female</div>
@@ -1934,6 +1968,9 @@ function renderTherapistProfile() {
 
     <div class="t-form-label">Insurance accepted</div>
     <div class="chip-grid">${['Aetna', 'BCBS', 'Cigna', 'United'].map(i => `<div class="chip-option ${t.insuranceList.includes(i) ? 'selected' : ''}" data-toggle-insurance="${i}">${i}</div>`).join('')}</div>
+
+    <div class="t-form-label">If you don't take insurance, what should clients know? (optional)</div>
+    <input type="text" class="t-rate-input" id="t-selfpaynote-input" placeholder="e.g. Sliding scale available" value="${t.selfPayNote || ''}">
 
     <div class="t-form-label">Rate (per session, $)</div>
     <input type="number" class="t-rate-input" id="t-rate-input" value="${t.rateMin}">
@@ -1986,6 +2023,8 @@ function attachTherapistProfileHandlers(t) {
     if (i === -1) t.modalities.push(m); else t.modalities.splice(i, 1);
     renderTherapistProfile();
   }));
+  const tBestForInput = document.getElementById('t-bestfor-input');
+  if (tBestForInput) tBestForInput.addEventListener('input', () => { t.bestFor = tBestForInput.value; });
   document.querySelectorAll('[data-set-gender]').forEach(el => el.addEventListener('click', () => {
     t.identity.gender = el.dataset.setGender;
     renderTherapistProfile();
@@ -2025,6 +2064,8 @@ function attachTherapistProfileHandlers(t) {
     if (i === -1) t.insuranceList.push(ins); else t.insuranceList.splice(i, 1);
     renderTherapistProfile();
   }));
+  const tSelfPayNoteInput = document.getElementById('t-selfpaynote-input');
+  if (tSelfPayNoteInput) tSelfPayNoteInput.addEventListener('input', () => { t.selfPayNote = tSelfPayNoteInput.value; });
   document.getElementById('t-rate-input').addEventListener('change', (e) => { t.rateMin = Number(e.target.value) || 0; });
   document.querySelectorAll('textarea[data-edit-prompt-index]').forEach(el => {
     el.addEventListener('input', () => { t.promptAnswers[Number(el.dataset.editPromptIndex)] = el.value; });

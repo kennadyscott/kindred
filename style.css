@@ -166,6 +166,40 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 }
 .card-meta span { display: flex; align-items: center; gap: 4px; }
 
+.detail-photo {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 20px;
+}
+
+.language-badge {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  background: rgba(255,255,255,0.95);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.best-for {
+  background: var(--sand);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
 .tag-row {
   display: flex;
   flex-wrap: wrap;
