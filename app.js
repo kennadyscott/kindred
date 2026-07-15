@@ -257,6 +257,15 @@ let intake = {
 let deck = [];
 let deckIndex = 0;
 let shortlist = [];       // therapists swiped right on but not yet requested
+let savedResources = [];  // resource ids the client saved from Explore — part of the shareable profile
+
+const EXPLORE_RESOURCES = [
+  { id: 'r1', icon: '🌱', title: 'What to expect in your first session', blurb: 'A gentle walkthrough so the first hour feels less like a mystery.' },
+  { id: 'r2', icon: '🫁', title: 'Grounding: the 5-4-3-2-1 exercise', blurb: 'A quick sensory reset for anxious moments, anywhere.' },
+  { id: 'r3', icon: '📓', title: 'Journaling prompts for hard weeks', blurb: 'Five prompts for when you can’t find the words on your own.' },
+  { id: 'r4', icon: '🌙', title: 'Winding down: sleep and stress', blurb: 'Why racing thoughts get louder at night, and what helps.' },
+  { id: 'r5', icon: '🗣️', title: 'How to talk about therapy with family', blurb: 'Scripts for the "so why do you need a therapist?" conversation.' }
+];
 const MAX_PENDING_REQUESTS = 5; // 5 real shots: pending + matched count, only a decline frees a slot
 let matches = [];         // {therapist, status: 'matched' | 'pending' | 'declined' | 'ondemand'}
 const chatLog = {};       // therapistId -> [{from: 'me'|'them', text}] — 'me' is always the client, 'them' is always the therapist
@@ -950,7 +959,11 @@ function confirmMatchRequest(therapistId, introMessage, desiredFrequency) {
   if (idx === -1) return;
   const t = shortlist[idx];
   shortlist.splice(idx, 1);
-  matches.push({ therapist: t, status: 'pending', needsSnapshot: intake.needs.slice(), introMessage, desiredFrequency });
+  matches.push({
+    therapist: t, status: 'pending', needsSnapshot: intake.needs.slice(), introMessage, desiredFrequency,
+    profileShared: false,
+    portal: { goals: [], homework: [], resources: [] }
+  });
   chatLog[therapistId] = [{ from: 'me', text: introMessage }];
   showToast('Match request sent — waiting for them to respond.');
   updateNavBadge();
@@ -1186,10 +1199,112 @@ function openChat(t, role) {
     }
     statusEl.textContent = 'Usually replies within a day';
   }
+  // The between-sessions portal only exists for an established (matched)
+  // client-therapist pair, and only the client views it from chat — the
+  // therapist manages it from their Home schedule.
+  const m = matches.find(m => m.therapist.id === t.id && m.status === 'matched');
+  document.getElementById('between-sessions-btn').classList.toggle('hidden', !(chatRole === 'client' && m));
+  document.getElementById('between-sessions-btn').dataset.tid = t.id;
   document.getElementById('chat-input').dataset.tid = t.id;
   renderChatMessages(t.id);
   showScreen('chat');
 }
+
+// ===== BETWEEN-SESSIONS PORTAL =====
+// One portal per matched pair. The therapist fills it (goals / homework /
+// resources); the client reads it and can tick homework off. It also holds
+// the therapist-facing view of the client's shared profile.
+const PORTAL_SECTIONS = [
+  { key: 'goals', label: 'Goals', icon: '🎯', placeholder: 'e.g. Practice saying no once this week' },
+  { key: 'homework', label: 'Homework', icon: '📝', placeholder: 'e.g. 5-4-3-2-1 grounding, once a day' },
+  { key: 'resources', label: 'Resources', icon: '🌿', placeholder: 'e.g. Ch. 2 of "Self-Compassion"' }
+];
+
+function clientProfileSummaryHtml(m) {
+  if (!m.profileShared) {
+    return `<div class="portal-note">This client hasn't shared their profile. They can turn on sharing from their own profile page whenever they're ready.</div>`;
+  }
+  const savedList = EXPLORE_RESOURCES.filter(r => savedResources.includes(r.id));
+  return `
+    <div class="pref-item"><div class="pref-label">Looking for support with</div><div class="pref-value">${needsSummary()}</div></div>
+    <div class="pref-item"><div class="pref-label">Approach</div><div class="pref-value">${modalitySummary()}</div></div>
+    <div class="pref-item"><div class="pref-label">Session format</div><div class="pref-value">${formatSummary()}</div></div>
+    <div class="pref-item"><div class="pref-label">Identity preferences</div><div class="pref-value">${identitySummary()}</div></div>
+    <div class="pref-item"><div class="pref-label">Saved resources</div><div class="pref-value">${savedList.length ? savedList.map(r => `${r.icon} ${r.title}`).join('<br>') : 'None saved yet.'}</div></div>
+  `;
+}
+
+function openTherapistPortal(therapistId) {
+  const m = matches.find(m => m.therapist.id === therapistId && m.status === 'matched');
+  if (!m) return;
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>Client Portal</h2>
+    <div class="intake-sub">What this client sees between sessions — and what they've chosen to share with you.</div>
+    <div class="section-title">Their shared profile</div>
+    ${clientProfileSummaryHtml(m)}
+    ${PORTAL_SECTIONS.map(s => `
+      <div class="section-title">${s.icon} ${s.label}</div>
+      ${m.portal[s.key].length ? m.portal[s.key].map((item, i) => `
+        <div class="portal-item">
+          <span class="portal-item-text">${s.key === 'homework' && item.done ? '✅ ' : ''}${s.key === 'homework' ? item.text : item}${s.key === 'homework' && item.done ? ' <em class="portal-done-note">— done</em>' : ''}</span>
+          <button class="portal-remove" data-portal-remove="${s.key}:${i}">✕</button>
+        </div>
+      `).join('') : `<div class="portal-note">Nothing here yet.</div>`}
+      <div class="add-slot-row">
+        <input type="text" data-portal-input="${s.key}" placeholder="${s.placeholder}">
+        <button data-portal-add="${s.key}">Add</button>
+      </div>
+    `).join('')}
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  sheet.querySelectorAll('[data-portal-add]').forEach(btn => btn.addEventListener('click', () => {
+    const key = btn.dataset.portalAdd;
+    const input = sheet.querySelector(`[data-portal-input="${key}"]`);
+    const text = input.value.trim();
+    if (!text) return;
+    m.portal[key].push(key === 'homework' ? { text, done: false } : text);
+    openTherapistPortal(therapistId);
+  }));
+  sheet.querySelectorAll('[data-portal-remove]').forEach(btn => btn.addEventListener('click', () => {
+    const [key, i] = btn.dataset.portalRemove.split(':');
+    m.portal[key].splice(Number(i), 1);
+    openTherapistPortal(therapistId);
+  }));
+}
+
+function openClientPortal(therapistId) {
+  const m = matches.find(m => m.therapist.id === therapistId && m.status === 'matched');
+  if (!m) return;
+  const sheet = document.getElementById('confirm-sheet');
+  const isEmpty = PORTAL_SECTIONS.every(s => m.portal[s.key].length === 0);
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>Between Sessions</h2>
+    <div class="intake-sub">From ${displayName(m.therapist)} — things to hold onto until you meet again.</div>
+    ${isEmpty ? `<div class="portal-note" style="margin-top:14px;">Nothing here yet — after a session, ${displayName(m.therapist)} can leave goals, homework, and resources for you here.</div>` : PORTAL_SECTIONS.map(s => `
+      <div class="section-title">${s.icon} ${s.label}</div>
+      ${m.portal[s.key].length ? m.portal[s.key].map((item, i) => s.key === 'homework' ? `
+        <label class="portal-item portal-checkable">
+          <input type="checkbox" data-homework-toggle="${i}" ${item.done ? 'checked' : ''}>
+          <span class="portal-item-text ${item.done ? 'portal-item-done' : ''}">${item.text}</span>
+        </label>
+      ` : `
+        <div class="portal-item"><span class="portal-item-text">${item}</span></div>
+      `).join('') : `<div class="portal-note">Nothing here yet.</div>`}
+    `).join('')}
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  sheet.querySelectorAll('[data-homework-toggle]').forEach(cb => cb.addEventListener('change', () => {
+    m.portal.homework[Number(cb.dataset.homeworkToggle)].done = cb.checked;
+    openClientPortal(therapistId);
+  }));
+}
+
+document.getElementById('between-sessions-btn').addEventListener('click', (e) => {
+  openClientPortal(e.currentTarget.dataset.tid);
+});
 
 function renderChatMessages(tid) {
   const container = document.getElementById('chat-messages');
@@ -1440,6 +1555,7 @@ function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   document.querySelectorAll('#bottom-nav .nav-btn').forEach(b => b.classList.remove('active'));
   if (name === 'profile') renderProfileScreen();
+  if (name === 'explore') renderExploreResources();
   if (name === 'ondemand') renderOndemand();
   if (name === 'shortlist') renderShortlist();
   if (name === 'matches') renderMatches();
@@ -1531,6 +1647,30 @@ function showExploreScreen() {
   // is a full-screen page whose only exit is "Match with a Therapist".
   document.getElementById('bottom-nav').classList.toggle('hidden', !intake.completed);
   showScreen('explore');
+}
+
+function renderExploreResources() {
+  const list = document.getElementById('explore-resources-list');
+  list.innerHTML = EXPLORE_RESOURCES.map(r => {
+    const saved = savedResources.includes(r.id);
+    return `
+      <div class="resource-card">
+        <span class="resource-icon">${r.icon}</span>
+        <div class="resource-text">
+          <div class="resource-title">${r.title}</div>
+          <div class="resource-blurb">${r.blurb}</div>
+        </div>
+        <button class="resource-save-btn ${saved ? 'saved' : ''}" data-resource="${r.id}">${saved ? '✓ Saved' : 'Save'}</button>
+      </div>`;
+  }).join('');
+  list.querySelectorAll('[data-resource]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.resource;
+      const i = savedResources.indexOf(id);
+      if (i === -1) savedResources.push(id); else savedResources.splice(i, 1);
+      renderExploreResources();
+    });
+  });
 }
 
 document.getElementById('exp-match-btn').addEventListener('click', enterMatchingExperience);
@@ -2056,7 +2196,7 @@ function renderTherapistHome() {
     items.push({ day, time: timeParts.join(' '), label: 'One-time session' });
   });
   matches.filter(m => m.therapist.id === currentTherapistId && m.status === 'matched' && m.scheduledDay).forEach(m => {
-    items.push({ day: m.scheduledDay, time: m.scheduledTime, label: 'Ongoing client' });
+    items.push({ day: m.scheduledDay, time: m.scheduledTime, label: 'Ongoing client', portalTid: m.therapist.id });
   });
   t.externalAppointments.forEach((a, i) => {
     items.push({ day: a.day, time: a.time, label: a.label, external: true, index: i });
@@ -2071,6 +2211,7 @@ function renderTherapistHome() {
       <div class="appt-card">
         <div class="appt-day">${it.day}</div>
         <div class="appt-details"><div class="appt-label">${it.label}</div><div class="appt-time">${it.time}</div></div>
+        ${it.portalTid ? `<button class="portal-open-btn" data-open-portal="${it.portalTid}">Client Portal</button>` : ''}
         ${it.external ? `<button class="appt-remove" data-remove-external="${it.index}">✕</button>` : ''}
       </div>
     `).join('');
@@ -2093,6 +2234,9 @@ function renderTherapistHome() {
       t.externalAppointments.splice(Number(btn.dataset.removeExternal), 1);
       renderTherapistHome();
     });
+  });
+  list.querySelectorAll('[data-open-portal]').forEach(btn => {
+    btn.addEventListener('click', () => openTherapistPortal(btn.dataset.openPortal));
   });
   document.getElementById('add-external-appt-btn').addEventListener('click', () => {
     const label = document.getElementById('external-appt-label').value.trim();
@@ -2481,6 +2625,8 @@ function renderProfileScreen() {
     screen.id = 'screen-profile';
     document.querySelector('.phone').insertBefore(screen, document.querySelector('.bottom-nav'));
   }
+  const savedList = EXPLORE_RESOURCES.filter(r => savedResources.includes(r.id));
+  const matchedMatches = matches.filter(m => m.status === 'matched');
   screen.innerHTML = `
     <header class="top-bar"><div class="logo">Your Preferences</div></header>
     <div class="profile-content">
@@ -2490,12 +2636,36 @@ function renderProfileScreen() {
       <div class="pref-item"><div class="pref-label">Insurance</div><div class="pref-value">${insuranceSummary()}</div></div>
       <div class="pref-item"><div class="pref-label">Budget</div><div class="pref-value">${budgetSummary()}</div></div>
       <div class="pref-item"><div class="pref-label">Identity preferences</div><div class="pref-value">${identitySummary()}</div></div>
+
+      <div class="pref-item">
+        <div class="pref-label">Saved resources</div>
+        <div class="pref-value">${savedList.length ? savedList.map(r => `${r.icon} ${r.title}`).join('<br>') : 'Nothing saved yet — browse the Kindred tab to find resources.'}</div>
+      </div>
+
+      <div class="pref-item">
+        <div class="pref-label">Share your profile</div>
+        <div class="pref-value" style="margin-bottom:6px;">Give a matched therapist a picture of what you're working with — your questionnaire answers and saved resources. You choose per therapist, and you can turn it off anytime.</div>
+        ${matchedMatches.length ? matchedMatches.map(m => `
+          <div class="must-have-toggle" style="margin-top:8px;">
+            <div class="toggle-label"><strong>${displayName(m.therapist)}</strong><span>${m.profileShared ? 'Can see your profile' : 'Cannot see your profile'}</span></div>
+            <div class="switch ${m.profileShared ? 'on' : ''}" data-share-toggle="${m.therapist.id}"></div>
+          </div>
+        `).join('') : `<div class="pref-value" style="color:var(--ink-soft);">Once you match with a therapist, you can share your profile with them here.</div>`}
+      </div>
+
       <button class="edit-prefs-btn" id="edit-prefs-btn">Edit My Preferences</button>
       <button class="edit-prefs-btn" id="client-logout-btn" style="color:var(--ink-soft);">Log Out</button>
     </div>
   `;
   document.getElementById('edit-prefs-btn').addEventListener('click', startIntake);
   document.getElementById('client-logout-btn').addEventListener('click', logout);
+  screen.querySelectorAll('[data-share-toggle]').forEach(el => el.addEventListener('click', () => {
+    const m = matches.find(m => m.therapist.id === el.dataset.shareToggle && m.status === 'matched');
+    if (!m) return;
+    m.profileShared = !m.profileShared;
+    showToast(m.profileShared ? `Profile shared with ${displayName(m.therapist)}.` : `Profile no longer shared with ${displayName(m.therapist)}.`);
+    renderProfileScreen();
+  }));
 }
 
 showScreen('account-type');
