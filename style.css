@@ -50,6 +50,18 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   flex-direction: column;
 }
 
+.demo-banner {
+  background: var(--teal-light);
+  color: var(--teal);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 5px 10px;
+  flex-shrink: 0;
+}
+
 .screen {
   flex: 1;
   display: flex;
