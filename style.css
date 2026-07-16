@@ -264,6 +264,90 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   flex-shrink: 0;
 }
 
+/* ===== LICENSE VERIFICATION ===== */
+.verified-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--moss-light);
+  color: var(--moss);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+.license-verified-box {
+  background: var(--moss-light);
+  color: var(--moss);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 11px 13px;
+}
+.stripe-verify-btn {
+  width: 100%;
+  background: #635BFF;
+  color: white;
+  border: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.stripe-verify-btn strong { font-weight: 800; letter-spacing: -0.3px; }
+.stripe-sheet-brand {
+  font-family: 'Inter', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #635BFF;
+  margin-bottom: 8px;
+}
+.stripe-sheet-brand span { font-weight: 500; letter-spacing: 0; color: var(--ink-soft); font-size: 13px; }
+.stripe-primary-btn { background: #635BFF !important; color: white !important; margin-top: 14px; }
+.stripe-primary-btn:disabled { opacity: 0.6; }
+
+/* ===== THERAPIST INSIGHTS ===== */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.stat-tile {
+  background: white;
+  border-radius: 16px;
+  padding: 14px 15px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.stat-value {
+  font-family: 'Fraunces', serif;
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--coral-dark);
+  line-height: 1.1;
+}
+.stat-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-soft);
+  font-weight: 700;
+  margin-top: 4px;
+}
+.stat-delta {
+  font-size: 11.5px;
+  color: var(--moss);
+  font-weight: 600;
+  margin-top: 2px;
+}
+.website-link { color: var(--teal); font-weight: 600; text-decoration: none; }
+.website-link:hover { text-decoration: underline; }
+
 .icon-btn {
   background: var(--sand);
   border: none;

@@ -23,7 +23,10 @@ const THERAPISTS = [
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
     practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false,
-    location: { city: 'Austin', state: 'TX' }
+    location: { city: 'Austin', state: 'TX' },
+    licenseVerified: true, licenseNumber: 'TX-38291',
+    website: 'drmayachen.com',
+    stats: { profileViews: 214, hearts: 58, top5: 12, conversationsStarted: 9, weekViews: 31, weekHearts: 8 }
   },
   {
     id: 't2', name: 'James Okafor', credentials: ['LMFT'],
@@ -50,7 +53,10 @@ const THERAPISTS = [
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Thu 4:00pm', rank: 2 }],
     nextAvailableRank: 3, nextAvailableLabel: 'Next week',
     practiceType: 'generalist', externalAppointments: [], agreedToOnDemandPolicy: true,
-    location: { city: 'Chicago', state: 'IL' }
+    location: { city: 'Chicago', state: 'IL' },
+    licenseVerified: true, licenseNumber: 'IL-77204',
+    website: 'okaforcouples.com',
+    stats: { profileViews: 162, hearts: 41, top5: 8, conversationsStarted: 7, weekViews: 22, weekHearts: 5 }
   },
   {
     id: 't3', name: 'Priya Raman', credentials: ['LPC', 'Trauma Specialist'],
@@ -77,7 +83,10 @@ const THERAPISTS = [
     acceptingOngoing: false, onDemand: true, onDemandSlots: [{ label: 'Wed 1:00pm', rank: 1 }, { label: 'Fri 11:00am', rank: 3 }],
     nextAvailableRank: null, nextAvailableLabel: 'Not accepting new ongoing clients',
     practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: true,
-    location: { city: 'Austin', state: 'TX' }
+    location: { city: 'Austin', state: 'TX' },
+    licenseVerified: true, licenseNumber: 'TX-51830',
+    website: '',
+    stats: { profileViews: 189, hearts: 47, top5: 10, conversationsStarted: 6, weekViews: 26, weekHearts: 6 }
   },
   {
     id: 't4', name: 'Dr. Sam Alvarez', credentials: ['PsyD'],
@@ -103,7 +112,10 @@ const THERAPISTS = [
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
     practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false,
-    location: { city: 'Chicago', state: 'IL' }
+    location: { city: 'Chicago', state: 'IL' },
+    licenseVerified: true, licenseNumber: 'IL-42917',
+    website: '',
+    stats: { profileViews: 143, hearts: 36, top5: 7, conversationsStarted: 5, weekViews: 19, weekHearts: 4 }
   },
   {
     id: 't5', name: 'Dr. Leah Fitzgerald', credentials: ['PhD', 'Perinatal Specialist'],
@@ -129,7 +141,10 @@ const THERAPISTS = [
     acceptingOngoing: false, onDemand: false, onDemandSlots: [],
     nextAvailableRank: null, nextAvailableLabel: 'Paused',
     practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false,
-    location: { city: 'Denver', state: 'CO' }
+    location: { city: 'Denver', state: 'CO' },
+    licenseVerified: true, licenseNumber: 'CO-20348',
+    website: 'drleahfitz.com',
+    stats: { profileViews: 98, hearts: 22, top5: 4, conversationsStarted: 3, weekViews: 9, weekHearts: 2 }
   },
   {
     id: 't6', name: 'Marcus Webb', credentials: ['LCSW'],
@@ -156,7 +171,10 @@ const THERAPISTS = [
     acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Tue 9:00am', rank: 1 }],
     nextAvailableRank: 4, nextAvailableLabel: 'In 2 weeks',
     practiceType: 'generalist', externalAppointments: [], agreedToOnDemandPolicy: true,
-    location: { city: 'Austin', state: 'TX' }
+    location: { city: 'Austin', state: 'TX' },
+    licenseVerified: true, licenseNumber: 'TX-66125',
+    website: '',
+    stats: { profileViews: 121, hearts: 30, top5: 6, conversationsStarted: 4, weekViews: 15, weekHearts: 3 }
   }
 ];
 
@@ -279,6 +297,9 @@ const navBadge = document.getElementById('nav-badge');
 // COMPATIBILITY LOGIC
 // ===================================================================
 function isCompatible(t, mode) {
+  // Unverified licenses never reach clients — verification is the floor,
+  // not a ranking signal.
+  if (!t.licenseVerified) return false;
   if (mode === 'ongoing' && !t.acceptingOngoing) return false;
   if (mode === 'ondemand' && (!t.onDemand || t.onDemandSlots.length === 0)) return false;
 
@@ -787,7 +808,7 @@ function buildCard(t) {
       ${languageBadgeHtml(t)}
     </div>
     <div class="card-body">
-      <div class="card-name-row"><h2 class="serif-name">${displayName(t)}</h2></div>
+      <div class="card-name-row"><h2 class="serif-name">${displayName(t)}</h2>${t.licenseVerified ? `<span class="verified-chip" title="License verified via Stripe Identity">✓ Verified</span>` : ''}</div>
       ${(t.showPronouns && t.pronouns) ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
       <div class="card-subtitle">${[credentialsLabel(t), ...t.tags.slice(0, 2)].join(' • ')}</div>
       ${traitChipsHtml(t)}
@@ -872,6 +893,7 @@ function curYOf(card) {
 }
 
 function handleLike(t) {
+  t.stats.hearts++;
   // Swiping right only shortlists — it sends no signal to the therapist yet.
   // A client picks from the shortlist which ones to actually request,
   // capped at MAX_PENDING_REQUESTS, so a therapist's inbox reflects real
@@ -964,6 +986,7 @@ function confirmMatchRequest(therapistId, introMessage, desiredFrequency) {
     profileShared: false,
     portal: { goals: [], homework: [], resources: [] }
   });
+  t.stats.conversationsStarted++;
   chatLog[therapistId] = [{ from: 'me', text: introMessage }];
   showToast('Match request sent — waiting for them to respond.');
   updateNavBadge();
@@ -1025,6 +1048,7 @@ const detailSheet = document.getElementById('detail-sheet');
 
 function openDetail(t, opts = {}) {
   const preview = opts.preview === true;
+  if (!preview) t.stats.profileViews++;
   detailSheet.innerHTML = `
     <div class="sheet-close"></div>
     ${preview ? `<div class="preview-banner">👀 This is what clients see when they view your profile</div>` : ''}
@@ -1035,10 +1059,12 @@ function openDetail(t, opts = {}) {
     </div>
     <div class="card-name-row" style="margin-top:14px;"><h2>${displayName(t)}</h2><span class="creds">${credentialsLabel(t)}</span></div>
     ${t.pronouns ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
+    ${t.licenseVerified ? `<div class="verified-chip" style="margin-top:4px;">✓ License verified via Stripe Identity</div>` : ''}
     <div class="section-title">Details</div>
     <div class="card-meta"><span>📍 ${t.location.city}, ${t.location.state}</span></div>
     <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
     <div class="card-meta"><span>${insuranceDisplayLabel(t, { preview })}</span></div>
+    ${t.website ? `<div class="card-meta"><a class="website-link" href="https://${t.website}" target="_blank" rel="noopener">🌐 ${t.website}</a></div>` : ''}
     ${t.bestFor ? `<div class="best-for">${t.bestFor}</div>` : ''}
     <div class="section-title">Specialties</div>
     <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
@@ -1208,6 +1234,43 @@ function openChat(t, role) {
   document.getElementById('chat-input').dataset.tid = t.id;
   renderChatMessages(t.id);
   showScreen('chat');
+}
+
+// ===== LICENSE VERIFICATION (simulated Stripe Identity) =====
+// Prototype stand-in for a real Stripe Identity verification session —
+// the real flow would redirect to Stripe, run the document/registry check,
+// and return a verified webhook. Here: a themed sheet with a short delay.
+function openStripeVerification(licenseNumber, onVerified) {
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <div class="stripe-sheet-brand">stripe <span>| Identity</span></div>
+    <h2>Verify your professional license</h2>
+    <div class="intake-sub">Kindred uses Stripe Identity to confirm your license against state registries. This takes about a minute in the real flow.</div>
+    <div class="pref-item" style="margin-top:14px;">
+      <div class="pref-label">License number</div>
+      <div class="pref-value">${licenseNumber}</div>
+    </div>
+    <div id="stripe-verify-status"></div>
+    <button class="primary-btn stripe-primary-btn" id="stripe-start-btn">Start verification</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  document.getElementById('stripe-start-btn').addEventListener('click', () => {
+    const status = document.getElementById('stripe-verify-status');
+    const btn = document.getElementById('stripe-start-btn');
+    btn.disabled = true;
+    btn.textContent = 'Verifying…';
+    status.innerHTML = `<div class="portal-note" style="margin-bottom:10px;">Checking ${licenseNumber} against the state licensing registry…</div>`;
+    setTimeout(() => {
+      status.innerHTML = `<div class="license-verified-box" style="margin-bottom:10px;">✓ License ${licenseNumber} verified</div>`;
+      btn.textContent = 'Done';
+      btn.disabled = false;
+      btn.onclick = () => {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        onVerified();
+      };
+    }, 1400);
+  });
 }
 
 // ===== BETWEEN-SESSIONS PORTAL =====
@@ -1735,6 +1798,8 @@ function startTherapistSignup() {
   signupStep = 0;
   newTherapistDraft = {
     name: '', credentials: ['', '', ''],
+    licenseNumber: '', licenseVerified: false,
+    website: '',
     pronouns: '', showPronouns: true, useCompanyName: false, companyName: '',
     practiceType: 'specialist',
     bestFor: '',
@@ -1778,7 +1843,13 @@ function renderSignupStep() {
       <div class="t-form-label">Credentials (up to 3)</div>
       <input type="text" class="t-rate-input" id="ts-cred-0" placeholder="e.g. LPC" value="${d.credentials[0]}">
       <input type="text" class="t-rate-input" id="ts-cred-1" placeholder="e.g. PhD" value="${d.credentials[1]}">
-      <input type="text" class="t-rate-input" id="ts-cred-2" placeholder="e.g. Certified Gottman Therapist" value="${d.credentials[2]}">`;
+      <input type="text" class="t-rate-input" id="ts-cred-2" placeholder="e.g. Certified Gottman Therapist" value="${d.credentials[2]}">
+      <div class="t-form-label">License verification</div>
+      ${d.licenseVerified
+        ? `<div class="license-verified-box">✓ License ${d.licenseNumber} verified via Stripe Identity</div>`
+        : `<input type="text" class="t-rate-input" id="ts-license-number" placeholder="License number, e.g. TX-38291" value="${d.licenseNumber}">
+           <button type="button" class="stripe-verify-btn" id="ts-verify-license-btn">Verify with <strong>Stripe</strong> Identity</button>
+           <div class="intake-sub" style="margin-top:6px;">Your profile can't go live until your license is verified. Clients only ever see verified therapists.</div>`}`;
   } else if (signupStep === 1) {
     html += `
       <h1>What do you specialize in?</h1>
@@ -1891,7 +1962,7 @@ function renderSignupStep() {
   }
 
   let canProceed = true;
-  if (signupStep === 0) canProceed = d.name.trim().length > 0;
+  if (signupStep === 0) canProceed = d.name.trim().length > 0 && d.licenseVerified;
   else if (signupStep === 3) canProceed = d.city.trim() !== '' && d.state !== '';
   else if (signupStep === 4) canProceed = d.mandatoryPromptAnswers.every(a => a.trim().length > 0);
   html += `
@@ -1910,7 +1981,17 @@ function attachSignupHandlers() {
   const nameInput = document.getElementById('ts-name');
   if (nameInput) nameInput.addEventListener('input', () => {
     d.name = nameInput.value;
-    document.getElementById('ts-next').disabled = d.name.trim().length === 0;
+    document.getElementById('ts-next').disabled = !(d.name.trim().length > 0 && d.licenseVerified);
+  });
+  const licenseInput = document.getElementById('ts-license-number');
+  if (licenseInput) licenseInput.addEventListener('input', () => { d.licenseNumber = licenseInput.value; });
+  const verifyBtn = document.getElementById('ts-verify-license-btn');
+  if (verifyBtn) verifyBtn.addEventListener('click', () => {
+    if (!d.licenseNumber.trim()) { showToast('Enter your license number first.'); return; }
+    openStripeVerification(d.licenseNumber.trim(), () => {
+      d.licenseVerified = true;
+      renderSignupStep();
+    });
   });
   const pronounsInput = document.getElementById('ts-pronouns');
   if (pronounsInput) pronounsInput.addEventListener('input', () => { d.pronouns = pronounsInput.value; });
@@ -2110,6 +2191,9 @@ function finishTherapistSignup() {
   THERAPISTS.push({
     id, name: d.name.trim(),
     credentials: trimmedCredentials.length ? trimmedCredentials : ['Licensed Therapist'],
+    licenseVerified: d.licenseVerified, licenseNumber: d.licenseNumber.trim(),
+    website: d.website.trim(),
+    stats: { profileViews: 0, hearts: 0, top5: 0, conversationsStarted: 0, weekViews: 0, weekHearts: 0 },
     pronouns: d.pronouns.trim(), showPronouns: d.showPronouns,
     useCompanyName: d.useCompanyName, companyName: d.companyName.trim(),
     photo: null,
@@ -2162,7 +2246,50 @@ function showTScreen(name) {
   if (navBtn) navBtn.classList.add('active');
   if (name === 't-home') renderTherapistHome();
   if (name === 't-requests') renderRequests();
+  if (name === 't-insights') renderTherapistInsights();
   if (name === 't-profile') renderTherapistProfile();
+}
+
+// ===== THERAPIST INSIGHTS DASHBOARD =====
+function renderTherapistInsights() {
+  const t = THERAPISTS.find(t => t.id === currentTherapistId);
+  const container = document.getElementById('t-insights-content');
+  // "Top 5" = how many clients are using one of their 5 match-request slots
+  // on this therapist right now (pending or matched), on top of the seeded
+  // historical baseline.
+  const liveTop5 = matches.filter(m => m.therapist.id === t.id && (m.status === 'pending' || m.status === 'matched')).length;
+  const tiles = [
+    { label: 'Profile views', value: t.stats.profileViews, delta: `+${t.stats.weekViews} this week` },
+    { label: 'Hearts', value: t.stats.hearts, delta: `+${t.stats.weekHearts} this week` },
+    { label: "In clients' Top 5", value: t.stats.top5 + liveTop5, delta: 'active request slots' },
+    { label: 'Conversations started', value: t.stats.conversationsStarted, delta: 'all time' }
+  ];
+  container.innerHTML = `
+    <div class="intake-sub" style="margin-bottom:14px;">How clients are finding and responding to your profile.</div>
+    <div class="stat-grid">
+      ${tiles.map(s => `
+        <div class="stat-tile">
+          <div class="stat-value">${s.value}</div>
+          <div class="stat-label">${s.label}</div>
+          <div class="stat-delta">${s.delta}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="pref-item" style="margin-top:16px;">
+      <div class="pref-label">Your website</div>
+      <div class="pref-value" style="margin-bottom:8px;">${t.website ? `Shown on your profile as <strong>🌐 ${t.website}</strong>` : 'Add your practice website — it appears on your full profile for clients.'}</div>
+      <div class="add-slot-row">
+        <input type="text" id="t-website-input" placeholder="e.g. yourpractice.com" value="${t.website || ''}">
+        <button id="t-website-save-btn">Save</button>
+      </div>
+    </div>
+    <div class="portal-note" style="margin-top:12px;">Counts reflect this demo session plus seeded history — real analytics arrive with the production backend.</div>
+  `;
+  document.getElementById('t-website-save-btn').addEventListener('click', () => {
+    t.website = document.getElementById('t-website-input').value.trim().replace(/^https?:\/\//, '');
+    showToast(t.website ? 'Website saved — now on your profile.' : 'Website removed.');
+    renderTherapistInsights();
+  });
 }
 
 document.querySelectorAll('#therapist-nav .nav-btn').forEach(btn => {
@@ -2171,6 +2298,7 @@ document.querySelectorAll('#therapist-nav .nav-btn').forEach(btn => {
 document.getElementById('therapist-logout-0').addEventListener('click', logout);
 document.getElementById('therapist-logout-1').addEventListener('click', logout);
 document.getElementById('therapist-logout-2').addEventListener('click', logout);
+document.getElementById('therapist-logout-3').addEventListener('click', logout);
 
 function updateTNavBadge() {
   const badge = document.getElementById('t-nav-badge');
