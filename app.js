@@ -26,7 +26,12 @@ const THERAPISTS = [
     location: { city: 'Austin', state: 'TX' },
     licenseVerified: true, licenseNumber: 'TX-38291',
     website: 'drmayachen.com',
-    stats: { profileViews: 214, hearts: 58, top5: 12, conversationsStarted: 9, weekViews: 31, weekHearts: 8 }
+    stats: { profileViews: 214, hearts: 58, top5: 12, conversationsStarted: 9, weekViews: 31, weekHearts: 8 },
+    media: { video: 'https://www.w3schools.com/html/mov_bbb.mp4', office: 'https://picsum.photos/id/42/700/460', outOfOffice: 'https://picsum.photos/id/1043/700/460' },
+    persona: {
+      inOffice: "Structured but never stiff — we open with a two-minute check-in, then get to work. I keep a visible agenda and we end every session with one concrete thing to try.",
+      outOfOffice: "On a trail before 7am most Saturdays. Hiking is where I practice what I preach about quieting an overachieving brain."
+    }
   },
   {
     id: 't2', name: 'James Okafor', credentials: ['LMFT'],
@@ -56,7 +61,12 @@ const THERAPISTS = [
     location: { city: 'Chicago', state: 'IL' },
     licenseVerified: true, licenseNumber: 'IL-77204',
     website: 'okaforcouples.com',
-    stats: { profileViews: 162, hearts: 41, top5: 8, conversationsStarted: 7, weekViews: 22, weekHearts: 5 }
+    stats: { profileViews: 162, hearts: 41, top5: 8, conversationsStarted: 7, weekViews: 22, weekHearts: 5 },
+    media: { video: null, office: 'https://picsum.photos/id/48/700/460', outOfOffice: 'https://picsum.photos/id/553/700/460' },
+    persona: {
+      inOffice: "Two chairs angled toward each other, not toward me. I talk with my hands, I name the elephant in the room early, and nobody leaves mid-fight.",
+      outOfOffice: "Long walks with terrible podcasts and great questions. My wife says I interview strangers at parties — she's right."
+    }
   },
   {
     id: 't3', name: 'Priya Raman', credentials: ['LPC', 'Trauma Specialist'],
@@ -86,7 +96,12 @@ const THERAPISTS = [
     location: { city: 'Austin', state: 'TX' },
     licenseVerified: true, licenseNumber: 'TX-51830',
     website: '',
-    stats: { profileViews: 189, hearts: 47, top5: 10, conversationsStarted: 6, weekViews: 26, weekHearts: 6 }
+    stats: { profileViews: 189, hearts: 47, top5: 10, conversationsStarted: 6, weekViews: 26, weekHearts: 6 },
+    media: { video: null, office: 'https://picsum.photos/id/1060/700/460', outOfOffice: 'https://picsum.photos/id/106/700/460' },
+    persona: {
+      inOffice: "Soft light, a tea kettle, and no clock facing you. We move at your pace — silence is allowed here, and so is not being ready yet.",
+      outOfOffice: "Tending an unreasonable number of plants and learning my grandmother's recipes one phone call at a time."
+    }
   },
   {
     id: 't4', name: 'Dr. Sam Alvarez', credentials: ['PsyD'],
@@ -115,7 +130,12 @@ const THERAPISTS = [
     location: { city: 'Chicago', state: 'IL' },
     licenseVerified: true, licenseNumber: 'IL-42917',
     website: '',
-    stats: { profileViews: 143, hearts: 36, top5: 7, conversationsStarted: 5, weekViews: 19, weekHearts: 4 }
+    stats: { profileViews: 143, hearts: 36, top5: 7, conversationsStarted: 5, weekViews: 19, weekHearts: 4 },
+    media: { video: null, office: 'https://picsum.photos/id/60/700/460', outOfOffice: 'https://picsum.photos/id/1035/700/460' },
+    persona: {
+      inOffice: "Whiteboard on the wall, fidget bin on the table. We externalize everything — your brain gets to think out loud here without being graded on it.",
+      outOfOffice: "Chasing waterfalls, literally. My camera roll is 90% trails and 10% terrible selfies at the top of them."
+    }
   },
   {
     id: 't5', name: 'Dr. Leah Fitzgerald', credentials: ['PhD', 'Perinatal Specialist'],
@@ -144,7 +164,12 @@ const THERAPISTS = [
     location: { city: 'Denver', state: 'CO' },
     licenseVerified: true, licenseNumber: 'CO-20348',
     website: 'drleahfitz.com',
-    stats: { profileViews: 98, hearts: 22, top5: 4, conversationsStarted: 3, weekViews: 9, weekHearts: 2 }
+    stats: { profileViews: 98, hearts: 22, top5: 4, conversationsStarted: 3, weekViews: 9, weekHearts: 2 },
+    media: { video: null, office: 'https://picsum.photos/id/0/700/460', outOfOffice: 'https://picsum.photos/id/429/700/460' },
+    persona: {
+      inOffice: "Video-first and baby-friendly — nurse, rock, or pause whenever you need. Half my sessions happen during nap windows and that's exactly how it should be.",
+      outOfOffice: "Slow breakfasts on weekends. Berries in a mug counts as self-care and I will defend that position professionally."
+    }
   },
   {
     id: 't6', name: 'Marcus Webb', credentials: ['LCSW'],
@@ -174,7 +199,12 @@ const THERAPISTS = [
     location: { city: 'Austin', state: 'TX' },
     licenseVerified: true, licenseNumber: 'TX-66125',
     website: '',
-    stats: { profileViews: 121, hearts: 30, top5: 6, conversationsStarted: 4, weekViews: 15, weekHearts: 3 }
+    stats: { profileViews: 121, hearts: 30, top5: 6, conversationsStarted: 4, weekViews: 15, weekHearts: 3 },
+    media: { video: null, office: 'https://picsum.photos/id/180/700/460', outOfOffice: 'https://picsum.photos/id/1036/700/460' },
+    persona: {
+      inOffice: "Hoodie-friendly. No clipboard between us, no trick questions. If you want to sit on the floor, the floor is honestly where the best sessions happen.",
+      outOfOffice: "Winter camping, because apparently I only relax when it's slightly too cold to think."
+    }
   }
 ];
 
@@ -758,21 +788,46 @@ function tagHtml(tag) {
     : `<span class="tag">${tag}</span>`;
 }
 
-function promptBlocksHtml(t) {
-  const mandatory = MANDATORY_PROMPTS.map((q, i) => `
+function promptCardHtml(q, a) {
+  return `
     <div class="prompt-block">
       <div class="prompt-q">${q}</div>
-      <div class="prompt-a">${(t.mandatoryPromptAnswers && t.mandatoryPromptAnswers[i]) || "I'm still writing this one — check back soon."}</div>
-    </div>
-  `).join('');
-  const optional = (t.optionalPrompts || []).map(p => `
-    <div class="prompt-block">
-      <div class="prompt-q">${p.question}</div>
-      <div class="prompt-a">${p.answer || "I'm still writing this one — check back soon."}</div>
-    </div>
-    ${p.photo ? `<img class="prompt-photo" src="${p.photo}" alt="">` : ''}
-  `).join('');
-  return mandatory + optional;
+      <div class="prompt-a">${a || "I'm still writing this one — check back soon."}</div>
+    </div>`;
+}
+
+function feedPhotoHtml(src, caption) {
+  return `
+    <figure class="feed-media">
+      <img class="prompt-photo" src="${src}" alt="" loading="lazy">
+      ${caption ? `<figcaption class="feed-caption">${caption}</figcaption>` : ''}
+    </figure>`;
+}
+
+// The Hinge-style scrollable profile: prompts and media interleaved so the
+// person comes through, not just the credentials. Same feed on the swipe
+// card (scroll down) and the full detail view.
+function profileFeedHtml(t) {
+  const firstName = displayName(t).replace(/^Dr\.?\s*/i, '').split(' ')[0];
+  const blocks = [];
+  if (t.media && t.media.video) {
+    blocks.push(`
+      <div class="feed-media feed-video">
+        <video src="${t.media.video}" controls preload="metadata" playsinline></video>
+        <div class="feed-caption">A quick hello from ${firstName}</div>
+      </div>`);
+  }
+  blocks.push(promptCardHtml(MANDATORY_PROMPTS[0], t.mandatoryPromptAnswers && t.mandatoryPromptAnswers[0]));
+  if (t.media && t.media.office) blocks.push(feedPhotoHtml(t.media.office, 'My office — where we meet'));
+  blocks.push(promptCardHtml(MANDATORY_PROMPTS[1], t.mandatoryPromptAnswers && t.mandatoryPromptAnswers[1]));
+  if (t.persona && t.persona.inOffice) blocks.push(promptCardHtml('Who I am in the office...', t.persona.inOffice));
+  if (t.media && t.media.outOfOffice) blocks.push(feedPhotoHtml(t.media.outOfOffice, 'Out of office'));
+  if (t.persona && t.persona.outOfOffice) blocks.push(promptCardHtml('Who I am out of the office...', t.persona.outOfOffice));
+  (t.optionalPrompts || []).forEach(p => {
+    blocks.push(promptCardHtml(p.question, p.answer));
+    if (p.photo) blocks.push(feedPhotoHtml(p.photo));
+  });
+  return blocks.join('');
 }
 
 function whyYouMatchHtml(t) {
@@ -815,6 +870,8 @@ function buildCard(t) {
       ${t.bestFor ? `<div class="quote-block">${t.bestFor}</div>` : ''}
       ${whyYouMatchHtml(t)}
       ${capabilityRowHtml(t)}
+      <div class="feed-divider">Keep scrolling — get to know ${displayName(t).replace(/^Dr\.?\s*/i, '').split(' ')[0]}</div>
+      ${profileFeedHtml(t)}
     </div>
   `;
   card.querySelectorAll('[data-info]').forEach(el => {
@@ -1070,8 +1127,8 @@ function openDetail(t, opts = {}) {
     <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
     ${practiceBadgeHtml(t)}
     ${preview ? '' : matchTagsHtml(t)}
-    <div class="section-title">In their words</div>
-    ${promptBlocksHtml(t)}
+    <div class="section-title">Get to know them</div>
+    ${profileFeedHtml(t)}
     ${preview
       ? `<button class="primary-btn" style="margin-top:20px;background:white;border:1.5px solid var(--coral);color:var(--coral-dark);" id="detail-close-btn">Close Preview</button>`
       : `<button class="primary-btn" style="margin-top:20px;background:var(--coral);color:white;" id="detail-like-btn">Add to Shortlist</button>`}
@@ -2194,6 +2251,8 @@ function finishTherapistSignup() {
     licenseVerified: d.licenseVerified, licenseNumber: d.licenseNumber.trim(),
     website: d.website.trim(),
     stats: { profileViews: 0, hearts: 0, top5: 0, conversationsStarted: 0, weekViews: 0, weekHearts: 0 },
+    media: { video: null, office: null, outOfOffice: null },
+    persona: { inOffice: '', outOfOffice: '' },
     pronouns: d.pronouns.trim(), showPronouns: d.showPronouns,
     useCompanyName: d.useCompanyName, companyName: d.companyName.trim(),
     photo: null,
@@ -2491,6 +2550,35 @@ function renderTherapistProfile() {
     <div class="t-form-label">In one line, who do you work best with?</div>
     <input type="text" class="t-rate-input" id="t-bestfor-input" placeholder="e.g. I work best with new parents navigating postpartum anxiety" value="${t.bestFor || ''}">
 
+    <div class="t-form-label" style="margin-top:20px;">Photos & video</div>
+    <div class="intake-sub">These build the "get to know you" feed clients scroll through — the more of you they see, the stronger the match.</div>
+
+    <div class="media-row">
+      <div class="media-thumb">${t.photo ? `<img src="${t.photo}">` : '<span>—</span>'}</div>
+      <div class="media-row-text"><strong>Lead photo</strong><span>Personal or professional — whichever feels most like you</span></div>
+      <input type="file" accept="image/*" data-media-upload="photo">
+    </div>
+    <div class="media-row">
+      <div class="media-thumb">${t.media.video ? '🎬' : '<span>—</span>'}</div>
+      <div class="media-row-text"><strong>Quick video</strong><span>A 15–30s hello — clients hear your voice before they reach out</span></div>
+      <input type="file" accept="video/*" data-media-upload="video">
+    </div>
+    <div class="media-row">
+      <div class="media-thumb">${t.media.office ? `<img src="${t.media.office}">` : '<span>—</span>'}</div>
+      <div class="media-row-text"><strong>Office space</strong><span>Optional — where sessions happen</span></div>
+      <input type="file" accept="image/*" data-media-upload="office">
+    </div>
+    <div class="media-row">
+      <div class="media-thumb">${t.media.outOfOffice ? `<img src="${t.media.outOfOffice}">` : '<span>—</span>'}</div>
+      <div class="media-row-text"><strong>Out of office</strong><span>A glimpse of your life outside sessions</span></div>
+      <input type="file" accept="image/*" data-media-upload="outOfOffice">
+    </div>
+
+    <div class="t-form-label">Who I am in the office...</div>
+    <textarea class="intake-textarea" id="t-persona-in" rows="2" placeholder="What sessions with you actually feel like">${t.persona.inOffice || ''}</textarea>
+    <div class="t-form-label">Who I am out of the office...</div>
+    <textarea class="intake-textarea" id="t-persona-out" rows="2" placeholder="The human behind the license">${t.persona.outOfOffice || ''}</textarea>
+
     <div class="t-form-label">Gender</div>
     <div class="chip-grid">
       <div class="chip-option ${t.identity.gender === 'female' ? 'selected' : ''}" data-set-gender="female">Female</div>
@@ -2610,6 +2698,27 @@ function attachTherapistProfileHandlers(t) {
   }));
   const tBestForInput = document.getElementById('t-bestfor-input');
   if (tBestForInput) tBestForInput.addEventListener('input', () => { t.bestFor = tBestForInput.value; });
+  document.querySelectorAll('[data-media-upload]').forEach(el => el.addEventListener('change', () => {
+    const file = el.files[0];
+    if (!file) return;
+    const slot = el.dataset.mediaUpload;
+    if (slot === 'video') {
+      // Object URLs keep large video files out of memory-hungry data URLs.
+      t.media.video = URL.createObjectURL(file);
+      renderTherapistProfile();
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (slot === 'photo') t.photo = reader.result; else t.media[slot] = reader.result;
+        renderTherapistProfile();
+      };
+      reader.readAsDataURL(file);
+    }
+  }));
+  const personaIn = document.getElementById('t-persona-in');
+  if (personaIn) personaIn.addEventListener('input', () => { t.persona.inOffice = personaIn.value; });
+  const personaOut = document.getElementById('t-persona-out');
+  if (personaOut) personaOut.addEventListener('input', () => { t.persona.outOfOffice = personaOut.value; });
   document.querySelectorAll('[data-set-gender]').forEach(el => el.addEventListener('click', () => {
     t.identity.gender = el.dataset.setGender;
     renderTherapistProfile();
