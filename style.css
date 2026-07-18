@@ -264,6 +264,58 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   flex-shrink: 0;
 }
 
+/* ===== ON-DEMAND SAFETY & TRUST ===== */
+.crisis-note {
+  background: var(--rust-light);
+  color: var(--rust);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin: 0 20px 10px;
+}
+.crisis-note strong { font-weight: 800; }
+.crisis-help-btn {
+  background: var(--rust) !important;
+  color: white !important;
+  margin-top: 14px;
+}
+.crisis-resource {
+  display: block;
+  background: var(--rust-light);
+  color: var(--rust);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 12px;
+  padding: 13px 14px;
+  margin-top: 8px;
+  text-align: center;
+}
+.noshow-link {
+  background: none;
+  border: none;
+  color: var(--rust);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 2px 0 0;
+  text-align: left;
+}
+.welcome-stats-title {
+  font-family: 'Fraunces', serif;
+  color: var(--coral-dark);
+}
+.welcome-stats-line {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  margin-top: 8px;
+}
+
 /* ===== LICENSE VERIFICATION ===== */
 .verified-chip {
   display: inline-flex;

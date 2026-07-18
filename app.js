@@ -306,6 +306,7 @@ let deck = [];
 let deckIndex = 0;
 let shortlist = [];       // therapists swiped right on but not yet requested
 let savedResources = [];  // resource ids the client saved from Explore — part of the shareable profile
+let crisisAcknowledged = false; // per-session: client confirmed On-Demand isn't being used for a crisis
 
 const EXPLORE_RESOURCES = [
   { id: 'r1', icon: '🌱', title: 'What to expect in your first session', blurb: 'A gentle walkthrough so the first hour feels less like a mystery.' },
@@ -331,7 +332,7 @@ function isCompatible(t, mode) {
   // not a ranking signal.
   if (!t.licenseVerified) return false;
   if (mode === 'ongoing' && !t.acceptingOngoing) return false;
-  if (mode === 'ondemand' && (!t.onDemand || t.onDemandSlots.length === 0)) return false;
+  if (mode === 'ondemand' && (!t.onDemand || t.onDemandBanned || t.onDemandSlots.length === 0)) return false;
 
   // Generalists don't need a literal tag overlap — that's the whole point
   // of being a generalist. Specialists still have to actually match.
@@ -1198,10 +1199,10 @@ function renderShortlist() {
 
 function renderMatches() {
   if (matches.length === 0) {
-    matchesList.innerHTML = `<p class="empty-state">No requests sent yet — head to your Short List to reach out to someone.</p>`;
+    matchesList.innerHTML = `<p class="empty-state">No requests sent yet — head to your Short List to pick your Top 5.</p>`;
     return;
   }
-  let html = `<div class="request-cap-banner">${activeRequestCount()} of ${MAX_PENDING_REQUESTS} match requests used</div>`;
+  let html = `<div class="request-cap-banner">${activeRequestCount()} of ${MAX_PENDING_REQUESTS} Top 5 slots used</div>`;
   html += matches.slice().reverse().map(m => {
     const t = m.therapist;
     const log = chatLog[t.id] || [];
@@ -1214,15 +1215,26 @@ function renderMatches() {
       </div>`;
     }
     if (m.status === 'ondemand') {
+      if (m.paymentStatus === 'authorized') {
+        return `<div class="match-row pending" data-id="${t.id}">
+          ${avatarHtml(t, 'avatar-md')}
+          <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">Awaiting their confirmation — $${m.amountPaid} authorized, not yet charged</div></div>
+          <button class="cancel-session-btn" data-release-ondemand="${t.id}">Cancel</button>
+        </div>`;
+      }
       if (m.paymentStatus !== 'paid') {
         return `<div class="match-row pending" data-id="${t.id}" style="opacity:0.5;">
           ${avatarHtml(t, 'avatar-md')}
-          <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">Cancelled — ${refundStatusLabel(m.paymentStatus)}</div></div>
+          <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">${refundStatusLabel(m.paymentStatus)}</div></div>
         </div>`;
       }
       return `<div class="match-row pending" data-id="${t.id}">
         ${avatarHtml(t, 'avatar-md')}
-        <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">One-time session booked — ${m.slotLabel} · $${m.amountPaid} paid</div></div>
+        <div>
+          <div class="chat-name">${displayName(t)}</div>
+          <div class="last-msg">One-time session confirmed — ${m.slotLabel} · $${m.amountPaid} paid</div>
+          <button class="noshow-link" data-noshow-ondemand="${t.id}">Therapist didn't show?</button>
+        </div>
         <button class="cancel-session-btn" data-cancel-ondemand="${t.id}">Cancel</button>
       </div>`;
     }
@@ -1251,6 +1263,21 @@ function renderMatches() {
   });
   matchesList.querySelectorAll('[data-cancel-ondemand]').forEach(btn => {
     btn.addEventListener('click', (e) => { e.stopPropagation(); requestCancelOndemand(btn.dataset.cancelOndemand); });
+  });
+  // Cancelling while still authorized just releases the hold — the
+  // cancellation tiers only exist once a payment has actually processed.
+  matchesList.querySelectorAll('[data-release-ondemand]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const m = matches.find(m => m.therapist.id === btn.dataset.releaseOndemand && m.status === 'ondemand' && m.paymentStatus === 'authorized');
+      if (!m) return;
+      m.paymentStatus = 'released';
+      showToast('Request cancelled — the hold was released, you were not charged.');
+      renderMatches();
+    });
+  });
+  matchesList.querySelectorAll('[data-noshow-ondemand]').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); reportNoShow(btn.dataset.noshowOndemand); });
   });
 }
 
@@ -1479,11 +1506,12 @@ function renderOndemandPolicyGate() {
   ondemandList.innerHTML = `
     <div class="policy-gate">
       <div class="t-form-label">Before you use On-Demand</div>
-      <p class="modality-info-text">On-Demand sessions require payment up front to confirm your slot. If your plans change:</p>
+      <p class="modality-info-text">Requesting a slot authorizes your card, but <strong>you're only charged when the therapist accepts</strong>. If they decline or don't respond, the hold is released. Once a session is confirmed and your plans change:</p>
       <ul class="policy-list">
         <li>48+ hours before your session: full refund</li>
         <li>24–48 hours before: 50% refund</li>
         <li>Less than 24 hours before: no refund</li>
+        <li>If the therapist doesn't show: full refund, always — and they lose On-Demand access</li>
       </ul>
       <button class="primary-btn" style="background:var(--coral);color:white;" id="agree-ondemand-btn">I Agree &amp; Continue</button>
     </div>
@@ -1494,7 +1522,45 @@ function renderOndemandPolicyGate() {
   });
 }
 
+// On-Demand is confirmed by a human on their own schedule — hours, not
+// minutes. That's the wrong tool for a crisis, and we say so before anyone
+// books, with real resources up front.
+function openCrisisCheck() {
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>Before you book — is this a crisis?</h2>
+    <p class="modality-info-text">On-Demand sessions are confirmed by the therapist, which can take a few hours. <strong>That's not fast enough if you're in crisis.</strong></p>
+    <p class="modality-info-text">If you're in immediate danger, or having thoughts of harming yourself or someone else, please reach out right now:</p>
+    <ul class="policy-list">
+      <li><strong>Call or text 988</strong> — Suicide &amp; Crisis Lifeline, free, 24/7</li>
+      <li><strong>Text HOME to 741741</strong> — Crisis Text Line</li>
+      <li><strong>Call 911</strong> or go to your nearest emergency room</li>
+    </ul>
+    <button class="primary-btn crisis-help-btn" id="crisis-help-btn">I need help right now</button>
+    <button class="primary-btn" style="margin-top:8px;background:var(--coral);color:white;" id="crisis-continue-btn">This isn't a crisis — continue</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  document.getElementById('crisis-help-btn').addEventListener('click', () => {
+    sheet.innerHTML = `
+      <div class="sheet-close"></div>
+      <h2>You don't have to hold this alone</h2>
+      <p class="modality-info-text">Reaching out right now is the strongest move available to you. These are free, confidential, and open 24/7:</p>
+      <a class="crisis-resource" href="tel:988">📞 Call 988 — Suicide &amp; Crisis Lifeline</a>
+      <a class="crisis-resource" href="sms:988">💬 Text 988</a>
+      <a class="crisis-resource" href="sms:741741&body=HOME">💬 Text HOME to 741741 — Crisis Text Line</a>
+      <a class="crisis-resource" href="tel:911">🚨 Call 911</a>
+      <p class="modality-info-text" style="margin-top:10px;">Kindred will be here when you're through this. On-Demand and matching aren't going anywhere.</p>
+    `;
+  });
+  document.getElementById('crisis-continue-btn').addEventListener('click', () => {
+    crisisAcknowledged = true;
+    document.getElementById('confirm-modal').classList.add('hidden');
+  });
+}
+
 function renderOndemand() {
+  if (!crisisAcknowledged) openCrisisCheck();
   if (!clientAgreedToOnDemandPolicy) {
     renderOndemandPolicyGate();
     return;
@@ -1559,6 +1625,9 @@ function nextOccurrence(dayAbbrev, timeLabel) {
 function refundStatusLabel(status) {
   if (status === 'refunded') return 'full refund issued';
   if (status === 'partially-refunded') return '50% refund issued';
+  if (status === 'declined-by-therapist') return 'they declined — hold released, no charge';
+  if (status === 'noshow-refunded') return 'no-show — full refund issued';
+  if (status === 'released') return 'cancelled — hold released, no charge';
   if (status === 'cancelled-no-refund') return 'no refund per policy';
   return '';
 }
@@ -1572,16 +1641,18 @@ function openPaymentConfirm(t, slotLabel, btnEl) {
   const amount = t.rateMin;
   document.getElementById('confirm-sheet').innerHTML = `
     <div class="sheet-close"></div>
-    <h2>Confirm &amp; Pay</h2>
+    <h2>Request this session</h2>
     <div class="intake-sub">One-time session with ${displayName(t)} — ${slotLabel}</div>
     <div class="payment-amount">$${amount}</div>
-    <div class="t-form-label">Cancellation policy</div>
+    <p class="modality-info-text">Your card is <strong>authorized now but only charged when ${displayName(t)} accepts</strong> the session. If they decline or don't respond, the hold is released and you pay nothing.</p>
+    <div class="t-form-label">Cancellation policy (after acceptance)</div>
     <ul class="policy-list">
       <li>48+ hours before your session: full refund</li>
       <li>24–48 hours before: 50% refund</li>
       <li>Less than 24 hours before: no refund</li>
+      <li>Therapist no-show: full refund, always</li>
     </ul>
-    <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="confirm-pay-btn">Confirm &amp; Pay $${amount}</button>
+    <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="confirm-pay-btn">Authorize $${amount} &amp; Request</button>
     <button class="text-btn" id="confirm-pay-cancel" style="color:var(--ink-soft);">Cancel</button>
   `;
   document.getElementById('confirm-modal').classList.remove('hidden');
@@ -1600,17 +1671,62 @@ document.getElementById('confirm-modal').addEventListener('click', (e) => {
 function finalizeOndemandBooking(t, slotLabel, btnEl, amount) {
   const card = btnEl.closest('.ondemand-card');
   card.querySelectorAll('.slot-btn').forEach(b => { b.disabled = true; b.classList.add('booked'); });
-  btnEl.textContent = `Booked: ${slotLabel}`;
+  btnEl.textContent = `Requested: ${slotLabel}`;
   const [day, ...timeParts] = slotLabel.split(' ');
   const sessionDateTime = nextOccurrence(day, timeParts.join(' '));
+  // Payment is a hold, not a charge — it only processes when the therapist
+  // accepts. Declines and no-responses cost the client nothing.
   matches.push({
     therapist: t, status: 'ondemand', slotLabel,
-    amountPaid: amount, paymentStatus: 'paid',
+    amountPaid: amount, paymentStatus: 'authorized',
     sessionDateTime: sessionDateTime.toISOString()
   });
-  chatLog[t.id] = chatLog[t.id] || [{ from: 'them', text: `Looking forward to our session ${slotLabel}! Feel free to message me anything beforehand.` }];
-  showToast(`Payment confirmed — $${amount} charged.`);
+  showToast(`Request sent — $${amount} authorized, charged only if ${displayName(t)} accepts.`);
   renderMatches();
+}
+
+// Therapist accepts an on-demand request: this is the moment the payment
+// actually processes.
+function acceptOndemandBooking(m) {
+  m.paymentStatus = 'paid';
+  chatLog[m.therapist.id] = chatLog[m.therapist.id] || [{ from: 'them', text: `Looking forward to our session ${m.slotLabel}! Feel free to message me anything beforehand.` }];
+  showToast(`Session accepted — client's $${m.amountPaid} payment processed.`);
+  renderRequests();
+}
+
+function declineOndemandBooking(m) {
+  m.paymentStatus = 'declined-by-therapist';
+  showToast('Request declined — the payment hold was released.');
+  renderRequests();
+}
+
+// A reported no-show refunds the client in full and permanently suspends
+// the therapist's On-Demand access — honoring confirmed sessions is the
+// deal they agreed to when they turned On-Demand on.
+function reportNoShow(therapistId) {
+  const m = matches.find(m => m.therapist.id === therapistId && m.status === 'ondemand' && m.paymentStatus === 'paid');
+  if (!m) return;
+  document.getElementById('confirm-sheet').innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>Report a no-show</h2>
+    <div class="intake-sub">Your session with ${displayName(m.therapist)} was ${m.slotLabel}.</div>
+    <p class="modality-info-text">If ${displayName(m.therapist)} didn't join your session, you'll receive a <strong>full refund of $${m.amountPaid}</strong> — the cancellation tiers never apply to a therapist no-show. Their On-Demand access is also suspended.</p>
+    <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="confirm-noshow-btn">They didn't show — refund me</button>
+    <button class="text-btn" id="confirm-noshow-back" style="color:var(--ink-soft);">Never Mind</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  document.getElementById('confirm-noshow-btn').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    m.paymentStatus = 'noshow-refunded';
+    m.refundAmount = m.amountPaid;
+    m.therapist.onDemandBanned = true;
+    m.therapist.onDemand = false;
+    showToast(`$${m.amountPaid} refunded in full. ${displayName(m.therapist)}'s On-Demand access is suspended.`);
+    renderMatches();
+  });
+  document.getElementById('confirm-noshow-back').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+  });
 }
 
 function requestCancelOndemand(therapistId) {
@@ -1650,12 +1766,13 @@ function openTherapistOnDemandAgreement(onAgree) {
   document.getElementById('confirm-sheet').innerHTML = `
     <div class="sheet-close"></div>
     <h2>On-Demand Payment Policy</h2>
-    <p class="modality-info-text">Clients pay up front to confirm an On-Demand slot with you. If a client cancels:</p>
+    <p class="modality-info-text">Clients authorize payment when they request a slot, and the charge processes when you accept. If a client cancels a confirmed session:</p>
     <ul class="policy-list">
       <li>48+ hours before the session: they get a full refund</li>
       <li>24–48 hours before: they get a 50% refund — you keep the other 50%</li>
       <li>Less than 24 hours before: no refund — you keep the full amount</li>
     </ul>
+    <p class="modality-info-text"><strong>Showing up is the deal:</strong> if you miss a confirmed session, the client is refunded in full and your On-Demand access is permanently suspended.</p>
     <p class="modality-info-text">By continuing, you agree to these terms and to honor confirmed sessions.</p>
     <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="agree-td-ondemand-btn">I Agree</button>
     <button class="text-btn" id="decline-td-ondemand-btn" style="color:var(--ink-soft);">Not Now</button>
@@ -2282,6 +2399,7 @@ function finishTherapistSignup() {
 
 function logout() {
   accountType = null;
+  therapistWelcomeShown = false;
   document.getElementById('bottom-nav').classList.add('hidden');
   document.getElementById('therapist-nav').classList.add('hidden');
   showScreen('account-type');
@@ -2291,10 +2409,42 @@ function logout() {
 let currentTherapistId = THERAPISTS[0].id;
 let profileShowOtherLanguage = false; // transient UI flag for the profile editor's "+Other" language picker — not real therapist data
 
+let therapistWelcomeShown = false; // once per login, reset on logout
+
 function showTherapistView() {
   document.getElementById('bottom-nav').classList.add('hidden');
   document.getElementById('therapist-nav').classList.remove('hidden');
   showTScreen('t-home');
+  if (!therapistWelcomeShown) {
+    therapistWelcomeShown = true;
+    openTherapistWelcome();
+  }
+}
+
+// Login greeting with the week's numbers — the dashboard's headline stats,
+// served before the therapist even asks.
+function openTherapistWelcome() {
+  const t = THERAPISTS.find(t => t.id === currentTherapistId);
+  if (!t) return;
+  const hearts = t.stats.weekHearts;
+  const matchCount = matches.filter(m => m.therapist.id === t.id && (m.status === 'pending' || m.status === 'matched')).length;
+  const firstName = t.name.replace(/^Dr\.?\s*/i, '').split(' ')[0];
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2 class="welcome-stats-title">Welcome back, ${firstName}</h2>
+    <div class="welcome-stats-line">💜 You got <strong>${hearts} heart${hearts === 1 ? '' : 's'}</strong> and <strong>${matchCount} match${matchCount === 1 ? '' : 'es'}</strong> this week.</div>
+    <button class="primary-btn" style="margin-top:16px;background:var(--coral);color:white;" id="welcome-insights-btn">See My Insights</button>
+    <button class="text-btn" id="welcome-close-btn" style="color:var(--ink-soft);">Continue to Home</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  document.getElementById('welcome-insights-btn').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    showTScreen('t-insights');
+  });
+  document.getElementById('welcome-close-btn').addEventListener('click', () => {
+    document.getElementById('confirm-modal').classList.add('hidden');
+  });
 }
 
 function showTScreen(name) {
@@ -2478,15 +2628,32 @@ function renderRequests() {
       return `<div class="request-card resolved"><span class="resolved-tag declined">Declined</span></div>`;
     }).join('');
   }
-  myBookings.forEach(m => {
-    if (m.paymentStatus === 'paid') {
+  myBookings.forEach((m, i) => {
+    if (m.paymentStatus === 'authorized') {
+      html += `<div class="request-card">
+        <div class="request-need">On-Demand request — <strong>${m.slotLabel}</strong> · $${m.amountPaid} authorized</div>
+        <div class="request-intro">The client's card is on hold — it's only charged if you accept. Accepting commits you to showing up: a reported no-show refunds them in full and suspends your On-Demand access.</div>
+        <div class="decision-row">
+          <button class="decline-btn" data-od-decline="${i}">Decline</button>
+          <button class="accept-btn" data-od-accept="${i}">Accept — process $${m.amountPaid}</button>
+        </div>
+      </div>`;
+    } else if (m.paymentStatus === 'paid') {
       html += `<div class="confirmed-session">One-time session confirmed — ${m.slotLabel} · $${m.amountPaid} paid</div>`;
+    } else if (m.paymentStatus === 'noshow-refunded') {
+      html += `<div class="confirmed-session cancelled">No-show reported — ${m.slotLabel} · $${m.amountPaid} refunded to the client · your On-Demand access is suspended</div>`;
     } else {
-      html += `<div class="confirmed-session cancelled">Cancelled — ${m.slotLabel} (${refundStatusLabel(m.paymentStatus)})</div>`;
+      html += `<div class="confirmed-session cancelled">${m.slotLabel} — ${refundStatusLabel(m.paymentStatus)}</div>`;
     }
   });
 
   list.innerHTML = html;
+  list.querySelectorAll('[data-od-accept]').forEach(btn => {
+    btn.addEventListener('click', () => acceptOndemandBooking(myBookings[Number(btn.dataset.odAccept)]));
+  });
+  list.querySelectorAll('[data-od-decline]').forEach(btn => {
+    btn.addEventListener('click', () => declineOndemandBooking(myBookings[Number(btn.dataset.odDecline)]));
+  });
   list.querySelectorAll('[data-decision="decline"]').forEach(btn => {
     btn.addEventListener('click', () => declineRequest(currentTherapistId));
   });
@@ -2645,10 +2812,14 @@ function renderTherapistProfile() {
       <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
     </div>
 
+    ${t.onDemandBanned ? `
+    <div class="must-have-toggle" style="opacity:0.75;">
+      <div class="toggle-label"><strong>On-Demand suspended</strong><span>A confirmed session was reported as a no-show. On-Demand access doesn't come back — ongoing matching is unaffected.</span></div>
+    </div>` : `
     <div class="must-have-toggle">
       <div class="toggle-label"><strong>Offering on-demand this week</strong><span>Shown in On-Demand for one-time sessions</span></div>
       <div class="switch ${t.onDemand ? 'on' : ''}" id="t-ondemand-switch"></div>
-    </div>
+    </div>`}
 
     <div id="t-slots-section" style="${t.onDemand ? '' : 'display:none;'}">
       <div class="t-form-label">Open slots this week</div>
@@ -2792,7 +2963,8 @@ function attachTherapistProfileHandlers(t) {
     renderTherapistProfile();
   }));
   document.getElementById('t-ongoing-switch').addEventListener('click', () => { t.acceptingOngoing = !t.acceptingOngoing; renderTherapistProfile(); });
-  document.getElementById('t-ondemand-switch').addEventListener('click', () => {
+  const odSwitch = document.getElementById('t-ondemand-switch');
+  if (odSwitch) odSwitch.addEventListener('click', () => {
     if (!t.onDemand && !t.agreedToOnDemandPolicy) {
       openTherapistOnDemandAgreement(() => { t.agreedToOnDemandPolicy = true; t.onDemand = true; renderTherapistProfile(); });
     } else {

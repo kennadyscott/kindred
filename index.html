@@ -107,6 +107,7 @@
       <div class="logo">On-Demand</div>
     </header>
     <p class="ondemand-subtitle">Therapists with open one-time slots this week — matched to what you told us you need.</p>
+    <div class="crisis-note">In crisis? Call or text <strong>988</strong> — On-Demand isn't for emergencies.</div>
     <div class="ondemand-list" id="ondemand-list"></div>
   </section>
 
@@ -115,19 +116,19 @@
     <header class="top-bar">
       <div class="logo">Short List</div>
     </header>
-    <p class="ondemand-subtitle">Therapists you've saved. Pick up to 5 to actually reach out to — sending a request lets them know you're serious.</p>
+    <p class="ondemand-subtitle">Therapists you've hearted. Pick up to 5 to actually reach out to — your Top 5 lets them know you're serious.</p>
     <div class="matches-list" id="shortlist-list">
       <p class="empty-state">Nothing saved yet — swipe right on someone in Discover to add them here.</p>
     </div>
   </section>
 
-  <!-- ===== MATCHES SCREEN ===== -->
+  <!-- ===== TOP 5 (MATCHES) SCREEN ===== -->
   <section class="screen hidden" id="screen-matches">
     <header class="top-bar">
-      <div class="logo">Matches</div>
+      <div class="logo">Top 5</div>
     </header>
     <div class="matches-list" id="matches-list">
-      <p class="empty-state">No requests sent yet — head to your Short List to reach out to someone.</p>
+      <p class="empty-state">No requests sent yet — head to your Short List to pick your Top 5.</p>
     </div>
   </section>
 
@@ -269,10 +270,10 @@
       <span class="nav-icon">⚡</span><span>On-Demand</span>
     </button>
     <button class="nav-btn" data-screen="shortlist">
-      <span class="nav-icon">⭐</span><span>Short List</span>
+      <span class="nav-icon">💜</span><span>Short List</span>
     </button>
     <button class="nav-btn" data-screen="matches">
-      <span class="nav-icon">💬</span><span>Matches</span>
+      <span class="nav-icon">💬</span><span>Top 5</span>
       <span class="nav-badge hidden" id="nav-badge">0</span>
     </button>
     <button class="nav-btn" data-screen="profile">
