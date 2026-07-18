@@ -19,7 +19,7 @@ const THERAPISTS = [
     ],
     modalities: ['CBT'], style: 'direct',
     identity: { gender: 'female', lgbtqAffirming: true }, languages: ['English'],
-    formats: ['video', 'in-person'], rateMin: 140, insuranceList: ['Aetna', 'BCBS'],
+    formats: ['video', 'in-person'], rateMin: 140, insuranceList: ['Aetna', 'BCBS', 'EAP'],
     acceptingOngoing: true, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
     practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false,
@@ -266,7 +266,50 @@ function openModalityInfo(name) {
 document.getElementById('modality-info-modal').addEventListener('click', (e) => {
   if (e.target.id === 'modality-info-modal') document.getElementById('modality-info-modal').classList.add('hidden');
 });
-const INSURANCE_OPTIONS = ['Aetna', 'BCBS', 'Cigna', 'United', 'any'];
+const INSURANCE_OPTIONS = ['Aetna', 'BCBS', 'Cigna', 'United', 'EAP'];
+// Full carrier catalog behind "+ Other" — fixed list, same no-free-text
+// rule as languages and specialties.
+const OTHER_INSURANCES = [
+  '1199SEIU', 'AARP', 'ACI Specialty Benefits', 'Aetna EAP', 'Aetna Medicare',
+  'Aetna Student Health', 'All Savers', 'AllOne Health',
+  "America's Choice Provider Network (ACPN)", 'AmeriHealth Caritas', 'Anthem',
+  'Anthem EAP', 'APS Healthcare', 'Ascension SmartHealth',
+  'BHS | Behavioral Health Systems', 'Blue Cross', 'Blue Shield',
+  'BlueCross BlueShield', 'Carebridge EAP', 'CareConnect Health Plan',
+  'Carelon Behavioral Health', 'CareOregon', 'CCN | Community Care Network',
+  'Centivo', 'CHAMPVA', "Children's Health Insurance Program (CHIP)",
+  'ChoiceCare Network', 'Cigna and Evernorth', 'Cigna EAP', 'Cigna Medicare',
+  'Cofinity | First Health', 'Colorado Access', 'ComPsych', 'Concern',
+  'Coventry', 'CuraLinc Healthcare', 'Curative', 'Dayforce',
+  'Denver Health Medical Plan', 'ESI Employee Assistance Group',
+  'Evernorth EAP', 'First Health', 'Friday Health Plans', 'Golden Rule',
+  'Government Employees Health Association (GEHA)', 'Great-West Life',
+  'Guardian', 'Health First Colorado', 'Health Net', 'Horizon Healthcare',
+  'Humana', 'Humana Dual', 'Humana Medicare', 'Independence Administrators',
+  'Kaiser Permanente (OON)', 'Lyra Health', 'Magellan', 'MagnaCare',
+  'Managed Health Network (MHN)', 'Medicaid', 'Medicare',
+  'MediNcrease Health Plans (MHP)', 'Meritain Health', 'Military OneSource',
+  'MINES and Associates', 'Modern Health', 'Molina Healthcare', 'MotivHealth',
+  'MultiPlan', 'MultiPlan Private Healthcare Systems (PHCS)', 'Mutual of Omaha',
+  'New Directions | Lucet', 'Nippon Life Benefits', 'Northwell Direct',
+  'Optum', 'Oscar Health', 'Oxford', 'Partners Direct Health',
+  'Provider Network of America (PNOA)', 'PsychCare', 'Reliant',
+  'Rocky Mountain Health Plans', 'Sagamore', 'Sana Benefits', 'SelectHealth',
+  'Surest', 'TELUS Health', 'TRICARE', 'TriWest', 'Trustmark Benefits',
+  'Ulliance', 'United Medical Resources (UMR)', 'UnitedHealthcare / Optum EAP',
+  'UnitedHealthcare / Optum Medicaid', 'UnitedHealthcare / Optum Medicare',
+  'UnitedHealthcare Student Resources', 'UnitedHealthcare UHC | UBH',
+  'VA Community Care Network (CCN)', 'Velocity National Provider Network (VNPN)',
+  'WellCare', 'Wellfleet', 'Wellpoint | Amerigroup', 'Workplace Options',
+  'Zelis Healthcare'
+];
+const BUDGET_RANGES = [
+  { label: 'Any budget', min: 0, max: Infinity },
+  { label: 'Under $100', min: 0, max: 100 },
+  { label: '$100–$150', min: 100, max: 150 },
+  { label: '$150–$200', min: 150, max: 200 },
+  { label: '$200+', min: 200, max: Infinity }
+];
 // Three quick-tap chips cover the most common cases. "Other" opens a real
 // dropdown pulled from OTHER_LANGUAGES instead of free text, so language
 // names stay consistent between what a therapist selects and what a client
@@ -322,7 +365,10 @@ let intake = {
   format: 'no-preference',
   city: '', state: '',
   insurance: 'any',
-  budgetMax: 300, // slider defaults to the top of the range so no one is filtered out until the client actually narrows it
+  hasInsurance: null,        // 'yes' | 'no' — gate question before any carrier picking
+  insuranceOtherOpen: false, // transient UI flag for the "+ Other" carrier dropdown
+  noInsurancePref: null,     // 'sliding-scale' | 'therapist-first' when hasInsurance === 'no'
+  budgetRange: 'Any budget', // label into BUDGET_RANGES — a range, not a max
   completed: false
 };
 
@@ -377,9 +423,14 @@ function isCompatible(t, mode) {
   if (intake.state && t.location.state !== intake.state) return false;
   if (intake.format === 'in-person' && intake.city.trim() && t.location.city.trim().toLowerCase() !== intake.city.trim().toLowerCase()) return false;
 
-  if (intake.insurance !== 'any' && !t.insuranceList.includes(intake.insurance)) return false;
+  if (intake.hasInsurance === 'yes' && intake.insurance !== 'any' && !t.insuranceList.includes(intake.insurance)) return false;
 
-  if (intake.budgetMax && t.rateMin > intake.budgetMax) return false;
+  // No insurance + needs a sliding scale = only show therapists who offer one.
+  // "The therapist is more important" deliberately adds no payment filter.
+  if (intake.hasInsurance === 'no' && intake.noInsurancePref === 'sliding-scale' && !/sliding/i.test(t.selfPayNote || '')) return false;
+
+  const range = BUDGET_RANGES.find(r => r.label === intake.budgetRange);
+  if (range && t.rateMin > range.max) return false;
 
   return true;
 }
@@ -400,7 +451,8 @@ function getMatchReasons(t) {
   } else if (intake.state && t.location.state === intake.state) {
     reasons.push(`Licensed in ${intake.state}`);
   }
-  if (intake.insurance !== 'any' && t.insuranceList.includes(intake.insurance)) reasons.push(`Accepts ${intake.insurance}`);
+  if (intake.hasInsurance === 'yes' && intake.insurance !== 'any' && t.insuranceList.includes(intake.insurance)) reasons.push(`Accepts ${intake.insurance}`);
+  if (intake.hasInsurance === 'no' && intake.noInsurancePref === 'sliding-scale' && /sliding/i.test(t.selfPayNote || '')) reasons.push('Sliding scale available');
   if (intake.lgbtqRequired && t.identity.lgbtqAffirming) reasons.push('LGBTQ+ Affirming');
   if (intake.genderPref !== 'no-preference' && t.identity.gender === intake.genderPref) {
     reasons.push({ female: 'Female therapist', male: 'Male therapist', nonbinary: 'Nonbinary therapist' }[t.identity.gender] || 'Preferred gender');
@@ -554,14 +606,30 @@ function renderIntakeStep() {
     html += `
       <h1>A few logistics</h1>
       <div class="intake-sub">Last step — how you'll pay for sessions.</div>
-      <div class="match-tag-label" style="margin-top:0;">Insurance</div>
-      <div class="chip-grid" id="insurance-grid">
-        ${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${intake.insurance === i ? 'selected' : ''}" data-insurance="${i}">${i === 'any' ? 'Self-pay / any' : i}</div>`).join('')}
+      <div class="match-tag-label" style="margin-top:0;">Do you have insurance?</div>
+      <div class="option-list" id="has-insurance-list">
+        <div class="option-row ${intake.hasInsurance === 'yes' ? 'selected' : ''}" data-has-insurance="yes">Yes</div>
+        <div class="option-row ${intake.hasInsurance === 'no' ? 'selected' : ''}" data-has-insurance="no">No</div>
       </div>
-      <div class="match-tag-label">Max budget per session</div>
-      <div class="budget-slider-row">
-        <input type="range" id="budget-slider" min="100" max="300" step="10" value="${intake.budgetMax}">
-        <div class="budget-value" id="budget-value">$${intake.budgetMax}</div>
+      ${intake.hasInsurance === 'yes' ? `
+      <div class="match-tag-label">Which insurance?</div>
+      <div class="chip-grid" id="insurance-grid">
+        ${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${intake.insurance === i ? 'selected' : ''}" data-insurance="${i}">${i}</div>`).join('')}
+        ${(!INSURANCE_OPTIONS.includes(intake.insurance) && intake.insurance !== 'any') ? `<div class="chip-option selected" data-insurance="${intake.insurance}">${intake.insurance}</div>` : ''}
+        <div class="chip-option" id="insurance-other-btn">+ Other</div>
+      </div>
+      ${intake.insuranceOtherOpen ? `<div class="other-language-row">
+        <select id="insurance-other-select">${OTHER_INSURANCES.map(i => `<option value="${i}" ${i === intake.insurance ? 'selected' : ''}>${i}</option>`).join('')}</select>
+      </div>` : ''}` : ''}
+      ${intake.hasInsurance === 'no' ? `
+      <div class="match-tag-label">No problem — which sounds more like you?</div>
+      <div class="option-list" id="no-insurance-list">
+        <div class="option-row ${intake.noInsurancePref === 'sliding-scale' ? 'selected' : ''}" data-no-insurance="sliding-scale">I'm in need of a sliding scale</div>
+        <div class="option-row ${intake.noInsurancePref === 'therapist-first' ? 'selected' : ''}" data-no-insurance="therapist-first">The therapist is more important to me</div>
+      </div>` : ''}
+      <div class="match-tag-label">Budget range for session</div>
+      <div class="chip-grid" id="budget-range-grid">
+        ${BUDGET_RANGES.map(r => `<div class="chip-option ${intake.budgetRange === r.label ? 'selected' : ''}" data-budget-range="${r.label}">${r.label}</div>`).join('')}
       </div>`;
   }
 
@@ -574,6 +642,9 @@ function renderIntakeStep() {
   // State is always required — even online, therapists are licensed by
   // state. City only matters when they want to meet in person.
   else if (intakeStep === 2) canProceed = intake.state !== '' && (intake.format !== 'in-person' || intake.city.trim() !== '');
+  else if (intakeStep === 5) canProceed = intake.hasInsurance === 'yes' ? intake.insurance !== 'any'
+    : intake.hasInsurance === 'no' ? intake.noInsurancePref !== null
+    : false;
   html += `
     <div class="intake-footer">
       ${intakeStep > 0 ? `<button class="btn-back" id="intake-back">Back</button>` : ''}
@@ -677,16 +748,27 @@ function attachIntakeHandlers() {
   });
   const intakeStateSelect = document.getElementById('intake-state');
   if (intakeStateSelect) intakeStateSelect.addEventListener('change', () => { intake.state = intakeStateSelect.value; renderIntakeStep(); });
-  document.querySelectorAll('#insurance-grid .chip-option').forEach(el => {
-    el.addEventListener('click', () => { intake.insurance = el.dataset.insurance; renderIntakeStep(); });
-  });
-  const budgetSlider = document.getElementById('budget-slider');
-  if (budgetSlider) {
-    budgetSlider.addEventListener('input', () => {
-      intake.budgetMax = Number(budgetSlider.value);
-      document.getElementById('budget-value').textContent = `$${intake.budgetMax}`;
+  document.querySelectorAll('#has-insurance-list .option-row').forEach(el => {
+    el.addEventListener('click', () => {
+      intake.hasInsurance = el.dataset.hasInsurance;
+      // switching branches clears the other branch's answer
+      if (intake.hasInsurance === 'yes') intake.noInsurancePref = null; else { intake.insurance = 'any'; intake.insuranceOtherOpen = false; }
+      renderIntakeStep();
     });
-  }
+  });
+  document.querySelectorAll('#insurance-grid .chip-option[data-insurance]').forEach(el => {
+    el.addEventListener('click', () => { intake.insurance = el.dataset.insurance; intake.insuranceOtherOpen = false; renderIntakeStep(); });
+  });
+  const insuranceOtherBtn = document.getElementById('insurance-other-btn');
+  if (insuranceOtherBtn) insuranceOtherBtn.addEventListener('click', () => { intake.insuranceOtherOpen = true; renderIntakeStep(); });
+  const insuranceOtherSelect = document.getElementById('insurance-other-select');
+  if (insuranceOtherSelect) insuranceOtherSelect.addEventListener('change', () => { intake.insurance = insuranceOtherSelect.value; renderIntakeStep(); });
+  document.querySelectorAll('#no-insurance-list .option-row').forEach(el => {
+    el.addEventListener('click', () => { intake.noInsurancePref = el.dataset.noInsurance; renderIntakeStep(); });
+  });
+  document.querySelectorAll('#budget-range-grid .chip-option').forEach(el => {
+    el.addEventListener('click', () => { intake.budgetRange = el.dataset.budgetRange; renderIntakeStep(); });
+  });
 
   const backBtn = document.getElementById('intake-back');
   if (backBtn) backBtn.addEventListener('click', () => { intakeStep--; renderIntakeStep(); });
@@ -830,7 +912,7 @@ function credentialsLabel(t) {
 }
 
 function insuranceDisplayLabel(t, opts = {}) {
-  if (!opts.preview && intake.insurance !== 'any') return `Accepts ${intake.insurance}`;
+  if (!opts.preview && intake.hasInsurance === 'yes' && intake.insurance !== 'any') return `Accepts ${intake.insurance}`;
   if (t.insuranceList.length) return `Accepts ${t.insuranceList.join(', ')}`;
   return t.selfPayNote || 'Self-pay';
 }
@@ -2142,7 +2224,7 @@ function renderSignupStep() {
       <div class="intake-sub" style="margin-top:6px;">Clients looking for in-person sessions only see therapists located in their city/state.</div>
       <div class="t-form-label">Insurance accepted</div>
       <div class="chip-grid" id="ts-insurance-grid">
-        ${['Aetna', 'BCBS', 'Cigna', 'United'].map(i => `<div class="chip-option ${d.insuranceList.includes(i) ? 'selected' : ''}" data-insurance="${i}">${i}</div>`).join('')}
+        ${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${d.insuranceList.includes(i) ? 'selected' : ''}" data-insurance="${i}">${i}</div>`).join('')}
       </div>
       <div class="t-form-label">If you don't take insurance, what should clients know? (optional)</div>
       <input type="text" class="t-rate-input" id="ts-selfpaynote" placeholder="e.g. Sliding scale available" value="${d.selfPayNote}">
@@ -2838,7 +2920,7 @@ function renderTherapistProfile() {
     <div class="intake-sub" style="margin-top:6px;">Clients looking for in-person sessions only see therapists located in their city/state.</div>
 
     <div class="t-form-label">Insurance accepted</div>
-    <div class="chip-grid">${['Aetna', 'BCBS', 'Cigna', 'United'].map(i => `<div class="chip-option ${t.insuranceList.includes(i) ? 'selected' : ''}" data-toggle-insurance="${i}">${i}</div>`).join('')}</div>
+    <div class="chip-grid">${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${t.insuranceList.includes(i) ? 'selected' : ''}" data-toggle-insurance="${i}">${i}</div>`).join('')}</div>
 
     <div class="t-form-label">If you don't take insurance, what should clients know? (optional)</div>
     <input type="text" class="t-rate-input" id="t-selfpaynote-input" placeholder="e.g. Sliding scale available" value="${t.selfPayNote || ''}">
@@ -3072,10 +3154,13 @@ function formatSummary() {
   return (intake.format === 'video' ? 'Online (video) preferred' : 'In-person preferred') + where;
 }
 function insuranceSummary() {
-  return intake.insurance === 'any' ? 'Self-pay / any' : intake.insurance;
+  if (intake.hasInsurance === 'no') {
+    return intake.noInsurancePref === 'sliding-scale' ? 'No insurance — needs a sliding scale' : 'No insurance — therapist fit comes first';
+  }
+  return intake.insurance === 'any' ? 'Not specified yet' : intake.insurance;
 }
 function budgetSummary() {
-  return intake.budgetMax >= 300 ? 'Up to $300/session (no real limit)' : `Up to $${intake.budgetMax}/session`;
+  return intake.budgetRange === 'Any budget' ? 'Any budget' : `${intake.budgetRange}/session`;
 }
 function identitySummary() {
   const parts = [];
