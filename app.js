@@ -209,6 +209,35 @@ const THERAPISTS = [
 ];
 
 const NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
+// The full specialty catalog behind "+ Other" — same no-free-text rule as
+// languages: picking from a fixed list is what keeps client needs and
+// therapist specialties matchable.
+const OTHER_SPECIALTIES = [
+  'Addiction', 'Adoption', 'Alcohol Use', 'Anger Management', 'Anorexia',
+  'Antisocial Personality (ASPD)', 'ARFID', 'Autism', 'Behavioral Issues',
+  'Binge Eating Disorder', 'Bipolar Disorder', 'Blended Family', 'Body Image',
+  'Borderline Personality (BPD)', 'Bulimia', 'Cancer', 'Career Counseling',
+  'Child Anxiety', 'Chronic Illness', 'Chronic Pain', 'Co-Parenting',
+  'Codependency', 'Complex PTSD', 'Dementia', 'Depersonalization (DPDR)',
+  'Depression', 'Dissociative Disorders (DID)', 'Divorce', 'Domestic Abuse',
+  'Driving Anxiety', 'Drug Abuse', 'Dual Diagnosis', 'Eating Disorders',
+  'Education and Learning Disabilities', 'Emotional Abuse', 'Emotional Regulation',
+  'First Responders', 'Gambling', 'Geriatric', 'Health Anxiety', 'Hoarding',
+  'Infertility', 'Infidelity', 'Intellectual Disability', 'Internet Addiction',
+  'Life Coaching', 'Marriage Counseling', 'Medical Detox', 'Medical Trauma',
+  'Medication Management', "Men's Issues", 'Menopause', 'Miscarriage',
+  'Narcissistic Abuse', 'Narcissistic Personality (NPD)', 'Neurodivergence',
+  'Obesity', 'Obsessive-Compulsive (OCD)', 'Oppositional Defiance (ODD)',
+  'Parenting', 'Personality Disorders', 'Porn Addiction', 'Postpartum Depression',
+  'Pregnancy, Prenatal, Postpartum', 'Premarital',
+  'Premenstrual Dysphoric Disorder (PMDD)', 'Psychosis', 'Racial Identity',
+  'Relationship Anxiety', 'Relationship Issues', 'Schizophrenia', 'Self Esteem',
+  'Self-Harming', 'Sex Therapy', 'Sexual Abuse', 'Sexual Addiction',
+  'Sleep or Insomnia', 'Social Anxiety', 'Spirituality', 'Sports Performance',
+  'Stress', 'Suicidal Ideation', 'Testing and Evaluation', 'Trauma and PTSD',
+  'Traumatic Brain Injury (TBI)', 'Veterans', 'Video Game Addiction',
+  'Weight Loss', "Women's Issues"
+];
 const MODALITY_OPTIONS = ['CBT', 'EMDR', 'ACT', 'EFT', 'Motivational Interviewing'];
 const US_STATES = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'];
 
@@ -283,6 +312,8 @@ const UNSURE_OPTIONS = [
 let intake = {
   knowsNeeds: null, // 'yes' | 'no' — which onboarding path the client took
   needs: [],
+  notSure: false,        // "I'm not sure" on the needs step — valid answer, adds no tag filter
+  needsOtherOpen: false, // transient UI flag for the "+ Other" specialty panel
   modality: 'open', modalityRequired: false,
   stylePref: 'balanced',
   genderPref: 'no-preference', genderRequired: false,
@@ -426,12 +457,24 @@ function renderIntakeStep() {
         ${UNSURE_OPTIONS.map(o => `<div class="option-row ${intake.needs.includes(o.tag) ? 'selected' : ''}" data-unsure-tag="${o.tag}">${o.label}</div>`).join('')}
       </div>`;
   } else if (intakeStep === 1) {
+    const extraSelected = intake.needs.filter(n => !NEED_OPTIONS.includes(n));
     html += `
       <h1>What brings you to therapy right now?</h1>
       <div class="intake-sub">Pick as many as apply — this is how we find therapists who actually work with what you're dealing with.</div>
       <div class="chip-grid" id="needs-grid">
         ${NEED_OPTIONS.map(n => `<div class="chip-option ${intake.needs.includes(n) ? 'selected' : ''}" data-need="${n}">${n}</div>`).join('')}
-      </div>`;
+        ${extraSelected.map(n => `<div class="chip-option selected" data-need="${n}">${n}</div>`).join('')}
+        <div class="chip-option ${intake.notSure ? 'selected' : ''}" id="needs-not-sure-btn">I'm not sure</div>
+        <div class="chip-option ${intake.needsOtherOpen ? 'selected' : ''}" id="needs-other-btn">${intake.needsOtherOpen ? 'Done' : '+ Other'}</div>
+      </div>
+      ${intake.needsOtherOpen ? `
+      <div class="specialty-panel" id="specialty-panel">
+        ${OTHER_SPECIALTIES.map(s => `
+          <label class="specialty-row">
+            <input type="checkbox" data-specialty="${s}" ${intake.needs.includes(s) ? 'checked' : ''}>
+            <span>${s}</span>
+          </label>`).join('')}
+      </div>` : ''}`;
   } else if (intakeStep === 2) {
     html += `
       <h1>Who do you want to work with?</h1>
@@ -524,7 +567,7 @@ function renderIntakeStep() {
 
   let canProceed = true;
   if (intakeStep === 0) canProceed = intake.knowsNeeds !== null;
-  else if (intakeStep === 1 && intake.knowsNeeds === 'yes') canProceed = intake.needs.length > 0;
+  else if (intakeStep === 1 && intake.knowsNeeds === 'yes') canProceed = intake.needs.length > 0 || intake.notSure;
   // The "not sure" path never blocks on a minimum selection — someone who
   // doesn't know what's going on yet shouldn't be stuck because none of the
   // options quite fit.
@@ -546,12 +589,28 @@ function attachIntakeHandlers() {
     el.addEventListener('click', () => { intake.knowsNeeds = el.dataset.knows; renderIntakeStep(); });
   });
 
-  document.querySelectorAll('#needs-grid .chip-option').forEach(el => {
+  document.querySelectorAll('#needs-grid .chip-option[data-need]').forEach(el => {
     el.addEventListener('click', () => {
       const need = el.dataset.need;
       const i = intake.needs.indexOf(need);
       if (i === -1) intake.needs.push(need); else intake.needs.splice(i, 1);
       renderIntakeStep();
+    });
+  });
+  const notSureBtn = document.getElementById('needs-not-sure-btn');
+  if (notSureBtn) notSureBtn.addEventListener('click', () => { intake.notSure = !intake.notSure; renderIntakeStep(); });
+  const needsOtherBtn = document.getElementById('needs-other-btn');
+  if (needsOtherBtn) needsOtherBtn.addEventListener('click', () => { intake.needsOtherOpen = !intake.needsOtherOpen; renderIntakeStep(); });
+  // Checkbox toggles update state and the Continue button directly, without
+  // a full re-render — re-rendering would reset the panel's scroll position
+  // on every tick in a ~90-item list.
+  document.querySelectorAll('#specialty-panel [data-specialty]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const s = cb.dataset.specialty;
+      const i = intake.needs.indexOf(s);
+      if (cb.checked && i === -1) intake.needs.push(s);
+      if (!cb.checked && i !== -1) intake.needs.splice(i, 1);
+      document.getElementById('intake-next').disabled = !(intake.needs.length > 0 || intake.notSure);
     });
   });
 
