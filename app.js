@@ -212,13 +212,6 @@ const NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions
 const MODALITY_OPTIONS = ['CBT', 'EMDR', 'ACT', 'EFT', 'Motivational Interviewing'];
 const US_STATES = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'];
 
-// Physical proximity isn't a soft preference the way gender or language are —
-// two locations either match or they don't, so this is a plain equality
-// check used as a hard filter, not a must-have toggle.
-function locationsMatch(a, b) {
-  if (!a || !b || !a.city || !a.state || !b.city || !b.state) return false;
-  return a.state === b.state && a.city.trim().toLowerCase() === b.city.trim().toLowerCase();
-}
 const MODALITY_INFO = {
   'CBT': "Cognitive Behavioral Therapy. Focuses on identifying and changing unhelpful thought patterns and behaviors — often structured, with exercises to practice between sessions.",
   'EMDR': "Eye Movement Desensitization and Reprocessing. A structured approach often used for trauma, using guided eye movements or other bilateral stimulation to help the brain reprocess difficult memories.",
@@ -348,7 +341,10 @@ function isCompatible(t, mode) {
 
   if (intake.format !== 'no-preference' && !t.formats.includes(intake.format)) return false;
 
-  if (intake.format === 'in-person' && !locationsMatch(t.location, { city: intake.city, state: intake.state })) return false;
+  // State always matters — even online, a therapist has to be licensed
+  // where the client lives. City only matters for meeting in person.
+  if (intake.state && t.location.state !== intake.state) return false;
+  if (intake.format === 'in-person' && intake.city.trim() && t.location.city.trim().toLowerCase() !== intake.city.trim().toLowerCase()) return false;
 
   if (intake.insurance !== 'any' && !t.insuranceList.includes(intake.insurance)) return false;
 
@@ -368,13 +364,15 @@ function getMatchReasons(t) {
   if (intake.format !== 'no-preference' && t.formats.includes(intake.format)) {
     reasons.push(intake.format === 'video' ? 'Video sessions' : 'In-person sessions');
   }
-  if (intake.format === 'in-person' && locationsMatch(t.location, { city: intake.city, state: intake.state })) {
+  if (intake.format === 'in-person' && intake.city.trim() && t.location.city.trim().toLowerCase() === intake.city.trim().toLowerCase()) {
     reasons.push(`Located in ${t.location.city}, ${t.location.state}`);
+  } else if (intake.state && t.location.state === intake.state) {
+    reasons.push(`Licensed in ${intake.state}`);
   }
   if (intake.insurance !== 'any' && t.insuranceList.includes(intake.insurance)) reasons.push(`Accepts ${intake.insurance}`);
   if (intake.lgbtqRequired && t.identity.lgbtqAffirming) reasons.push('LGBTQ+ Affirming');
   if (intake.genderPref !== 'no-preference' && t.identity.gender === intake.genderPref) {
-    reasons.push(t.identity.gender === 'female' ? 'Female therapist' : 'Male therapist');
+    reasons.push({ female: 'Female therapist', male: 'Male therapist', nonbinary: 'Nonbinary therapist' }[t.identity.gender] || 'Preferred gender');
   }
   if (intake.languagePref !== 'any' && t.languages.includes(intake.languagePref)) reasons.push(`Speaks ${intake.languagePref}`);
   if (intake.stylePref !== 'balanced' && t.style === intake.stylePref) reasons.push('Similar style to what you want');
@@ -436,35 +434,13 @@ function renderIntakeStep() {
       </div>`;
   } else if (intakeStep === 2) {
     html += `
-      <h1>Looking for a specific approach?</h1>
-      <div class="intake-sub">If you're not sure, that's completely fine — most people aren't.</div>
-      <div class="option-list" id="modality-list">
-        <div class="option-row ${intake.modality === 'open' ? 'selected' : ''}" data-modality="open">Not sure / open to anything</div>
-        ${MODALITY_OPTIONS.map(m => `<div class="option-row ${intake.modality === m ? 'selected' : ''}" data-modality="${m}">${m} <span class="info-btn" data-info="${m}">?</span></div>`).join('')}
-      </div>
-      <div id="modality-must-have" style="${intake.modality === 'open' ? 'display:none;' : ''}">
-        <div class="must-have-toggle">
-          <div class="toggle-label"><strong>Must-have</strong><span>Only show therapists who offer this</span></div>
-          <div class="switch ${intake.modalityRequired ? 'on' : ''}" id="modality-required-switch"></div>
-        </div>
-      </div>`;
-  } else if (intakeStep === 3) {
-    html += `
-      <h1>What kind of guidance do you want?</h1>
-      <div class="intake-sub">There's no wrong answer — this just helps us show you therapists whose style tends to match.</div>
-      <div class="option-list" id="style-list">
-        <div class="option-row ${intake.stylePref === 'gentle' ? 'selected' : ''}" data-style="gentle">Mostly listens and reflects back</div>
-        <div class="option-row ${intake.stylePref === 'balanced' ? 'selected' : ''}" data-style="balanced">A mix of both</div>
-        <div class="option-row ${intake.stylePref === 'direct' ? 'selected' : ''}" data-style="direct">Direct — tells me like it is</div>
-      </div>`;
-  } else if (intakeStep === 4) {
-    html += `
-      <h1>Any preferences on who you work with?</h1>
-      <div class="intake-sub">Totally optional — skip anything that doesn't matter to you.</div>
+      <h1>Who do you want to work with?</h1>
+      <div class="intake-sub">Preferences are optional — but we do need to know where you are, since therapists are licensed by state.</div>
       <div class="option-list" id="gender-list">
         <div class="option-row ${intake.genderPref === 'no-preference' ? 'selected' : ''}" data-gender="no-preference">No preference</div>
         <div class="option-row ${intake.genderPref === 'female' ? 'selected' : ''}" data-gender="female">Female therapist</div>
         <div class="option-row ${intake.genderPref === 'male' ? 'selected' : ''}" data-gender="male">Male therapist</div>
+        <div class="option-row ${intake.genderPref === 'nonbinary' ? 'selected' : ''}" data-gender="nonbinary">Nonbinary therapist</div>
       </div>
       <div id="gender-must-have" style="${intake.genderPref === 'no-preference' ? 'display:none;' : ''}">
         <div class="must-have-toggle">
@@ -491,28 +467,51 @@ function renderIntakeStep() {
           <div class="toggle-label"><strong>Must-have</strong><span>Only show therapists who speak this language</span></div>
           <div class="switch ${intake.languageRequired ? 'on' : ''}" id="language-required-switch"></div>
         </div>
+      </div>
+      <div class="t-form-label">How do you want to meet?</div>
+      <div class="option-list" id="format-list">
+        <div class="option-row ${intake.format === 'no-preference' ? 'selected' : ''}" data-format="no-preference">Either works</div>
+        <div class="option-row ${intake.format === 'video' ? 'selected' : ''}" data-format="video">Online (video)</div>
+        <div class="option-row ${intake.format === 'in-person' ? 'selected' : ''}" data-format="in-person">In-person</div>
+      </div>
+      <div class="t-form-label">Your state</div>
+      <select id="intake-state">
+        <option value="">Select a state</option>
+        ${US_STATES.map(s => `<option value="${s}" ${intake.state === s ? 'selected' : ''}>${s}</option>`).join('')}
+      </select>
+      <div id="location-fields" style="${intake.format === 'in-person' ? '' : 'display:none;'}">
+        <div class="t-form-label">Your city</div>
+        <input type="text" class="t-rate-input" id="intake-city" placeholder="e.g. Austin" value="${intake.city}">
+      </div>
+      <div class="intake-sub" style="margin-top:6px;">${intake.format === 'in-person' ? 'In-person only works with a therapist actually located near you.' : 'Even online, your therapist has to be licensed in your state.'}</div>`;
+  } else if (intakeStep === 3) {
+    html += `
+      <h1>Looking for a specific approach?</h1>
+      <div class="intake-sub">If you're not sure, that's completely fine — most people aren't.</div>
+      <div class="option-list" id="modality-list">
+        <div class="option-row ${intake.modality === 'open' ? 'selected' : ''}" data-modality="open">Not sure / open to anything</div>
+        ${MODALITY_OPTIONS.map(m => `<div class="option-row ${intake.modality === m ? 'selected' : ''}" data-modality="${m}">${m} <span class="info-btn" data-info="${m}">?</span></div>`).join('')}
+      </div>
+      <div id="modality-must-have" style="${intake.modality === 'open' ? 'display:none;' : ''}">
+        <div class="must-have-toggle">
+          <div class="toggle-label"><strong>Must-have</strong><span>Only show therapists who offer this</span></div>
+          <div class="switch ${intake.modalityRequired ? 'on' : ''}" id="modality-required-switch"></div>
+        </div>
+      </div>`;
+  } else if (intakeStep === 4) {
+    html += `
+      <h1>What kind of guidance do you want?</h1>
+      <div class="intake-sub">There's no wrong answer — this just helps us show you therapists whose style tends to match.</div>
+      <div class="option-list" id="style-list">
+        <div class="option-row ${intake.stylePref === 'gentle' ? 'selected' : ''}" data-style="gentle">Mostly listens and reflects back</div>
+        <div class="option-row ${intake.stylePref === 'balanced' ? 'selected' : ''}" data-style="balanced">A mix of both</div>
+        <div class="option-row ${intake.stylePref === 'direct' ? 'selected' : ''}" data-style="direct">Direct — tells me like it is</div>
       </div>`;
   } else if (intakeStep === 5) {
     html += `
       <h1>A few logistics</h1>
-      <div class="intake-sub">So we only show you therapists you can actually see.</div>
-      <div class="match-tag-label" style="margin-top:0;">Session format</div>
-      <div class="option-list" id="format-list">
-        <div class="option-row ${intake.format === 'no-preference' ? 'selected' : ''}" data-format="no-preference">No preference</div>
-        <div class="option-row ${intake.format === 'video' ? 'selected' : ''}" data-format="video">Video</div>
-        <div class="option-row ${intake.format === 'in-person' ? 'selected' : ''}" data-format="in-person">In-person</div>
-      </div>
-      <div id="location-fields" style="${intake.format === 'in-person' ? '' : 'display:none;'}">
-        <div class="t-form-label">Your city</div>
-        <input type="text" class="t-rate-input" id="intake-city" placeholder="e.g. Austin" value="${intake.city}">
-        <div class="t-form-label">Your state</div>
-        <select id="intake-state">
-          <option value="">Select a state</option>
-          ${US_STATES.map(s => `<option value="${s}" ${intake.state === s ? 'selected' : ''}>${s}</option>`).join('')}
-        </select>
-        <div class="intake-sub" style="margin-top:6px;">In-person only works if we can find a therapist actually located near you.</div>
-      </div>
-      <div class="match-tag-label">Insurance</div>
+      <div class="intake-sub">Last step — how you'll pay for sessions.</div>
+      <div class="match-tag-label" style="margin-top:0;">Insurance</div>
       <div class="chip-grid" id="insurance-grid">
         ${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${intake.insurance === i ? 'selected' : ''}" data-insurance="${i}">${i === 'any' ? 'Self-pay / any' : i}</div>`).join('')}
       </div>
@@ -529,7 +528,9 @@ function renderIntakeStep() {
   // The "not sure" path never blocks on a minimum selection — someone who
   // doesn't know what's going on yet shouldn't be stuck because none of the
   // options quite fit.
-  else if (intakeStep === 5 && intake.format === 'in-person') canProceed = intake.city.trim() !== '' && intake.state !== '';
+  // State is always required — even online, therapists are licensed by
+  // state. City only matters when they want to meet in person.
+  else if (intakeStep === 2) canProceed = intake.state !== '' && (intake.format !== 'in-person' || intake.city.trim() !== '');
   html += `
     <div class="intake-footer">
       ${intakeStep > 0 ? `<button class="btn-back" id="intake-back">Back</button>` : ''}
@@ -2055,6 +2056,7 @@ function renderSignupStep() {
       <div class="option-list" id="ts-gender-list">
         <div class="option-row ${d.gender === 'female' ? 'selected' : ''}" data-gender="female">Female</div>
         <div class="option-row ${d.gender === 'male' ? 'selected' : ''}" data-gender="male">Male</div>
+        <div class="option-row ${d.gender === 'nonbinary' ? 'selected' : ''}" data-gender="nonbinary">Nonbinary</div>
       </div>
       <div class="must-have-toggle">
         <div class="toggle-label"><strong>LGBTQ+ affirming</strong><span>Shown to clients who require this</span></div>
@@ -2750,6 +2752,7 @@ function renderTherapistProfile() {
     <div class="chip-grid">
       <div class="chip-option ${t.identity.gender === 'female' ? 'selected' : ''}" data-set-gender="female">Female</div>
       <div class="chip-option ${t.identity.gender === 'male' ? 'selected' : ''}" data-set-gender="male">Male</div>
+      <div class="chip-option ${t.identity.gender === 'nonbinary' ? 'selected' : ''}" data-set-gender="nonbinary">Nonbinary</div>
     </div>
 
     <div class="must-have-toggle">
@@ -3005,8 +3008,9 @@ function needsSummary() {
   return intake.needs.length ? intake.needs.join(', ') : 'Not specified';
 }
 function formatSummary() {
-  if (intake.format === 'no-preference') return 'No preference';
-  return intake.format === 'video' ? 'Video preferred' : 'In-person preferred';
+  const where = intake.state ? (intake.format === 'in-person' && intake.city.trim() ? ` · ${intake.city.trim()}, ${intake.state}` : ` · ${intake.state}`) : '';
+  if (intake.format === 'no-preference') return `Either works${where}`;
+  return (intake.format === 'video' ? 'Online (video) preferred' : 'In-person preferred') + where;
 }
 function insuranceSummary() {
   return intake.insurance === 'any' ? 'Self-pay / any' : intake.insurance;
