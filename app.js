@@ -208,6 +208,25 @@ const THERAPISTS = [
   }
 ];
 
+// Identity-affinity data for the seed therapists (ethnicity / gender-sexuality
+// affinities / faith backgrounds they work with). Kept as a side map so the
+// large therapist literals above stay readable; new signups start empty and
+// would fill these from a future profile section.
+const THERAPIST_IDENTITY = {
+  t1: { ethnicity: 'Asian', affinities: ['LGBTQ+'], faith: ['Secular and Non-Religious'] },
+  t2: { ethnicity: 'Black and African American', affinities: [], faith: ['Christian'] },
+  t3: { ethnicity: 'South Asian', affinities: ['LGBTQ+'], faith: ['Hindu'] },
+  t4: { ethnicity: 'Hispanic and Latino', affinities: [], faith: ['Secular and Non-Religious'] },
+  t5: { ethnicity: '', affinities: [], faith: ['Christian'] },
+  t6: { ethnicity: '', affinities: ['LGBTQ+', 'Transgender'], faith: ['Secular and Non-Religious'] }
+};
+THERAPISTS.forEach(t => {
+  const id = THERAPIST_IDENTITY[t.id] || {};
+  t.ethnicity = id.ethnicity || '';
+  t.affinities = id.affinities || [];
+  t.faith = id.faith || [];
+});
+
 const NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
 // The full specialty catalog behind "+ Other" — same no-free-text rule as
 // languages: picking from a fixed list is what keeps client needs and
@@ -308,8 +327,22 @@ const BUDGET_RANGES = [
   { label: 'Under $100', min: 0, max: 100 },
   { label: '$100–$150', min: 100, max: 150 },
   { label: '$150–$200', min: 150, max: 200 },
-  { label: '$200+', min: 200, max: Infinity }
+  { label: '$200+', min: 200, max: Infinity },
+  { label: 'Sliding scale', slidingScale: true }
 ];
+const CARE_FOR_OPTIONS = [
+  { key: 'myself', label: 'Myself' },
+  { key: 'child', label: 'A child' },
+  { key: 'couples', label: 'Couples' },
+  { key: 'family', label: 'Family' }
+];
+// Identity-affinity options (from the client's requested filters). These are
+// SOFT preferences — they surface as match reasons when they line up, but
+// never hard-filter the pool empty. "No preference" is the default for
+// ethnicity; gender/sexuality and faith are optional multi-selects.
+const ETHNICITY_OPTIONS = ['Arab and Middle Eastern', 'Asian', 'Black and African American', 'Hispanic and Latino', 'Multiracial', 'Native American', 'Pacific Islander', 'South Asian'];
+const GENDER_SEXUALITY_OPTIONS = ['Bisexual', 'Gay', 'Lesbian', 'LGBTQ+', 'Polyamory & ENM', 'Sex-Positive & Kink-Friendly', 'Transgender'];
+const FAITH_OPTIONS = ['Buddhist', 'Christian', 'Hindu', 'Jewish', 'Muslim', 'Secular and Non-Religious', 'Sikh', 'The Church of Jesus Christ of Latter-day Saints'];
 // Three quick-tap chips cover the most common cases. "Other" opens a real
 // dropdown pulled from OTHER_LANGUAGES instead of free text, so language
 // names stay consistent between what a therapist selects and what a client
@@ -354,13 +387,18 @@ const UNSURE_OPTIONS = [
 
 let intake = {
   knowsNeeds: null, // 'yes' | 'no' — which onboarding path the client took
+  careFor: null,         // 'myself' | 'child' | 'couples' | 'family'
+  childAge: '',          // shown only when careFor === 'child'
   needs: [],
   notSure: false,        // "I'm not sure" on the needs step — valid answer, adds no tag filter
   needsOtherOpen: false, // transient UI flag for the "+ Other" specialty panel
   modality: 'open', modalityRequired: false,
-  stylePref: 'balanced',
+  stylePref: null,       // guidance style — optional, no default selection
   genderPref: 'no-preference', genderRequired: false,
+  ethnicityPref: 'no-preference', // soft single-select
   lgbtqRequired: false,
+  affinities: [],        // gender/sexuality affinity tags — soft multi-select ("anything else")
+  faith: [],             // faith backgrounds — soft multi-select ("anything else")
   languagePref: 'any', languageRequired: false, languageOtherOpen: false,
   format: 'no-preference',
   city: '', state: '',
@@ -430,10 +468,16 @@ function isCompatible(t, mode) {
   if (intake.hasInsurance === 'no' && intake.noInsurancePref === 'sliding-scale' && !/sliding/i.test(t.selfPayNote || '')) return false;
 
   const range = BUDGET_RANGES.find(r => r.label === intake.budgetRange);
-  if (range && t.rateMin > range.max) return false;
+  if (range && range.slidingScale && !/sliding/i.test(t.selfPayNote || '')) return false;
+  if (range && !range.slidingScale && range.max != null && t.rateMin > range.max) return false;
 
   return true;
 }
+
+// Which therapist style aligns with each guidance preference. empathy leans
+// gentle, challenge leans direct — so the soft "similar style" reason still
+// fires with the four new options.
+const STYLE_ALIGN = { gentle: 'gentle', empathy: 'gentle', direct: 'direct', challenge: 'direct' };
 
 function getMatchReasons(t) {
   const reasons = [];
@@ -458,7 +502,14 @@ function getMatchReasons(t) {
     reasons.push({ female: 'Female therapist', male: 'Male therapist', nonbinary: 'Nonbinary therapist' }[t.identity.gender] || 'Preferred gender');
   }
   if (intake.languagePref !== 'any' && t.languages.includes(intake.languagePref)) reasons.push(`Speaks ${intake.languagePref}`);
-  if (intake.stylePref !== 'balanced' && t.style === intake.stylePref) reasons.push('Similar style to what you want');
+  if (intake.stylePref && STYLE_ALIGN[intake.stylePref] === t.style) reasons.push('Similar style to what you want');
+  if (intake.ethnicityPref !== 'no-preference' && t.ethnicity === intake.ethnicityPref) reasons.push(`${t.ethnicity} therapist`);
+  // Soft identity affinities — surface shared ground, don't hard-filter.
+  intake.affinities.filter(a => (t.affinities || []).includes(a)).forEach(a => reasons.push(`Affirming: ${a}`));
+  intake.faith.filter(f => (t.faith || []).includes(f)).forEach(f => reasons.push(f));
+  if ((intake.careFor === 'couples' && t.tags.includes('Couples')) || (intake.careFor === 'family' && t.tags.includes('Family Conflict'))) {
+    reasons.push(intake.careFor === 'couples' ? 'Works with couples' : 'Works with families');
+  }
   return reasons;
 }
 
@@ -486,14 +537,28 @@ function loosenRequirements() {
 // INTAKE QUIZ
 // ===================================================================
 let intakeStep = 0;
-const TOTAL_STEPS = 6;
+// Keyed step order so inserting or reordering steps never means renumbering a
+// pile of `intakeStep === N` checks. The 'needs' step renders either the
+// clinical chips or the plain-language list depending on the knows-fork.
+const INTAKE_STEPS = ['careFor', 'knows', 'needs', 'who', 'approach', 'guidance', 'anythingElse', 'logistics'];
 const intakeContent = document.getElementById('intake-content');
 
 function renderIntakeStep() {
-  let html = `<div class="intake-progress">${Array.from({ length: TOTAL_STEPS }).map((_, i) =>
+  const k = INTAKE_STEPS[intakeStep];
+  let html = `<div class="intake-progress">${INTAKE_STEPS.map((_, i) =>
     `<div class="dot ${i <= intakeStep ? 'done' : ''}"></div>`).join('')}</div>`;
 
-  if (intakeStep === 0) {
+  if (k === 'careFor') {
+    html += `
+      <h1>I'm looking for therapy for...</h1>
+      <div class="intake-sub">This helps us line you up with the right kind of therapist from the start.</div>
+      <div class="option-list" id="care-for-list">
+        ${CARE_FOR_OPTIONS.map(o => `<div class="option-row ${intake.careFor === o.key ? 'selected' : ''}" data-care-for="${o.key}">${o.label}</div>`).join('')}
+      </div>
+      ${intake.careFor === 'child' ? `
+      <div class="t-form-label">How old is the child?</div>
+      <input type="text" class="t-rate-input" id="child-age-input" placeholder="e.g. 8" value="${intake.childAge}">` : ''}`;
+  } else if (k === 'knows') {
     html += `
       <h1>Do you know what brings you to therapy?</h1>
       <div class="intake-sub">Either answer is completely fine — we'll get you to the right therapists either way.</div>
@@ -501,14 +566,14 @@ function renderIntakeStep() {
         <div class="option-row ${intake.knowsNeeds === 'yes' ? 'selected' : ''}" data-knows="yes">Yes, I know what I need help with</div>
         <div class="option-row ${intake.knowsNeeds === 'no' ? 'selected' : ''}" data-knows="no">Not really — help me figure it out</div>
       </div>`;
-  } else if (intakeStep === 1 && intake.knowsNeeds === 'no') {
+  } else if (k === 'needs' && intake.knowsNeeds === 'no') {
     html += `
       <h1>What's been going on?</h1>
       <div class="intake-sub">Pick anything that resonates — you don't need the right words for it, and it's okay if nothing quite fits.</div>
       <div class="option-list" id="unsure-list">
         ${UNSURE_OPTIONS.map(o => `<div class="option-row ${intake.needs.includes(o.tag) ? 'selected' : ''}" data-unsure-tag="${o.tag}">${o.label}</div>`).join('')}
       </div>`;
-  } else if (intakeStep === 1) {
+  } else if (k === 'needs') {
     const extraSelected = intake.needs.filter(n => !NEED_OPTIONS.includes(n));
     html += `
       <h1>What brings you to therapy right now?</h1>
@@ -527,7 +592,7 @@ function renderIntakeStep() {
             <span>${s}</span>
           </label>`).join('')}
       </div>` : ''}`;
-  } else if (intakeStep === 2) {
+  } else if (k === 'who') {
     html += `
       <h1>Who do you want to work with?</h1>
       <div class="intake-sub">Preferences are optional — but we do need to know where you are, since therapists are licensed by state.</div>
@@ -547,9 +612,13 @@ function renderIntakeStep() {
         <div class="toggle-label"><strong>LGBTQ+ affirming</strong><span>Must be explicitly affirming</span></div>
         <div class="switch ${intake.lgbtqRequired ? 'on' : ''}" id="lgbtq-switch"></div>
       </div>
+      <div class="t-form-label">Ethnicity</div>
+      <div class="chip-grid" id="ethnicity-grid">
+        <div class="chip-option ${intake.ethnicityPref === 'no-preference' ? 'selected' : ''}" data-ethnicity="no-preference">No preference</div>
+        ${ETHNICITY_OPTIONS.map(e => `<div class="chip-option ${intake.ethnicityPref === e ? 'selected' : ''}" data-ethnicity="${e}">${e}</div>`).join('')}
+      </div>
       <div class="t-form-label">Language</div>
       <div class="chip-grid" id="language-grid">
-        <div class="chip-option ${intake.languagePref === 'any' ? 'selected' : ''}" data-language="any">No preference</div>
         ${LANGUAGE_QUICK_OPTIONS.map(l => `<div class="chip-option ${intake.languagePref === l ? 'selected' : ''}" data-language="${l}">${l}</div>`).join('')}
         ${(!LANGUAGE_QUICK_OPTIONS.includes(intake.languagePref) && intake.languagePref !== 'any') ? `<div class="chip-option selected" data-language="${intake.languagePref}">${intake.languagePref}</div>` : ''}
         <div class="chip-option" id="language-other-btn">+ Other</div>
@@ -579,7 +648,7 @@ function renderIntakeStep() {
         <input type="text" class="t-rate-input" id="intake-city" placeholder="e.g. Austin" value="${intake.city}">
       </div>
       <div class="intake-sub" style="margin-top:6px;">${intake.format === 'in-person' ? 'In-person only works with a therapist actually located near you.' : 'Even online, your therapist has to be licensed in your state.'}</div>`;
-  } else if (intakeStep === 3) {
+  } else if (k === 'approach') {
     html += `
       <h1>Looking for a specific approach?</h1>
       <div class="intake-sub">If you're not sure, that's completely fine — most people aren't.</div>
@@ -593,16 +662,29 @@ function renderIntakeStep() {
           <div class="switch ${intake.modalityRequired ? 'on' : ''}" id="modality-required-switch"></div>
         </div>
       </div>`;
-  } else if (intakeStep === 4) {
+  } else if (k === 'guidance') {
     html += `
       <h1>What kind of guidance do you want?</h1>
       <div class="intake-sub">There's no wrong answer — this just helps us show you therapists whose style tends to match.</div>
       <div class="option-list" id="style-list">
         <div class="option-row ${intake.stylePref === 'gentle' ? 'selected' : ''}" data-style="gentle">Mostly listens and reflects back</div>
-        <div class="option-row ${intake.stylePref === 'balanced' ? 'selected' : ''}" data-style="balanced">A mix of both</div>
         <div class="option-row ${intake.stylePref === 'direct' ? 'selected' : ''}" data-style="direct">Direct — tells me like it is</div>
+        <div class="option-row ${intake.stylePref === 'empathy' ? 'selected' : ''}" data-style="empathy">I'm needing more empathy and understanding</div>
+        <div class="option-row ${intake.stylePref === 'challenge' ? 'selected' : ''}" data-style="challenge">I'm needing to be challenged and pushed</div>
       </div>`;
-  } else if (intakeStep === 5) {
+  } else if (k === 'anythingElse') {
+    html += `
+      <h1>Anything else that matters?</h1>
+      <div class="intake-sub">All optional — pick anything that would help you feel understood, and we'll surface therapists who share it.</div>
+      <div class="t-form-label">Gender &amp; sexuality</div>
+      <div class="chip-grid" id="affinities-grid">
+        ${GENDER_SEXUALITY_OPTIONS.map(o => `<div class="chip-option ${intake.affinities.includes(o) ? 'selected' : ''}" data-affinity="${o}">${o}</div>`).join('')}
+      </div>
+      <div class="t-form-label">Faith</div>
+      <div class="chip-grid" id="faith-grid">
+        ${FAITH_OPTIONS.map(o => `<div class="chip-option ${intake.faith.includes(o) ? 'selected' : ''}" data-faith="${o}">${o}</div>`).join('')}
+      </div>`;
+  } else if (k === 'logistics') {
     html += `
       <h1>A few logistics</h1>
       <div class="intake-sub">Last step — how you'll pay for sessions.</div>
@@ -634,21 +716,20 @@ function renderIntakeStep() {
   }
 
   let canProceed = true;
-  if (intakeStep === 0) canProceed = intake.knowsNeeds !== null;
-  else if (intakeStep === 1 && intake.knowsNeeds === 'yes') canProceed = intake.needs.length > 0 || intake.notSure;
-  // The "not sure" path never blocks on a minimum selection — someone who
-  // doesn't know what's going on yet shouldn't be stuck because none of the
-  // options quite fit.
-  // State is always required — even online, therapists are licensed by
-  // state. City only matters when they want to meet in person.
-  else if (intakeStep === 2) canProceed = intake.state !== '' && (intake.format !== 'in-person' || intake.city.trim() !== '');
-  else if (intakeStep === 5) canProceed = intake.hasInsurance === 'yes' ? intake.insurance !== 'any'
+  if (k === 'careFor') canProceed = intake.careFor !== null && (intake.careFor !== 'child' || intake.childAge.trim() !== '');
+  else if (k === 'knows') canProceed = intake.knowsNeeds !== null;
+  else if (k === 'needs' && intake.knowsNeeds === 'yes') canProceed = intake.needs.length > 0 || intake.notSure;
+  // The "not sure" path never blocks on a minimum selection. On the who step:
+  // state is always required (therapists are licensed by state), city only for
+  // in-person, and a language must now be chosen — there's no "no preference".
+  else if (k === 'who') canProceed = intake.state !== '' && (intake.format !== 'in-person' || intake.city.trim() !== '') && intake.languagePref !== 'any';
+  else if (k === 'logistics') canProceed = intake.hasInsurance === 'yes' ? intake.insurance !== 'any'
     : intake.hasInsurance === 'no' ? intake.noInsurancePref !== null
     : false;
   html += `
     <div class="intake-footer">
       ${intakeStep > 0 ? `<button class="btn-back" id="intake-back">Back</button>` : ''}
-      <button class="btn-next" id="intake-next" ${canProceed ? '' : 'disabled'}>${intakeStep === TOTAL_STEPS - 1 ? 'See My Matches' : 'Continue'}</button>
+      <button class="btn-next" id="intake-next" ${canProceed ? '' : 'disabled'}>${intakeStep === INTAKE_STEPS.length - 1 ? 'See My Matches' : 'Continue'}</button>
     </div>`;
 
   intakeContent.innerHTML = html;
@@ -656,6 +737,15 @@ function renderIntakeStep() {
 }
 
 function attachIntakeHandlers() {
+  document.querySelectorAll('#care-for-list .option-row').forEach(el => {
+    el.addEventListener('click', () => { intake.careFor = el.dataset.careFor; renderIntakeStep(); });
+  });
+  const childAgeInput = document.getElementById('child-age-input');
+  if (childAgeInput) childAgeInput.addEventListener('input', () => {
+    intake.childAge = childAgeInput.value;
+    document.getElementById('intake-next').disabled = intake.childAge.trim() === '';
+  });
+
   document.querySelectorAll('#knows-list .option-row').forEach(el => {
     el.addEventListener('click', () => { intake.knowsNeeds = el.dataset.knows; renderIntakeStep(); });
   });
@@ -722,6 +812,9 @@ function attachIntakeHandlers() {
   if (genderReqSwitch) genderReqSwitch.addEventListener('click', () => { intake.genderRequired = !intake.genderRequired; renderIntakeStep(); });
   const lgbtqSwitch = document.getElementById('lgbtq-switch');
   if (lgbtqSwitch) lgbtqSwitch.addEventListener('click', () => { intake.lgbtqRequired = !intake.lgbtqRequired; renderIntakeStep(); });
+  document.querySelectorAll('#ethnicity-grid .chip-option').forEach(el => {
+    el.addEventListener('click', () => { intake.ethnicityPref = el.dataset.ethnicity; renderIntakeStep(); });
+  });
 
   document.querySelectorAll('#language-grid [data-language]').forEach(el => {
     el.addEventListener('click', () => {
@@ -744,7 +837,23 @@ function attachIntakeHandlers() {
   const intakeCityInput = document.getElementById('intake-city');
   if (intakeCityInput) intakeCityInput.addEventListener('input', () => {
     intake.city = intakeCityInput.value;
-    document.getElementById('intake-next').disabled = !(intake.city.trim() && intake.state);
+    document.getElementById('intake-next').disabled = !(intake.city.trim() && intake.state && intake.languagePref !== 'any');
+  });
+  document.querySelectorAll('#affinities-grid .chip-option').forEach(el => {
+    el.addEventListener('click', () => {
+      const a = el.dataset.affinity;
+      const i = intake.affinities.indexOf(a);
+      if (i === -1) intake.affinities.push(a); else intake.affinities.splice(i, 1);
+      renderIntakeStep();
+    });
+  });
+  document.querySelectorAll('#faith-grid .chip-option').forEach(el => {
+    el.addEventListener('click', () => {
+      const f = el.dataset.faith;
+      const i = intake.faith.indexOf(f);
+      if (i === -1) intake.faith.push(f); else intake.faith.splice(i, 1);
+      renderIntakeStep();
+    });
   });
   const intakeStateSelect = document.getElementById('intake-state');
   if (intakeStateSelect) intakeStateSelect.addEventListener('change', () => { intake.state = intakeStateSelect.value; renderIntakeStep(); });
@@ -774,7 +883,7 @@ function attachIntakeHandlers() {
   if (backBtn) backBtn.addEventListener('click', () => { intakeStep--; renderIntakeStep(); });
 
   document.getElementById('intake-next').addEventListener('click', () => {
-    if (intakeStep < TOTAL_STEPS - 1) {
+    if (intakeStep < INTAKE_STEPS.length - 1) {
       intakeStep++;
       renderIntakeStep();
     } else {
@@ -875,12 +984,15 @@ function matchPercent(t) {
   }
   const prefs = [
     [intake.modality !== 'open', t.modalities.includes(intake.modality)],
-    [intake.stylePref !== 'balanced', t.style === intake.stylePref],
+    [!!intake.stylePref, STYLE_ALIGN[intake.stylePref] === t.style],
     [intake.genderPref !== 'no-preference', t.identity.gender === intake.genderPref],
+    [intake.ethnicityPref !== 'no-preference', t.ethnicity === intake.ethnicityPref],
     [intake.lgbtqRequired, t.identity.lgbtqAffirming],
+    [intake.affinities.length > 0, intake.affinities.some(a => (t.affinities || []).includes(a))],
+    [intake.faith.length > 0, intake.faith.some(f => (t.faith || []).includes(f))],
     [intake.languagePref !== 'any', t.languages.includes(intake.languagePref)],
     [intake.format !== 'no-preference', t.formats.includes(intake.format)],
-    [intake.insurance !== 'any', t.insuranceList.includes(intake.insurance)]
+    [intake.hasInsurance === 'yes' && intake.insurance !== 'any', t.insuranceList.includes(intake.insurance)]
   ];
   prefs.forEach(([applies, ok]) => { if (applies) { possible += 10; if (ok) earned += 10; } });
   if (!possible) return null;
@@ -2513,6 +2625,7 @@ function finishTherapistSignup() {
     stats: { profileViews: 0, hearts: 0, top5: 0, conversationsStarted: 0, weekViews: 0, weekHearts: 0 },
     media: { video: null, office: null, outOfOffice: null },
     persona: { inOffice: '', outOfOffice: '' },
+    ethnicity: '', affinities: [], faith: [],
     pronouns: d.pronouns.trim(), showPronouns: d.showPronouns,
     useCompanyName: d.useCompanyName, companyName: d.companyName.trim(),
     photo: null,
@@ -3145,8 +3258,14 @@ document.getElementById('btn-info').addEventListener('click', () => {
 });
 
 // ===== PROFILE =====
+function careForSummary() {
+  if (!intake.careFor) return '';
+  return { myself: 'For myself', child: `For a child${intake.childAge ? ` (age ${intake.childAge})` : ''}`, couples: 'For couples', family: 'For family' }[intake.careFor];
+}
 function needsSummary() {
-  return intake.needs.length ? intake.needs.join(', ') : 'Not specified';
+  const base = intake.needs.length ? intake.needs.join(', ') : (intake.notSure ? 'Still figuring it out' : 'Not specified');
+  const cf = careForSummary();
+  return cf ? `${cf} · ${base}` : base;
 }
 function formatSummary() {
   const where = intake.state ? (intake.format === 'in-person' && intake.city.trim() ? ` · ${intake.city.trim()}, ${intake.state}` : ` · ${intake.state}`) : '';
@@ -3160,13 +3279,18 @@ function insuranceSummary() {
   return intake.insurance === 'any' ? 'Not specified yet' : intake.insurance;
 }
 function budgetSummary() {
-  return intake.budgetRange === 'Any budget' ? 'Any budget' : `${intake.budgetRange}/session`;
+  if (intake.budgetRange === 'Any budget') return 'Any budget';
+  if (intake.budgetRange === 'Sliding scale') return 'Sliding scale';
+  return `${intake.budgetRange}/session`;
 }
 function identitySummary() {
   const parts = [];
   if (intake.genderPref !== 'no-preference') parts.push(`${intake.genderPref}${intake.genderRequired ? ' (must-have)' : ' (preferred)'}`);
+  if (intake.ethnicityPref !== 'no-preference') parts.push(intake.ethnicityPref);
   if (intake.lgbtqRequired) parts.push('LGBTQ+ affirming required');
   if (intake.languagePref !== 'any') parts.push(`Speaks ${intake.languagePref}${intake.languageRequired ? ' (must-have)' : ' (preferred)'}`);
+  if (intake.affinities.length) parts.push(...intake.affinities);
+  if (intake.faith.length) parts.push(...intake.faith);
   return parts.length ? parts.join(', ') : 'No preference specified';
 }
 function modalitySummary() {
