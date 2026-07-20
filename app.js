@@ -220,11 +220,21 @@ const THERAPIST_IDENTITY = {
   t5: { ethnicity: '', affinities: [], faith: ['Christian'] },
   t6: { ethnicity: '', affinities: ['LGBTQ+', 'Transgender'], faith: ['Secular and Non-Religious'] }
 };
+// Recurring weekly openings the therapist has for NEW ongoing clients — the
+// Home tab is an availability calendar, so this is the core of it. Only
+// therapists accepting ongoing clients are seeded with open slots.
+const THERAPIST_AVAILABILITY = {
+  t1: [{ day: 'Mon', time: '9:00am' }, { day: 'Wed', time: '4:00pm' }, { day: 'Thu', time: '11:00am' }],
+  t2: [{ day: 'Tue', time: '10:00am' }, { day: 'Fri', time: '2:00pm' }],
+  t4: [{ day: 'Mon', time: '1:00pm' }, { day: 'Wed', time: '9:00am' }, { day: 'Fri', time: '3:00pm' }],
+  t6: [{ day: 'Tue', time: '3:00pm' }, { day: 'Thu', time: '5:00pm' }]
+};
 THERAPISTS.forEach(t => {
   const id = THERAPIST_IDENTITY[t.id] || {};
   t.ethnicity = id.ethnicity || '';
   t.affinities = id.affinities || [];
   t.faith = id.faith || [];
+  t.availabilitySlots = THERAPIST_AVAILABILITY[t.id] || [];
 });
 
 const NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
@@ -2663,7 +2673,7 @@ function finishTherapistSignup() {
     stats: { profileViews: 0, hearts: 0, top5: 0, conversationsStarted: 0, weekViews: 0, weekHearts: 0 },
     media: { video: null, office: null, outOfOffice: null },
     persona: { inOffice: '', outOfOffice: '' },
-    ethnicity: '', affinities: [], faith: [],
+    ethnicity: '', affinities: [], faith: [], availabilitySlots: [],
     pronouns: d.pronouns.trim(), showPronouns: d.showPronouns,
     useCompanyName: d.useCompanyName, companyName: d.companyName.trim(),
     photo: null,
@@ -2816,65 +2826,98 @@ function updateTNavBadge() {
 // during accept, and appointments the therapist adds manually for anything
 // booked outside Kindred — so this is their real full week, not just what
 // happened on the platform.
+// The Home tab is an AVAILABILITY calendar, not a scheduling calendar: it
+// answers "what spaces do I have open?" for new ongoing clients and for
+// one-time on-demand sessions. Filled slots show as Booked; the therapist
+// manages their openings here.
 function renderTherapistHome() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
-  document.getElementById('t-home-title').textContent = `This Week — ${t.name}`;
+  document.getElementById('t-home-title').textContent = 'My Availability';
   const list = document.getElementById('t-home-list');
 
-  const items = [];
-  matches.filter(m => m.therapist.id === currentTherapistId && m.status === 'ondemand' && m.paymentStatus === 'paid').forEach(m => {
-    const [day, ...timeParts] = m.slotLabel.split(' ');
-    items.push({ day, time: timeParts.join(' '), label: 'One-time session' });
-  });
-  matches.filter(m => m.therapist.id === currentTherapistId && m.status === 'matched' && m.scheduledDay).forEach(m => {
-    items.push({ day: m.scheduledDay, time: m.scheduledTime, label: 'Ongoing client', portalTid: m.therapist.id });
-  });
-  t.externalAppointments.forEach((a, i) => {
-    items.push({ day: a.day, time: a.time, label: a.label, external: true, index: i });
-  });
-  items.sort((a, b) => DAYS_OF_WEEK.indexOf(a.day) - DAYS_OF_WEEK.indexOf(b.day) || timeSortKey(a.time) - timeSortKey(b.time));
+  const ongoingBookings = matches.filter(m => m.therapist.id === t.id && m.status === 'matched' && m.scheduledDay);
+  const odBooked = matches.filter(m => m.therapist.id === t.id && m.status === 'ondemand' && m.paymentStatus === 'paid');
+  const sortedAvail = [...t.availabilitySlots]
+    .map((s, i) => ({ ...s, i }))
+    .sort((a, b) => DAYS_OF_WEEK.indexOf(a.day) - DAYS_OF_WEEK.indexOf(b.day) || timeSortKey(a.time) - timeSortKey(b.time));
+  const openOngoing = sortedAvail.filter(s => !ongoingBookings.some(m => m.scheduledDay === s.day && m.scheduledTime === s.time)).length;
 
-  let html = `<div class="request-cap-banner">${items.length} appointment${items.length === 1 ? '' : 's'} this week</div>`;
-  if (items.length === 0) {
-    html += `<p class="empty-state">Nothing on the calendar yet.</p>`;
+  let html = '';
+
+  // ===== Ongoing availability =====
+  html += `<div class="avail-section-title">🌱 Open for new ongoing clients</div>`;
+  if (!t.acceptingOngoing) {
+    html += `<p class="portal-note">You're not accepting new ongoing clients right now. Turn that on in your Profile to open weekly slots.</p>`;
   } else {
-    html += items.map(it => `
-      <div class="appt-card">
-        <div class="appt-day">${it.day}</div>
-        <div class="appt-details"><div class="appt-label">${it.label}</div><div class="appt-time">${it.time}</div></div>
-        ${it.portalTid ? `<button class="portal-open-btn" data-open-portal="${it.portalTid}">Client Portal</button>` : ''}
-        ${it.external ? `<button class="appt-remove" data-remove-external="${it.index}">✕</button>` : ''}
+    html += `<div class="avail-sub">${openOngoing} open weekly ${openOngoing === 1 ? 'slot' : 'slots'} · recurring times a new client can book</div>`;
+    if (sortedAvail.length === 0) {
+      html += `<p class="portal-note">No open weekly slots yet — add the recurring times you could take a new client.</p>`;
+    } else {
+      html += sortedAvail.map(s => {
+        const filledBy = ongoingBookings.find(m => m.scheduledDay === s.day && m.scheduledTime === s.time);
+        return `<div class="avail-slot ${filledBy ? 'filled' : 'open'}">
+          <div class="avail-when"><span class="avail-day">${s.day}</span><span class="avail-time">${s.time}</span></div>
+          <span class="avail-status ${filledBy ? 'booked' : ''}">${filledBy ? 'Booked' : 'Open'}</span>
+          ${filledBy ? '' : `<button class="appt-remove" data-remove-avail="${s.i}">✕</button>`}
+        </div>`;
+      }).join('');
+    }
+    html += `
+      <div class="schedule-row">
+        <select id="avail-day">${DAYS_OF_WEEK.map(d => `<option value="${d}">${d}</option>`).join('')}</select>
+        <input type="time" id="avail-time" value="10:00">
       </div>
-    `).join('');
+      <button class="message-btn-full" id="add-avail-btn">+ Add open slot</button>`;
   }
 
-  html += `
-    <div class="t-form-label" style="margin-top:20px;">Add an appointment booked elsewhere</div>
-    <input type="text" class="t-rate-input" id="external-appt-label" placeholder="e.g. John D. — phone consult">
-    <div class="schedule-row">
-      <select id="external-appt-day">${DAYS_OF_WEEK.map(d => `<option value="${d}">${d}</option>`).join('')}</select>
-      <input type="time" id="external-appt-time" value="10:00">
-    </div>
-    <button class="message-btn-full" id="add-external-appt-btn">+ Add Appointment</button>
-  `;
+  // ===== On-demand availability =====
+  html += `<div class="avail-section-title" style="margin-top:22px;">⚡ On-demand this week</div>`;
+  if (t.onDemandBanned) {
+    html += `<p class="portal-note">On-demand access is suspended after a reported no-show. Ongoing matching is unaffected.</p>`;
+  } else if (!t.onDemand) {
+    html += `<p class="portal-note">On-demand is off. Turn it on in your Profile to offer one-time sessions.</p>`;
+  } else {
+    if (t.onDemandSlots.length === 0) {
+      html += `<p class="portal-note">No on-demand openings this week — add a one-time slot below.</p>`;
+    } else {
+      html += t.onDemandSlots.map((s, i) => {
+        const booked = odBooked.find(m => m.slotLabel === s.label);
+        return `<div class="avail-slot ${booked ? 'filled' : 'open'}">
+          <div class="avail-when"><span class="avail-day">${s.label}</span></div>
+          <span class="avail-status ${booked ? 'booked' : ''}">${booked ? 'Booked' : 'Open'}</span>
+          ${booked ? '' : `<button class="appt-remove" data-remove-od="${i}">✕</button>`}
+        </div>`;
+      }).join('');
+    }
+    html += `
+      <div class="add-slot-row">
+        <input type="text" id="new-od-slot" placeholder="e.g. Thu 4:00pm">
+        <button id="add-od-btn">Add</button>
+      </div>`;
+  }
 
   list.innerHTML = html;
 
-  list.querySelectorAll('[data-remove-external]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      t.externalAppointments.splice(Number(btn.dataset.removeExternal), 1);
-      renderTherapistHome();
-    });
+  list.querySelectorAll('[data-remove-avail]').forEach(btn => {
+    btn.addEventListener('click', () => { t.availabilitySlots.splice(Number(btn.dataset.removeAvail), 1); renderTherapistHome(); });
   });
-  list.querySelectorAll('[data-open-portal]').forEach(btn => {
-    btn.addEventListener('click', () => openTherapistPortal(btn.dataset.openPortal));
+  const addAvailBtn = document.getElementById('add-avail-btn');
+  if (addAvailBtn) addAvailBtn.addEventListener('click', () => {
+    const day = document.getElementById('avail-day').value;
+    const time = formatTime12h(document.getElementById('avail-time').value);
+    if (t.availabilitySlots.some(s => s.day === day && s.time === time)) { showToast('That slot is already open.'); return; }
+    t.availabilitySlots.push({ day, time });
+    renderTherapistHome();
   });
-  document.getElementById('add-external-appt-btn').addEventListener('click', () => {
-    const label = document.getElementById('external-appt-label').value.trim();
+  list.querySelectorAll('[data-remove-od]').forEach(btn => {
+    btn.addEventListener('click', () => { t.onDemandSlots.splice(Number(btn.dataset.removeOd), 1); renderTherapistHome(); });
+  });
+  const addOdBtn = document.getElementById('add-od-btn');
+  if (addOdBtn) addOdBtn.addEventListener('click', () => {
+    const label = document.getElementById('new-od-slot').value.trim();
     if (!label) return;
-    const day = document.getElementById('external-appt-day').value;
-    const time = formatTime12h(document.getElementById('external-appt-time').value);
-    t.externalAppointments.push({ label, day, time });
+    const rank = t.onDemandSlots.length ? Math.max(...t.onDemandSlots.map(s => s.rank)) + 1 : 1;
+    t.onDemandSlots.push({ label, rank });
     renderTherapistHome();
   });
 }

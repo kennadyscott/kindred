@@ -1752,6 +1752,42 @@ select.t-rate-input,
   flex-shrink: 0;
 }
 
+/* ===== AVAILABILITY CALENDAR (therapist Home) ===== */
+.avail-section-title {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--coral-dark);
+  margin-bottom: 4px;
+}
+.avail-sub { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 10px; }
+.avail-slot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  border-radius: 14px;
+  padding: 11px 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  margin-bottom: 8px;
+}
+.avail-slot.filled { opacity: 0.7; }
+.avail-when { flex: 1; display: flex; align-items: baseline; gap: 8px; }
+.avail-when .avail-day { font-weight: 700; font-size: 14px; color: var(--ink); }
+.avail-when .avail-time { font-size: 13px; color: var(--ink-soft); }
+.avail-status {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--moss);
+  background: var(--moss-light);
+  padding: 4px 9px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.avail-status.booked { color: var(--ink-soft); background: var(--sand); }
+
 /* ===== ACCOUNT TYPE / LOGIN ===== */
 .welcome-content {
   flex: 1;
