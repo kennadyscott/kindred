@@ -265,8 +265,35 @@ const MODALITY_INFO = {
   'EMDR': "Eye Movement Desensitization and Reprocessing. A structured approach often used for trauma, using guided eye movements or other bilateral stimulation to help the brain reprocess difficult memories.",
   'ACT': "Acceptance and Commitment Therapy. Focuses on accepting difficult thoughts and feelings rather than fighting them, while committing to actions aligned with your values.",
   'EFT': "Emotionally Focused Therapy. Often used with couples and families — focused on identifying emotional patterns and building stronger, safer emotional bonds.",
-  'Motivational Interviewing': "A collaborative conversational style that helps you explore and strengthen your own motivation for change — especially useful for ambivalence around habits or behaviors."
+  'Motivational Interviewing': "A collaborative conversational style that helps you explore and strengthen your own motivation for change — especially useful for ambivalence around habits or behaviors.",
+  'ERP': "Exposure and Response Prevention. A structured approach for OCD and anxiety that gently, gradually reduces the power of intrusive thoughts and compulsions.",
+  'Somatic': "Body-based therapy that works with physical sensations, not just talk — helpful when stress and trauma live in the body.",
+  'IFS': "Internal Family Systems. Works with the different 'parts' of you (the critic, the protector, the wounded) to build inner harmony.",
+  'DBT': "Dialectical Behavior Therapy. Teaches concrete skills for managing intense emotions, distress, and relationships.",
+  'Couples Therapy': "Focused on the relationship itself — communication patterns, conflict, and connection between partners."
 };
+// Client "Types of Therapy" step — set up like languages: common ones as
+// quick pills, everything else behind a "+ Other" dropdown. Single-select.
+const MODALITY_QUICK = ['ERP', 'ACT', 'Motivational Interviewing', 'Somatic', 'EMDR', 'IFS', 'DBT', 'Couples Therapy'];
+const OTHER_MODALITIES = [
+  'Adlerian', 'AEDP', 'Applied Behavioral Analysis (ABA)', 'Art Therapy',
+  'Attachment-based', 'Biofeedback', 'Brainspotting',
+  'Clinical Supervision and Licensed Supervisors', 'Coaching',
+  'Cognitive Behavioral (CBT)', 'Cognitive Processing (CPT)',
+  'Compassion Focused', 'Culturally Sensitive', 'Dance Movement Therapy',
+  'Eclectic', 'Emotionally Focused', 'Energy Psychology', 'Existential',
+  'Experiential Therapy', 'Expressive Arts', 'Family Systems', 'Family Therapy',
+  'Feminist', 'Forensic Psychology', 'Gestalt', 'Gottman Method', 'Humanistic',
+  'Hypnotherapy', 'Imago', 'Integrative', 'Interpersonal', 'Intervention',
+  'Jungian', 'Ketamine-Assisted', 'Mindfulness-Based (MBCT)', 'Multicultural',
+  'Music Therapy', 'Narrative', 'Neuro-Linguistic (NLP)', 'Neurofeedback',
+  'Parent-Child Interaction (PCIT)', 'Person-Centered', 'Play Therapy',
+  'Positive Psychology', 'Prolonged Exposure Therapy', 'Psychoanalytic',
+  'Psychobiological Approach Couple Therapy', 'Psychodynamic',
+  'Rational Emotive Behavior (REBT)', 'Reality Therapy', 'Relational',
+  'Sandplay', 'Schema Therapy', 'Solution Focused Brief (SFBT)',
+  'Strength-Based', 'Structural Family Therapy', 'Transpersonal', 'Trauma Focused'
+];
 
 function openModalityInfo(name) {
   const desc = MODALITY_INFO[name];
@@ -392,7 +419,7 @@ let intake = {
   needs: [],
   notSure: false,        // "I'm not sure" on the needs step — valid answer, adds no tag filter
   needsOtherOpen: false, // transient UI flag for the "+ Other" specialty panel
-  modality: 'open', modalityRequired: false,
+  modality: 'open', modalityRequired: false, modalityOtherOpen: false,
   stylePref: null,       // guidance style — optional, no default selection
   genderPref: 'no-preference', genderRequired: false,
   ethnicityPref: 'no-preference', // soft single-select
@@ -649,13 +676,19 @@ function renderIntakeStep() {
       </div>
       <div class="intake-sub" style="margin-top:6px;">${intake.format === 'in-person' ? 'In-person only works with a therapist actually located near you.' : 'Even online, your therapist has to be licensed in your state.'}</div>`;
   } else if (k === 'approach') {
+    const modalityExtra = (intake.modality !== 'open' && !MODALITY_QUICK.includes(intake.modality)) ? intake.modality : null;
     html += `
-      <h1>Looking for a specific approach?</h1>
-      <div class="intake-sub">If you're not sure, that's completely fine — most people aren't.</div>
-      <div class="option-list" id="modality-list">
-        <div class="option-row ${intake.modality === 'open' ? 'selected' : ''}" data-modality="open">Not sure / open to anything</div>
-        ${MODALITY_OPTIONS.map(m => `<div class="option-row ${intake.modality === m ? 'selected' : ''}" data-modality="${m}">${m} <span class="info-btn" data-info="${m}">?</span></div>`).join('')}
+      <h1>Any type of therapy in mind?</h1>
+      <div class="intake-sub">Optional — if you're not sure, "Open to anything" is a great answer. Tap the ? to learn what each one is.</div>
+      <div class="chip-grid" id="modality-grid">
+        <div class="chip-option ${intake.modality === 'open' ? 'selected' : ''}" data-modality="open">Open to anything</div>
+        ${MODALITY_QUICK.map(m => `<div class="chip-option ${intake.modality === m ? 'selected' : ''}" data-modality="${m}">${m}${MODALITY_INFO[m] ? ` <span class="info-btn" data-info="${m}">?</span>` : ''}</div>`).join('')}
+        ${modalityExtra ? `<div class="chip-option selected" data-modality="${modalityExtra}">${modalityExtra}</div>` : ''}
+        <div class="chip-option ${intake.modalityOtherOpen ? 'selected' : ''}" id="modality-other-btn">+ Other</div>
       </div>
+      ${intake.modalityOtherOpen ? `<div class="other-language-row">
+        <select id="modality-other-select">${OTHER_MODALITIES.map(m => `<option value="${m}" ${m === intake.modality ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      </div>` : ''}
       <div id="modality-must-have" style="${intake.modality === 'open' ? 'display:none;' : ''}">
         <div class="must-have-toggle">
           <div class="toggle-label"><strong>Must-have</strong><span>Only show therapists who offer this</span></div>
@@ -784,16 +817,21 @@ function attachIntakeHandlers() {
     });
   });
 
-  document.querySelectorAll('#modality-list .option-row').forEach(el => {
+  document.querySelectorAll('#modality-grid .chip-option[data-modality]').forEach(el => {
     el.addEventListener('click', () => {
       intake.modality = el.dataset.modality;
+      intake.modalityOtherOpen = false;
       if (intake.modality === 'open') intake.modalityRequired = false;
       renderIntakeStep();
     });
   });
-  document.querySelectorAll('#modality-list .info-btn').forEach(el => {
+  document.querySelectorAll('#modality-grid .info-btn').forEach(el => {
     el.addEventListener('click', (e) => { e.stopPropagation(); openModalityInfo(el.dataset.info); });
   });
+  const modalityOtherBtn = document.getElementById('modality-other-btn');
+  if (modalityOtherBtn) modalityOtherBtn.addEventListener('click', () => { intake.modalityOtherOpen = true; renderIntakeStep(); });
+  const modalityOtherSelect = document.getElementById('modality-other-select');
+  if (modalityOtherSelect) modalityOtherSelect.addEventListener('change', () => { intake.modality = modalityOtherSelect.value; renderIntakeStep(); });
   const modReqSwitch = document.getElementById('modality-required-switch');
   if (modReqSwitch) modReqSwitch.addEventListener('click', () => { intake.modalityRequired = !intake.modalityRequired; renderIntakeStep(); });
 
