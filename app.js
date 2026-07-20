@@ -373,6 +373,9 @@ const CARE_FOR_OPTIONS = [
   { key: 'couples', label: 'Couples' },
   { key: 'family', label: 'Family' }
 ];
+// When the client can usually meet — captured in intake, shown on the
+// shared profile so a matched therapist can see if their open slots line up.
+const AVAILABILITY_OPTIONS = ['Anytime', 'Early mornings', 'Lunch', 'Evenings', 'Weekends', 'Other'];
 // Identity-affinity options (from the client's requested filters). These are
 // SOFT preferences — they surface as match reasons when they line up, but
 // never hard-filter the pool empty. "No preference" is the default for
@@ -438,6 +441,7 @@ let intake = {
   faith: [],             // faith backgrounds — soft multi-select ("anything else")
   languagePref: 'any', languageRequired: false, languageOtherOpen: false,
   format: 'no-preference',
+  availability: [],      // when the client can usually meet — multi-select
   city: '', state: '',
   insurance: 'any',
   hasInsurance: null,        // 'yes' | 'no' — gate question before any carrier picking
@@ -675,6 +679,10 @@ function renderIntakeStep() {
         <div class="option-row ${intake.format === 'video' ? 'selected' : ''}" data-format="video">Online (video)</div>
         <div class="option-row ${intake.format === 'in-person' ? 'selected' : ''}" data-format="in-person">In-person</div>
       </div>
+      <div class="t-form-label">When can you usually meet?</div>
+      <div class="chip-grid" id="availability-grid">
+        ${AVAILABILITY_OPTIONS.map(a => `<div class="chip-option ${intake.availability.includes(a) ? 'selected' : ''}" data-availability="${a}">${a}</div>`).join('')}
+      </div>
       <div class="t-form-label">Your state</div>
       <select id="intake-state">
         <option value="">Select a state</option>
@@ -881,6 +889,20 @@ function attachIntakeHandlers() {
 
   document.querySelectorAll('#format-list .option-row').forEach(el => {
     el.addEventListener('click', () => { intake.format = el.dataset.format; renderIntakeStep(); });
+  });
+  document.querySelectorAll('#availability-grid .chip-option').forEach(el => {
+    el.addEventListener('click', () => {
+      const a = el.dataset.availability;
+      const has = intake.availability.includes(a);
+      // "Anytime" is exclusive — it and the specific windows can't coexist.
+      if (a === 'Anytime') intake.availability = has ? [] : ['Anytime'];
+      else {
+        intake.availability = intake.availability.filter(x => x !== 'Anytime');
+        if (has) intake.availability = intake.availability.filter(x => x !== a);
+        else intake.availability.push(a);
+      }
+      renderIntakeStep();
+    });
   });
   const intakeCityInput = document.getElementById('intake-city');
   if (intakeCityInput) intakeCityInput.addEventListener('input', () => {
@@ -1669,18 +1691,40 @@ const PORTAL_SECTIONS = [
   { key: 'resources', label: 'Resources', icon: '🌿', placeholder: 'e.g. Ch. 2 of "Self-Compassion"' }
 ];
 
+// The full picture a matched therapist sees when a client shares their
+// profile — also what the client previews before deciding to share.
+function sharedProfileBodyHtml() {
+  const savedList = EXPLORE_RESOURCES.filter(r => savedResources.includes(r.id));
+  return `
+    <div class="pref-item"><div class="pref-label">Looking for support with</div><div class="pref-value">${needsSummary()}</div></div>
+    <div class="pref-item"><div class="pref-label">What kind of guidance they want</div><div class="pref-value">${guidanceSummary()}</div></div>
+    <div class="pref-item"><div class="pref-label">Type of therapy in mind</div><div class="pref-value">${modalitySummary()}</div></div>
+    <div class="pref-item"><div class="pref-label">Session format</div><div class="pref-value">${formatSummary()}</div></div>
+    <div class="pref-item"><div class="pref-label">When they can meet</div><div class="pref-value">${availabilitySummary()}</div></div>
+    <div class="pref-item"><div class="pref-label">Identity preferences</div><div class="pref-value">${identitySummary()}</div></div>
+    <div class="pref-item"><div class="pref-label">Saved resources</div><div class="pref-value">${savedList.length ? savedList.map(r => `${r.icon} ${r.title}`).join('<br>') : 'None saved yet.'}</div></div>
+  `;
+}
+
 function clientProfileSummaryHtml(m) {
   if (!m.profileShared) {
     return `<div class="portal-note">This client hasn't shared their profile. They can turn on sharing from their own profile page whenever they're ready.</div>`;
   }
-  const savedList = EXPLORE_RESOURCES.filter(r => savedResources.includes(r.id));
-  return `
-    <div class="pref-item"><div class="pref-label">Looking for support with</div><div class="pref-value">${needsSummary()}</div></div>
-    <div class="pref-item"><div class="pref-label">Approach</div><div class="pref-value">${modalitySummary()}</div></div>
-    <div class="pref-item"><div class="pref-label">Session format</div><div class="pref-value">${formatSummary()}</div></div>
-    <div class="pref-item"><div class="pref-label">Identity preferences</div><div class="pref-value">${identitySummary()}</div></div>
-    <div class="pref-item"><div class="pref-label">Saved resources</div><div class="pref-value">${savedList.length ? savedList.map(r => `${r.icon} ${r.title}`).join('<br>') : 'None saved yet.'}</div></div>
+  return sharedProfileBodyHtml();
+}
+
+// Client-side preview of exactly what a therapist sees when sharing is on.
+function openSharedProfilePreview() {
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>What your therapist sees</h2>
+    <div class="intake-sub">When you turn on sharing for a therapist, this is the snapshot they get — nothing more. You can turn it off anytime.</div>
+    ${sharedProfileBodyHtml()}
+    <button class="primary-btn" style="margin-top:16px;background:var(--coral);color:white;" id="shared-preview-close">Got it</button>
   `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  document.getElementById('shared-preview-close').addEventListener('click', () => document.getElementById('confirm-modal').classList.add('hidden'));
 }
 
 function openTherapistPortal(therapistId) {
@@ -3353,6 +3397,12 @@ function formatSummary() {
   if (intake.format === 'no-preference') return `Either works${where}`;
   return (intake.format === 'video' ? 'Online (video) preferred' : 'In-person preferred') + where;
 }
+function availabilitySummary() {
+  return intake.availability.length ? intake.availability.join(', ') : 'Not specified';
+}
+function guidanceSummary() {
+  return { gentle: 'Mostly listens and reflects back', direct: 'Direct — tells me like it is', empathy: 'More empathy and understanding', challenge: 'To be challenged and pushed' }[intake.stylePref] || 'Open to any style';
+}
 function insuranceSummary() {
   if (intake.hasInsurance === 'no') {
     return intake.noInsurancePref === 'sliding-scale' ? 'No insurance — needs a sliding scale' : 'No insurance — therapist fit comes first';
@@ -3395,6 +3445,7 @@ function renderProfileScreen() {
       <div class="pref-item"><div class="pref-label">Looking for support with</div><div class="pref-value">${needsSummary()}</div></div>
       <div class="pref-item"><div class="pref-label">Approach</div><div class="pref-value">${modalitySummary()}</div></div>
       <div class="pref-item"><div class="pref-label">Session format</div><div class="pref-value">${formatSummary()}</div></div>
+      <div class="pref-item"><div class="pref-label">When you can meet</div><div class="pref-value">${availabilitySummary()}</div></div>
       <div class="pref-item"><div class="pref-label">Insurance</div><div class="pref-value">${insuranceSummary()}</div></div>
       <div class="pref-item"><div class="pref-label">Budget</div><div class="pref-value">${budgetSummary()}</div></div>
       <div class="pref-item"><div class="pref-label">Identity preferences</div><div class="pref-value">${identitySummary()}</div></div>
@@ -3407,6 +3458,7 @@ function renderProfileScreen() {
       <div class="pref-item">
         <div class="pref-label">Share your profile</div>
         <div class="pref-value" style="margin-bottom:6px;">Give a matched therapist a picture of what you're working with — your questionnaire answers and saved resources. You choose per therapist, and you can turn it off anytime.</div>
+        <button class="edit-prefs-btn" id="preview-shared-btn" style="margin:2px 0 4px;background:white;border:1.5px solid var(--coral);color:var(--coral-dark);">👀 Preview what your therapist sees</button>
         ${matchedMatches.length ? matchedMatches.map(m => `
           <div class="must-have-toggle" style="margin-top:8px;">
             <div class="toggle-label"><strong>${displayName(m.therapist)}</strong><span>${m.profileShared ? 'Can see your profile' : 'Cannot see your profile'}</span></div>
@@ -3421,6 +3473,7 @@ function renderProfileScreen() {
   `;
   document.getElementById('edit-prefs-btn').addEventListener('click', startIntake);
   document.getElementById('client-logout-btn').addEventListener('click', logout);
+  document.getElementById('preview-shared-btn').addEventListener('click', openSharedProfilePreview);
   screen.querySelectorAll('[data-share-toggle]').forEach(el => el.addEventListener('click', () => {
     const m = matches.find(m => m.therapist.id === el.dataset.shareToggle && m.status === 'matched');
     if (!m) return;
