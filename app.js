@@ -1099,6 +1099,26 @@ function insuranceDisplayLabel(t, opts = {}) {
   return t.selfPayNote || 'Self-pay';
 }
 
+// True when this therapist is one of the client's active Top 5 (requested,
+// pending or matched) — drives the star badge the SME liked.
+function isInTop5(t) {
+  return matches.some(m => m.therapist.id === t.id && (m.status === 'pending' || m.status === 'matched'));
+}
+
+// Hinge-style compact fact row for the detail view — icon + short label,
+// wrapping, instead of stacked meta lines.
+function detailFactsHtml(t, opts = {}) {
+  const fmtIcon = t.formats.length === 2 ? '🎥' : t.formats.includes('video') ? '🎥' : '🏠';
+  const facts = [
+    ['📍', `${t.location.city}, ${t.location.state}`],
+    [fmtIcon, t.meta[0]],
+    ['💵', (t.meta[1] || '').replace('/session', '')],
+    ['🛡️', insuranceDisplayLabel(t, opts)]
+  ];
+  if (t.website) facts.push(['🌐', `<a class="website-link" href="https://${t.website}" target="_blank" rel="noopener">${t.website}</a>`]);
+  return `<div class="detail-facts">${facts.filter(f => f[1]).map(([ic, txt]) => `<span class="fact"><span class="fact-ic">${ic}</span>${txt}</span>`).join('')}</div>`;
+}
+
 // Only surfaced when it's actually the reason this therapist is showing up —
 // a client who didn't ask for a specific language shouldn't see one at all.
 function languageBadgeHtml(t) {
@@ -1188,7 +1208,7 @@ function buildCard(t) {
       ${languageBadgeHtml(t)}
     </div>
     <div class="card-body">
-      <div class="card-name-row"><h2 class="serif-name">${displayName(t)}</h2>${t.licenseVerified ? `<span class="verified-chip" title="License verified via Stripe Identity">✓ Verified</span>` : ''}</div>
+      <div class="card-name-row"><h2 class="serif-name">${displayName(t)}</h2>${isInTop5(t) ? `<span class="top5-chip" title="In your Top 5">★</span>` : ''}${t.licenseVerified ? `<span class="verified-chip" title="License verified via Stripe Identity">✓ Verified</span>` : ''}</div>
       ${(t.showPronouns && t.pronouns) ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
       <div class="card-subtitle">${[credentialsLabel(t), ...t.tags.slice(0, 2)].join(' • ')}</div>
       ${traitChipsHtml(t)}
@@ -1441,12 +1461,11 @@ function openDetail(t, opts = {}) {
     </div>
     <div class="card-name-row" style="margin-top:14px;"><h2>${displayName(t)}</h2><span class="creds">${credentialsLabel(t)}</span></div>
     ${t.pronouns ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
-    ${t.licenseVerified ? `<div class="verified-chip" style="margin-top:4px;">✓ License verified via Stripe Identity</div>` : ''}
-    <div class="section-title">Details</div>
-    <div class="card-meta"><span>📍 ${t.location.city}, ${t.location.state}</span></div>
-    <div class="card-meta">${t.meta.map(m => `<span>${m}</span>`).join('')}</div>
-    <div class="card-meta"><span>${insuranceDisplayLabel(t, { preview })}</span></div>
-    ${t.website ? `<div class="card-meta"><a class="website-link" href="https://${t.website}" target="_blank" rel="noopener">🌐 ${t.website}</a></div>` : ''}
+    <div class="detail-badge-row">
+      ${(!preview && isInTop5(t)) ? `<span class="top5-chip">★ In your Top 5</span>` : ''}
+      ${t.licenseVerified ? `<span class="verified-chip">✓ License verified via Stripe Identity</span>` : ''}
+    </div>
+    ${detailFactsHtml(t, { preview })}
     ${t.bestFor ? `<div class="best-for">${t.bestFor}</div>` : ''}
     <div class="section-title">Specialties</div>
     <div class="tag-row">${t.tags.map(tagHtml).join('')}</div>
@@ -1534,7 +1553,7 @@ function renderMatches() {
     if (m.status === 'pending') {
       return `<div class="match-row" data-id="${t.id}">
         ${avatarHtml(t, 'avatar-md')}
-        <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">${last ? last.text : 'Waiting on their response…'}</div></div>
+        <div><div class="chat-name"><span class="top5-star">★</span>${displayName(t)}</div><div class="last-msg">${last ? last.text : 'Waiting on their response…'}</div></div>
         <span class="pending-tag">Requested</span>
       </div>`;
     }
@@ -1570,7 +1589,7 @@ function renderMatches() {
     }
     return `<div class="match-row" data-id="${t.id}">
       ${avatarHtml(t, 'avatar-md')}
-      <div><div class="chat-name">${displayName(t)}</div><div class="last-msg">${last ? last.text : 'Say hello!'}</div></div>
+      <div><div class="chat-name"><span class="top5-star">★</span>${displayName(t)}</div><div class="last-msg">${last ? last.text : 'Say hello!'}</div></div>
     </div>`;
   }).join('');
 
