@@ -229,12 +229,29 @@ const THERAPIST_AVAILABILITY = {
   t4: [{ day: 'Mon', time: '1:00pm' }, { day: 'Wed', time: '9:00am' }, { day: 'Fri', time: '3:00pm' }],
   t6: [{ day: 'Tue', time: '3:00pm' }, { day: 'Thu', time: '5:00pm' }]
 };
+// The therapist's PRIVATE ideal-client spec — who they're the strongest fit for.
+// Never shown to clients. Everything on a therapist's profile above stays their
+// "I also work with" tier, so stating an ideal never narrows who can find them.
+// mustHaves (max 3) weigh double in scoring; they are not filters.
+const THERAPIST_IDEAL = {
+  t1: { ageBands: ['25–34', '35–44'], genders: ['Female'], fields: ['Tech', 'Healthcare'],
+        needs: ['Anxiety', 'Burnout'], modalities: ['CBT'], payment: 'Either',
+        availability: ['Early mornings', 'Evenings'], mustHaves: ['needs', 'modalities'] },
+  t3: { ageBands: ['25–34', '35–44'], genders: ['Female'], fields: ['First responder', 'Military & Veteran'],
+        needs: ['Trauma'], modalities: ['EMDR'], payment: 'Cash pay',
+        availability: [], mustHaves: ['needs', 'modalities', 'fields'] },
+  t6: { ageBands: ['18–24', '25–34'], genders: [], fields: ['Student', 'Creative'],
+        needs: ['ADHD'], modalities: [], payment: 'Either',
+        availability: [], mustHaves: ['needs'] }
+};
+
 THERAPISTS.forEach(t => {
   const id = THERAPIST_IDENTITY[t.id] || {};
   t.ethnicity = id.ethnicity || '';
   t.affinities = id.affinities || [];
   t.faith = id.faith || [];
   t.availabilitySlots = THERAPIST_AVAILABILITY[t.id] || [];
+  t.idealClient = Object.assign(emptyIdealClient(), THERAPIST_IDEAL[t.id] || {});
 });
 
 const NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
@@ -376,6 +393,38 @@ const CARE_FOR_OPTIONS = [
 // When the client can usually meet — captured in intake, shown on the
 // shared profile so a matched therapist can see if their open slots line up.
 const AVAILABILITY_OPTIONS = ['Anytime', 'Early mornings', 'Lunch', 'Evenings', 'Weekends', 'Other'];
+
+// ===== IDEAL-CLIENT VOCABULARY =====
+// A therapist's "ideal client" is matched against what the client tells us about
+// THEMSELVES, so both sides must pick from these exact lists — a mismatch here
+// would silently break matching (same reason languages are a controlled list).
+// These describe the client, not their preferences about a therapist.
+const CLIENT_AGE_BANDS = ['18–24', '25–34', '35–44', '45–54', '55–64', '65+'];
+const CLIENT_GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Transgender', 'Prefer not to say'];
+const CLIENT_FIELD_OPTIONS = ['First responder', 'Healthcare', 'Military & Veteran', 'Education',
+  'Tech', 'Finance & Legal', 'Service industry', 'Student', 'Full-time parent', 'Creative', 'Other'];
+// What a therapist will accept as payment. 'Either' = no constraint.
+const PAYMENT_TYPE_OPTIONS = ['Insurance', 'Cash pay', 'Either'];
+// The ideal-fit dimensions a therapist can mark as a "must have" (max 3).
+// Must-haves are WEIGHTED HEAVIER — they are never a filter.
+const IDEAL_DIMENSIONS = [
+  { key: 'ageBands', label: 'Age' },
+  { key: 'genders', label: 'Gender' },
+  { key: 'fields', label: 'Field of work' },
+  { key: 'needs', label: 'What they want to work on' },
+  { key: 'modalities', label: 'Modality' }
+];
+const MAX_MUST_HAVES = 3;
+// A client is an "ideal match" when they clear the therapist's practical
+// constraints AND score at or above this on the ideal-fit dimensions.
+const IDEAL_MATCH_THRESHOLD = 0.8;
+
+// A blank ideal-client spec — every therapist gets one; empty means "no ideal
+// stated", which simply means nobody is ever flagged ideal for them.
+function emptyIdealClient() {
+  return { ageBands: [], genders: [], fields: [], needs: [], modalities: [],
+    payment: 'Either', availability: [], mustHaves: [] };
+}
 // Identity-affinity options (from the client's requested filters). These are
 // SOFT preferences — they surface as match reasons when they line up, but
 // never hard-filter the pool empty. "No preference" is the default for
@@ -442,6 +491,12 @@ let intake = {
   languagePref: 'any', languageRequired: false, languageOtherOpen: false,
   format: 'no-preference',
   availability: [],      // when the client can usually meet — multi-select
+  // About the client THEMSELVES (not preferences about a therapist). Used only
+  // to see whether they line up with a therapist's private ideal-client spec.
+  // All optional — skipping simply means those dimensions never count.
+  ageBand: null,         // one of CLIENT_AGE_BANDS
+  selfGender: null,      // one of CLIENT_GENDER_OPTIONS — the client's own gender
+  field: null,           // one of CLIENT_FIELD_OPTIONS — what they do
   city: '', state: '',
   insurance: 'any',
   hasInsurance: null,        // 'yes' | 'no' — gate question before any carrier picking
@@ -581,7 +636,7 @@ let intakeStep = 0;
 // Keyed step order so inserting or reordering steps never means renumbering a
 // pile of `intakeStep === N` checks. The 'needs' step renders either the
 // clinical chips or the plain-language list depending on the knows-fork.
-const INTAKE_STEPS = ['careFor', 'knows', 'needs', 'who', 'approach', 'guidance', 'anythingElse', 'logistics'];
+const INTAKE_STEPS = ['careFor', 'knows', 'needs', 'who', 'approach', 'guidance', 'anythingElse', 'aboutYou', 'logistics'];
 const intakeContent = document.getElementById('intake-content');
 
 function renderIntakeStep() {
@@ -734,6 +789,22 @@ function renderIntakeStep() {
       <div class="t-form-label">Faith</div>
       <div class="chip-grid" id="faith-grid">
         ${FAITH_OPTIONS.map(o => `<div class="chip-option ${intake.faith.includes(o) ? 'selected' : ''}" data-faith="${o}">${o}</div>`).join('')}
+      </div>`;
+  } else if (k === 'aboutYou') {
+    html += `
+      <h1>A little about you</h1>
+      <div class="intake-sub">Some therapists work especially closely with certain groups. This helps us spot those matches for you — all of it is optional, and skipping never limits who you can see.</div>
+      <div class="match-tag-label" style="margin-top:0;">Your age</div>
+      <div class="chip-grid" id="age-band-grid">
+        ${CLIENT_AGE_BANDS.map(a => `<div class="chip-option ${intake.ageBand === a ? 'selected' : ''}" data-age-band="${a}">${a}</div>`).join('')}
+      </div>
+      <div class="match-tag-label">Your gender</div>
+      <div class="chip-grid" id="self-gender-grid">
+        ${CLIENT_GENDER_OPTIONS.map(g => `<div class="chip-option ${intake.selfGender === g ? 'selected' : ''}" data-self-gender="${g}">${g}</div>`).join('')}
+      </div>
+      <div class="match-tag-label">What you do</div>
+      <div class="chip-grid" id="field-grid">
+        ${CLIENT_FIELD_OPTIONS.map(f => `<div class="chip-option ${intake.field === f ? 'selected' : ''}" data-field="${f}">${f}</div>`).join('')}
       </div>`;
   } else if (k === 'logistics') {
     html += `
@@ -938,6 +1009,26 @@ function attachIntakeHandlers() {
   document.querySelectorAll('#insurance-grid .chip-option[data-insurance]').forEach(el => {
     el.addEventListener('click', () => { intake.insurance = el.dataset.insurance; intake.insuranceOtherOpen = false; renderIntakeStep(); });
   });
+  // "About you" — single-select each, and tapping the selected chip clears it
+  // again, because every one of these is optional.
+  document.querySelectorAll('#age-band-grid .chip-option[data-age-band]').forEach(el => {
+    el.addEventListener('click', () => {
+      intake.ageBand = intake.ageBand === el.dataset.ageBand ? null : el.dataset.ageBand;
+      renderIntakeStep();
+    });
+  });
+  document.querySelectorAll('#self-gender-grid .chip-option[data-self-gender]').forEach(el => {
+    el.addEventListener('click', () => {
+      intake.selfGender = intake.selfGender === el.dataset.selfGender ? null : el.dataset.selfGender;
+      renderIntakeStep();
+    });
+  });
+  document.querySelectorAll('#field-grid .chip-option[data-field]').forEach(el => {
+    el.addEventListener('click', () => {
+      intake.field = intake.field === el.dataset.field ? null : el.dataset.field;
+      renderIntakeStep();
+    });
+  });
   const insuranceOtherBtn = document.getElementById('insurance-other-btn');
   if (insuranceOtherBtn) insuranceOtherBtn.addEventListener('click', () => { intake.insuranceOtherOpen = true; renderIntakeStep(); });
   const insuranceOtherSelect = document.getElementById('insurance-other-select');
@@ -1044,6 +1135,52 @@ function avatarHtml(t, sizeClass) {
 // with this therapist — never reviews or ratings, and no invented number:
 // if the client expressed no preferences at all, this returns null and the
 // badge renders without a percent.
+// ===== IDEAL-CLIENT MATCHING =====
+// A therapist privately describes the client they're the strongest fit for. This
+// is NEVER shown to a client and NEVER filters anyone out of anything — a client
+// who isn't a "unicorn" still matches normally on the regular criteria. All it
+// does is (a) nudge ranking up and (b) earn a sparkle on the THERAPIST's own
+// request list so they can spot the clients they're best suited to.
+function idealMatchResult(t) {
+  const blank = { stated: false, isIdeal: false, score: 0, reasons: [] };
+  const ic = t.idealClient;
+  if (!ic) return blank;
+
+  const dims = IDEAL_DIMENSIONS.filter(d => (ic[d.key] || []).length > 0);
+  const hasPractical = ic.payment !== 'Either' || (ic.availability || []).length > 0;
+  if (!dims.length && !hasPractical) return blank;      // no ideal stated
+
+  // PRACTICAL CONSTRAINTS ARE FILTERS (for the ideal flag only). If they can't
+  // realistically work together, it isn't an ideal match however well they fit.
+  if (ic.payment === 'Cash pay' && intake.hasInsurance === 'yes') return { ...blank, stated: true };
+  if (ic.payment === 'Insurance' && intake.hasInsurance === 'no') return { ...blank, stated: true };
+  const icAvail = ic.availability || [];
+  if (icAvail.length && intake.availability.length &&
+      !intake.availability.includes('Anytime') && !icAvail.includes('Anytime') &&
+      !icAvail.some(a => intake.availability.includes(a))) return { ...blank, stated: true };
+
+  // IDEAL FIT IS A BOOST. Must-haves simply weigh double — never a gate.
+  const clientValue = {
+    ageBands:  intake.ageBand ? [intake.ageBand] : [],
+    genders:   intake.selfGender ? [intake.selfGender] : [],
+    fields:    intake.field ? [intake.field] : [],
+    needs:     intake.needs || [],
+    modalities: (intake.modality && intake.modality !== 'open') ? [intake.modality] : []
+  };
+  let earned = 0, possible = 0;
+  const reasons = [];
+  dims.forEach(d => {
+    const weight = (ic.mustHaves || []).includes(d.key) ? 2 : 1;
+    possible += weight;
+    if ((clientValue[d.key] || []).some(v => ic[d.key].includes(v))) {
+      earned += weight;
+      reasons.push(d.label);
+    }
+  });
+  const score = possible ? earned / possible : 0;
+  return { stated: true, isIdeal: possible > 0 && score >= IDEAL_MATCH_THRESHOLD, score, reasons };
+}
+
 function matchPercent(t) {
   let earned = 0, possible = 0;
   if (intake.needs.length) {
@@ -1066,7 +1203,10 @@ function matchPercent(t) {
   ];
   prefs.forEach(([applies, ok]) => { if (applies) { possible += 10; if (ok) earned += 10; } });
   if (!possible) return null;
-  return Math.min(98, Math.round(62 + (earned / possible) * 36));
+  // Lining up with a therapist's private ideal only ever ADDS — it can't push a
+  // score down, so a client is never penalised for not being their unicorn.
+  const idealBoost = Math.round(idealMatchResult(t).score * 6);
+  return Math.min(98, Math.round(62 + (earned / possible) * 36) + idealBoost);
 }
 
 function matchBadgeHtml(t) {
@@ -2737,6 +2877,7 @@ function finishTherapistSignup() {
     media: { video: null, office: null, outOfOffice: null },
     persona: { inOffice: '', outOfOffice: '' },
     ethnicity: '', affinities: [], faith: [], availabilitySlots: [],
+    idealClient: emptyIdealClient(), // filled in later from the profile tab
     pronouns: d.pronouns.trim(), showPronouns: d.showPronouns,
     useCompanyName: d.useCompanyName, companyName: d.companyName.trim(),
     photo: null,
@@ -2998,7 +3139,12 @@ function renderRequests() {
   } else {
     html += myRequests.slice().reverse().map(m => {
       if (m.status === 'pending') {
-        return `<div class="request-card">
+        // Private to the therapist: flags the clients they said they're the
+        // strongest fit for. Clients never see this, and not having it changes
+        // nothing about whether they can reach this therapist.
+        const ideal = idealMatchResult(t);
+        return `<div class="request-card${ideal.isIdeal ? ' ideal-match' : ''}">
+          ${ideal.isIdeal ? `<div class="ideal-flag" title="Matches the ideal client you described — only you can see this">✦ Ideal match${ideal.reasons.length ? ` · ${ideal.reasons.join(' · ')}` : ''}</div>` : ''}
           <div class="request-need">Looking for support with: <strong>${m.needsSnapshot.length ? m.needsSnapshot.join(', ') : 'general support'}</strong></div>
           ${m.desiredFrequency ? `<div class="request-need">Hoping to meet: <strong>${m.desiredFrequency}</strong></div>` : ''}
           ${m.introMessage ? `<div class="request-intro">&ldquo;${m.introMessage}&rdquo;</div>` : ''}
@@ -3082,6 +3228,42 @@ function renderTherapistProfile() {
   container.innerHTML = `
     <div class="t-form-name">${t.name} <span class="t-form-creds">${credentialsLabel(t)}</span></div>
     <button class="primary-btn" style="background:white;border:1.5px solid var(--coral);color:var(--coral-dark);margin-bottom:20px;" id="preview-profile-btn">👀 Preview My Profile as a Client</button>
+
+    <div class="ideal-section">
+      <div class="ideal-section-head">
+        <h3>✦ Your ideal client</h3>
+        <span class="ideal-private">Private — only you see this</span>
+      </div>
+      <p class="ideal-section-sub">Describe who you're the strongest fit for. When a client lines up, they're flagged <strong>✦ Ideal match</strong> on your requests. This never limits who can find you — everything below this section is your "I also work with" profile, and that's what clients see.</p>
+
+      <div class="t-form-label">Ages</div>
+      <div class="chip-grid">${CLIENT_AGE_BANDS.map(a => `<div class="chip-option ${t.idealClient.ageBands.includes(a) ? 'selected' : ''}" data-ideal="ageBands" data-val="${a}">${a}</div>`).join('')}</div>
+
+      <div class="t-form-label">Gender</div>
+      <div class="chip-grid">${CLIENT_GENDER_OPTIONS.map(g => `<div class="chip-option ${t.idealClient.genders.includes(g) ? 'selected' : ''}" data-ideal="genders" data-val="${g}">${g}</div>`).join('')}</div>
+
+      <div class="t-form-label">Field of work</div>
+      <div class="chip-grid">${CLIENT_FIELD_OPTIONS.map(f => `<div class="chip-option ${t.idealClient.fields.includes(f) ? 'selected' : ''}" data-ideal="fields" data-val="${f}">${f}</div>`).join('')}</div>
+
+      <div class="t-form-label">What they want to work on</div>
+      <div class="chip-grid">${NEED_OPTIONS.map(n => `<div class="chip-option ${t.idealClient.needs.includes(n) ? 'selected' : ''}" data-ideal="needs" data-val="${n}">${n}</div>`).join('')}</div>
+
+      <div class="t-form-label">Modality</div>
+      <div class="chip-grid">${MODALITY_OPTIONS.map(m => `<div class="chip-option ${t.idealClient.modalities.includes(m) ? 'selected' : ''}" data-ideal="modalities" data-val="${m}">${m}</div>`).join('')}</div>
+
+      <div class="t-form-label">Payment <span class="ideal-hard">practical — must line up</span></div>
+      <div class="chip-grid">${PAYMENT_TYPE_OPTIONS.map(p => `<div class="chip-option ${t.idealClient.payment === p ? 'selected' : ''}" data-ideal-pay="${p}">${p}</div>`).join('')}</div>
+
+      <div class="t-form-label">When you'd see them <span class="ideal-hard">practical — must line up</span></div>
+      <div class="chip-grid">${AVAILABILITY_OPTIONS.map(a => `<div class="chip-option ${t.idealClient.availability.includes(a) ? 'selected' : ''}" data-ideal="availability" data-val="${a}">${a}</div>`).join('')}</div>
+
+      <div class="t-form-label">Must-haves <span class="ideal-hint">pick up to ${MAX_MUST_HAVES} — these count double, but still never filter anyone out</span></div>
+      <div class="chip-grid">${IDEAL_DIMENSIONS.map(d => {
+        const on = t.idealClient.mustHaves.includes(d.key);
+        const full = t.idealClient.mustHaves.length >= MAX_MUST_HAVES && !on;
+        return `<div class="chip-option ${on ? 'selected' : ''}${full ? ' chip-disabled' : ''}" data-ideal-must="${d.key}">${d.label}</div>`;
+      }).join('')}</div>
+    </div>
 
     <div class="t-form-label">Pronouns (optional)</div>
     <input type="text" class="t-rate-input" id="t-pronouns-input" placeholder="e.g. she/her" value="${t.pronouns || ''}">
@@ -3266,6 +3448,26 @@ function attachTherapistProfileHandlers(t) {
     const m = el.dataset.toggleModality;
     const i = t.modalities.indexOf(m);
     if (i === -1) t.modalities.push(m); else t.modalities.splice(i, 1);
+    renderTherapistProfile();
+  }));
+  // ----- ideal-client spec (private) -----
+  document.querySelectorAll('[data-ideal]').forEach(el => el.addEventListener('click', () => {
+    const list = t.idealClient[el.dataset.ideal];
+    const v = el.dataset.val;
+    const i = list.indexOf(v);
+    if (i === -1) list.push(v); else list.splice(i, 1);
+    renderTherapistProfile();
+  }));
+  document.querySelectorAll('[data-ideal-pay]').forEach(el => el.addEventListener('click', () => {
+    t.idealClient.payment = el.dataset.idealPay;
+    renderTherapistProfile();
+  }));
+  document.querySelectorAll('[data-ideal-must]').forEach(el => el.addEventListener('click', () => {
+    const k = el.dataset.idealMust;
+    const mh = t.idealClient.mustHaves;
+    const i = mh.indexOf(k);
+    if (i !== -1) mh.splice(i, 1);
+    else if (mh.length < MAX_MUST_HAVES) mh.push(k);
     renderTherapistProfile();
   }));
   const tBestForInput = document.getElementById('t-bestfor-input');
