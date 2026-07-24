@@ -619,10 +619,133 @@ function getMatchReasons(t) {
   return reasons;
 }
 
+// ===================================================================
+// LIVE DATABASE (config-gated)
+// The app runs in demo mode (seeded roster, everything client-side) until a
+// Supabase config exists. Set KINDRED_DB at launch — or paste the same object
+// into localStorage 'kindred-db' to test against a project without a deploy.
+// Reads only: match + search RPCs, both anon-safe. Therapist WRITES wait for
+// real auth (Supabase Auth), so nobody can edit a profile they don't own.
+// HIPAA note: nothing client-side is persisted by these calls — intake answers
+// ride as unstored query parameters. Client ACCOUNTS/messaging must not be
+// built until the project has a signed BAA (see supabase/README.md).
+// ===================================================================
+const KINDRED_DB = null; // at launch: { url: 'https://xxxx.supabase.co', key: '<anon public key>' }
+
+function dbConfig() {
+  if (KINDRED_DB && KINDRED_DB.url && KINDRED_DB.key) return KINDRED_DB;
+  try { return JSON.parse(localStorage.getItem('kindred-db') || 'null'); } catch (e) { return null; }
+}
+function dbReady() { const c = dbConfig(); return !!(c && c.url && c.key); }
+
+async function dbRpc(name, params) {
+  const c = dbConfig();
+  const res = await fetch(`${c.url.replace(/\/$/, '')}/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': c.key, 'Authorization': `Bearer ${c.key}` },
+    body: JSON.stringify(params || {})
+  });
+  if (!res.ok) throw new Error(`rpc ${name}: HTTP ${res.status}`);
+  return res.json();
+}
+
+// A database row -> the therapist shape the whole UI already renders. Keeping
+// the adapter in ONE place means the day the roster goes live, nothing else
+// in the app has to know the difference.
+const DB_GRADIENTS = [
+  'linear-gradient(135deg,#8a63a8,#5c3766)', 'linear-gradient(135deg,#bf7350,#9c5535)',
+  'linear-gradient(135deg,#5f7d6b,#3c5246)', 'linear-gradient(135deg,#a86377,#6b3c4e)'
+];
+function dbRowToTherapist(row) {
+  const nameWords = (row.name || '').replace(/^Dr\.?\s*/i, '').split(' ').filter(Boolean);
+  let h = 0; for (const ch of (row.user_id || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const formats = row.formats || [];
+  const formatLabel = formats.length >= 2 ? 'Video & In-person'
+    : formats.includes('video') ? 'Video only'
+    : formats.includes('in-person') ? 'In-person only' : 'Format not set';
+  const optionalPrompts = Array.isArray(row.optional_prompts) ? row.optional_prompts.slice() : [];
+  if (row.prompt_fit) optionalPrompts.unshift({ question: 'You may be a fit if...', answer: row.prompt_fit, photo: null });
+  return {
+    id: row.user_id,
+    name: row.name || 'Kindred Therapist',
+    credentials: row.credentials && row.credentials.length ? row.credentials : ['Licensed Therapist'],
+    pronouns: row.pronouns || '', showPronouns: row.show_pronouns !== false,
+    useCompanyName: false, companyName: '',
+    photo: row.photo || null,
+    initials: nameWords.map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'KT',
+    gradient: DB_GRADIENTS[h % DB_GRADIENTS.length],
+    meta: [formatLabel, row.rate_min ? `$${row.rate_min}+/session` : 'Rate on request'],
+    bestFor: row.best_for || '',
+    tags: row.specialties || [],
+    mandatoryPromptAnswers: [row.prompt_style || '', row.prompt_first_session || ''],
+    optionalPrompts,
+    modalities: row.modalities || [], style: row.style || 'balanced',
+    identity: { gender: row.gender || '', lgbtqAffirming: !!row.lgbtq_affirming },
+    languages: row.languages && row.languages.length ? row.languages : ['English'],
+    formats, rateMin: row.rate_min || 0, insuranceList: row.insurance || [],
+    acceptingOngoing: true, onDemand: false, onDemandSlots: [],
+    nextAvailableRank: 1, nextAvailableLabel: 'This week',
+    practiceType: row.practice_type || 'specialist', externalAppointments: [],
+    agreedToOnDemandPolicy: false,
+    location: row.location || {},
+    licenseVerified: !!row.license_number, licenseNumber: row.license_number || '',
+    website: row.website || '',
+    ethnicity: row.ethnicity || '', affinities: row.affinities || [], faith: row.faith || [],
+    availabilitySlots: [], idealClient: emptyIdealClient(),
+    stats: { profileViews: 0, hearts: 0, top5: 0, conversationsStarted: 0, weekViews: 0, weekHearts: 0 },
+    media: row.media || { video: null, office: null, outOfOffice: null },
+    persona: row.persona || { inOffice: '', outOfOffice: '' },
+    _serverScore: typeof row.match_score === 'number' ? row.match_score : undefined,
+    _serverIdeal: !!row.is_ideal
+  };
+}
+
+// The client's intake, translated to match_therapists() arguments.
+function matchParams() {
+  return {
+    p_needs: intake.needs || [],
+    p_modality: intake.modality || 'open',
+    p_style: intake.stylePref ? (STYLE_ALIGN[intake.stylePref] || null) : null,
+    p_gender: intake.genderPref !== 'no-preference' ? intake.genderPref : null,
+    p_ethnicity: intake.ethnicityPref !== 'no-preference' ? intake.ethnicityPref : null,
+    p_lgbtq: !!intake.lgbtqRequired,
+    p_affinities: intake.affinities || [],
+    p_faith: intake.faith || [],
+    p_language: intake.languagePref !== 'any' ? intake.languagePref : null,
+    p_format: intake.format !== 'no-preference' ? intake.format : null,
+    p_insurance: (intake.hasInsurance === 'yes' && intake.insurance !== 'any') ? intake.insurance : null,
+    p_state: intake.state || null,
+    p_age_band: intake.ageBand || null,
+    p_self_gender: intake.selfGender || null,
+    p_field: intake.field || null,
+    p_has_insurance: intake.hasInsurance === 'yes' ? true : intake.hasInsurance === 'no' ? false : null,
+    p_prev_experience: intake.prevExperience || [],
+    p_limit: 50
+  };
+}
+
+let deckLoading = false;
+let deckFetchSeq = 0;
+
 function computeDeck() {
-  deck = THERAPISTS.filter(t => isCompatible(t, 'ongoing'))
-    .sort((a, b) => a.nextAvailableRank - b.nextAvailableRank);
-  deckIndex = 0;
+  if (!dbReady()) {
+    deck = THERAPISTS.filter(t => isCompatible(t, 'ongoing'))
+      .sort((a, b) => a.nextAvailableRank - b.nextAvailableRank);
+    deckIndex = 0;
+    return;
+  }
+  // Server mode: Postgres filters and scores, we render one page. The seq
+  // guard drops stale responses if the client edits preferences mid-flight.
+  const seq = ++deckFetchSeq;
+  deckLoading = true; deck = []; deckIndex = 0;
+  dbRpc('match_therapists', matchParams())
+    .then(rows => { if (seq === deckFetchSeq) deck = rows.map(dbRowToTherapist); })
+    .catch(() => {
+      // the seeded roster is a graceful fallback, never a blank screen
+      if (seq === deckFetchSeq) deck = THERAPISTS.filter(t => isCompatible(t, 'ongoing'))
+        .sort((a, b) => a.nextAvailableRank - b.nextAvailableRank);
+    })
+    .then(() => { if (seq === deckFetchSeq) { deckLoading = false; renderStack(); } });
 }
 
 function computeOnDemandList() {
@@ -1126,6 +1249,11 @@ function startIntake() {
 function renderStack() {
   cardStack.innerHTML = '';
 
+  if (deckLoading) {
+    cardStack.innerHTML = `<div class="empty-pool">Finding your matches…</div>`;
+    return;
+  }
+
   if (deck.length === 0) {
     cardStack.innerHTML = `<div class="empty-pool">
       No therapists match everything you asked for right now.<br><br>
@@ -1277,6 +1405,8 @@ function idealMatchResult(t) {
 }
 
 function matchPercent(t) {
+  // server mode: Postgres already scored this row — one source of truth
+  if (typeof t._serverScore === 'number') return t._serverScore;
   let earned = 0, possible = 0;
   if (intake.needs.length) {
     possible += 40;
@@ -4100,7 +4230,29 @@ function renderSearch() {
       ${chip('format', 'in-person', 'In person')}
     </div>`;
 
-  const found = searchResults();
+  if (dbReady()) {
+    // server mode: full-text search in Postgres over the live roster
+    const seq = ++searchFetchSeq;
+    results.innerHTML = '<p class="empty-state">Searching…</p>';
+    dbRpc('search_therapists', {
+      p_query: searchState.q.trim() || null,
+      p_state: searchState.state || null,
+      p_gender: searchState.gender || null,
+      p_format: searchState.format || null
+    })
+      .then(rows => { if (seq === searchFetchSeq) renderSearchRows(rows.map(dbRowToTherapist)); })
+      .catch(() => { if (seq === searchFetchSeq) renderSearchRows(searchResults()); });
+  } else {
+    renderSearchRows(searchResults());
+  }
+
+  filtersBindings();
+}
+
+let searchFetchSeq = 0;
+
+function renderSearchRows(found) {
+  const results = document.getElementById('search-results');
   const activeFilters = ['state', 'gender', 'format'].filter(k => searchState[k]).length;
   results.innerHTML = found.length
     ? `<div class="search-count">${found.length} therapist${found.length === 1 ? '' : 's'}${searchState.q ? ` for “${searchState.q}”` : ''}</div>` +
@@ -4115,13 +4267,18 @@ function renderSearch() {
         </div>`).join('')
     : `<p class="empty-state">No therapists match${searchState.q ? ` “${searchState.q}”` : ''}${activeFilters ? ' with those filters' : ''}. Try a broader term — a specialty like “anxiety”, or a modality like “EMDR”.</p>`;
 
-  filters.querySelectorAll('[data-sfilter]').forEach(el => el.addEventListener('click', () => {
+  results.querySelectorAll('[data-search-open]').forEach(el => el.addEventListener('click', () => {
+    const t = (window._lastSearchRows || []).find(x => x.id === el.dataset.searchOpen)
+      || THERAPISTS.find(x => x.id === el.dataset.searchOpen);
+    if (t) openDetail(t); // their profile — which carries the Share button
+  }));
+  window._lastSearchRows = found;
+}
+
+function filtersBindings() {
+  document.querySelectorAll('#search-filters [data-sfilter]').forEach(el => el.addEventListener('click', () => {
     searchState[el.dataset.sfilter] = el.dataset.sval;
     renderSearch();
-  }));
-  results.querySelectorAll('[data-search-open]').forEach(el => el.addEventListener('click', () => {
-    const t = THERAPISTS.find(x => x.id === el.dataset.searchOpen);
-    if (t) openDetail(t); // their profile — which carries the Share button
   }));
 }
 
