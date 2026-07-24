@@ -3008,7 +3008,7 @@ let therapistWelcomeShown = false; // once per login, reset on logout
 function showTherapistView() {
   document.getElementById('bottom-nav').classList.add('hidden');
   document.getElementById('therapist-nav').classList.remove('hidden');
-  showTScreen('t-home');
+  showTScreen('t-insights');
   if (!therapistWelcomeShown) {
     therapistWelcomeShown = true;
     openTherapistWelcome();
@@ -3051,6 +3051,7 @@ function showTScreen(name) {
   if (name === 't-requests') renderRequests();
   if (name === 't-insights') renderTherapistInsights();
   if (name === 't-profile') renderTherapistProfile();
+  if (name === 't-settings') renderTherapistSettings();
 }
 
 // ===== THERAPIST INSIGHTS DASHBOARD =====
@@ -3102,6 +3103,7 @@ document.getElementById('therapist-logout-0').addEventListener('click', logout);
 document.getElementById('therapist-logout-1').addEventListener('click', logout);
 document.getElementById('therapist-logout-2').addEventListener('click', logout);
 document.getElementById('therapist-logout-3').addEventListener('click', logout);
+document.getElementById('therapist-logout-4').addEventListener('click', logout);
 
 function updateTNavBadge() {
   const badge = document.getElementById('t-nav-badge');
@@ -3122,7 +3124,7 @@ function updateTNavBadge() {
 // manages their openings here.
 function renderTherapistHome() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
-  document.getElementById('t-home-title').textContent = 'My Availability';
+  document.getElementById('t-home-title').textContent = 'On Demand';
   const list = document.getElementById('t-home-list');
 
   const ongoingBookings = matches.filter(m => m.therapist.id === t.id && m.status === 'matched' && m.scheduledDay);
@@ -3132,7 +3134,7 @@ function renderTherapistHome() {
     .sort((a, b) => DAYS_OF_WEEK.indexOf(a.day) - DAYS_OF_WEEK.indexOf(b.day) || timeSortKey(a.time) - timeSortKey(b.time));
   const openOngoing = sortedAvail.filter(s => !ongoingBookings.some(m => m.scheduledDay === s.day && m.scheduledTime === s.time)).length;
 
-  let html = '';
+  let html = onDemandToggleHtml(t);
 
   // ===== Ongoing availability =====
   html += `<div class="avail-section-title">🌱 Open for new ongoing clients</div>`;
@@ -3191,6 +3193,7 @@ function renderTherapistHome() {
   list.querySelectorAll('[data-remove-avail]').forEach(btn => {
     btn.addEventListener('click', () => { t.availabilitySlots.splice(Number(btn.dataset.removeAvail), 1); renderTherapistHome(); });
   });
+  bindOnDemandToggle(t);
   const addAvailBtn = document.getElementById('add-avail-btn');
   if (addAvailBtn) addAvailBtn.addEventListener('click', () => {
     const day = document.getElementById('avail-day').value;
@@ -3308,6 +3311,8 @@ function renderRequests() {
   updateTNavBadge();
 }
 
+let tSpecOtherOpen = false, tModOtherOpen = false; // transient "+ Other" panels
+
 function renderTherapistProfile() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
   const container = document.getElementById('t-profile-content');
@@ -3376,11 +3381,35 @@ function renderTherapistProfile() {
       <div class="chip-option ${t.practiceType === 'generalist' ? 'selected' : ''}" data-set-practice="generalist">Broad range of concerns</div>
     </div>
 
-    <div class="t-form-label">Specialties / needs you work with</div>
-    <div class="chip-grid">${NEED_OPTIONS.map(n => `<div class="chip-option ${t.tags.includes(n) ? 'selected' : ''}" data-toggle-tag="${n}">${n}</div>`).join('')}</div>
+    <div class="everyone-section-head">
+      <h3>Everyone I work with</h3>
+      <span class="everyone-public">Public — this is what clients see</span>
+    </div>
+    <p class="everyone-sub">The full range you're able to take on. Being broad here doesn't dilute your ideal matches — it just means more of the right people can find you.</p>
+
+    <div class="t-form-label">Specialties / needs you work with <span class="ideal-hint">${t.tags.length} selected</span></div>
+    <div class="chip-grid">${NEED_OPTIONS.map(n => `<div class="chip-option ${t.tags.includes(n) ? 'selected' : ''}" data-toggle-tag="${n}">${n}</div>`).join('')}
+      ${t.tags.filter(x => !NEED_OPTIONS.includes(x)).map(x => `<div class="chip-option selected" data-toggle-tag="${x}">${x}</div>`).join('')}
+      <div class="chip-option" id="t-spec-other-btn">+ Other</div>
+    </div>
+    ${tSpecOtherOpen ? `<div class="other-language-row">
+      <select id="t-spec-other-select">
+        <option value="">Choose a specialty…</option>
+        ${OTHER_SPECIALTIES.filter(x => !t.tags.includes(x)).map(x => `<option value="${x}">${x}</option>`).join('')}
+      </select>
+    </div>` : ''}
 
     <div class="t-form-label">Modalities you offer</div>
-    <div class="chip-grid">${MODALITY_OPTIONS.map(m => `<div class="chip-option ${t.modalities.includes(m) ? 'selected' : ''}" data-toggle-modality="${m}">${m}</div>`).join('')}</div>
+    <div class="chip-grid">${MODALITY_OPTIONS.map(m => `<div class="chip-option ${t.modalities.includes(m) ? 'selected' : ''}" data-toggle-modality="${m}">${m}</div>`).join('')}
+      ${t.modalities.filter(x => !MODALITY_OPTIONS.includes(x)).map(x => `<div class="chip-option selected" data-toggle-modality="${x}">${x}</div>`).join('')}
+      <div class="chip-option" id="t-mod-other-btn">+ Other</div>
+    </div>
+    ${tModOtherOpen ? `<div class="other-language-row">
+      <select id="t-mod-other-select">
+        <option value="">Choose a modality…</option>
+        ${OTHER_MODALITIES.filter(x => !t.modalities.includes(x)).map(x => `<option value="${x}">${x}</option>`).join('')}
+      </select>
+    </div>` : ''}
 
     <div class="t-form-label">In one line, who do you work best with?</div>
     <input type="text" class="t-rate-input" id="t-bestfor-input" placeholder="e.g. I work best with new parents navigating postpartum anxiety" value="${t.bestFor || ''}">
@@ -3481,25 +3510,6 @@ function renderTherapistProfile() {
       <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
     </div>
 
-    ${t.onDemandBanned ? `
-    <div class="must-have-toggle" style="opacity:0.75;">
-      <div class="toggle-label"><strong>On-Demand suspended</strong><span>A confirmed session was reported as a no-show. On-Demand access doesn't come back — ongoing matching is unaffected.</span></div>
-    </div>` : `
-    <div class="must-have-toggle">
-      <div class="toggle-label"><strong>Offering on-demand this week</strong><span>Shown in On-Demand for one-time sessions</span></div>
-      <div class="switch ${t.onDemand ? 'on' : ''}" id="t-ondemand-switch"></div>
-    </div>`}
-
-    <div id="t-slots-section" style="${t.onDemand ? '' : 'display:none;'}">
-      <div class="t-form-label">Open slots this week</div>
-      <div class="slot-row" id="t-slots-list">
-        ${t.onDemandSlots.map((s, i) => `<span class="slot-btn booked" style="cursor:pointer;" data-remove-slot="${i}">${s.label} ✕</span>`).join('')}
-      </div>
-      <div class="add-slot-row">
-        <input type="text" id="new-slot-input" placeholder="e.g. Mon 3:00pm">
-        <button id="add-slot-btn">Add</button>
-      </div>
-    </div>
   `;
   attachTherapistProfileHandlers(t);
 }
@@ -3530,6 +3540,20 @@ function attachTherapistProfileHandlers(t) {
     if (i === -1) t.tags.push(tag); else t.tags.splice(i, 1);
     renderTherapistProfile();
   }));
+  const specOtherBtn = document.getElementById('t-spec-other-btn');
+  if (specOtherBtn) specOtherBtn.addEventListener('click', () => { tSpecOtherOpen = true; renderTherapistProfile(); });
+  const specOtherSel = document.getElementById('t-spec-other-select');
+  if (specOtherSel) specOtherSel.addEventListener('change', () => {
+    if (specOtherSel.value) t.tags.push(specOtherSel.value);
+    tSpecOtherOpen = false; renderTherapistProfile();
+  });
+  const modOtherBtn = document.getElementById('t-mod-other-btn');
+  if (modOtherBtn) modOtherBtn.addEventListener('click', () => { tModOtherOpen = true; renderTherapistProfile(); });
+  const modOtherSel = document.getElementById('t-mod-other-select');
+  if (modOtherSel) modOtherSel.addEventListener('change', () => {
+    if (modOtherSel.value) t.modalities.push(modOtherSel.value);
+    tModOtherOpen = false; renderTherapistProfile();
+  });
   document.querySelectorAll('[data-toggle-modality]').forEach(el => el.addEventListener('click', () => {
     const m = el.dataset.toggleModality;
     const i = t.modalities.indexOf(m);
@@ -3652,28 +3676,36 @@ function attachTherapistProfileHandlers(t) {
     renderTherapistProfile();
   }));
   document.getElementById('t-ongoing-switch').addEventListener('click', () => { t.acceptingOngoing = !t.acceptingOngoing; renderTherapistProfile(); });
+}
+
+// ===== ON-DEMAND CONTROLS =====
+// These live on the On Demand tab (not Profile): turning it on, and the open
+// slots for this week. Kept as their own html/bind pair so the tab owns them.
+// The On Demand tab owns the on/off switch. Slot management already lives on
+// that screen, so this is just the toggle that gates it.
+function onDemandToggleHtml(t) {
+  if (t.onDemandBanned) return `
+    <div class="must-have-toggle" style="opacity:0.75;">
+      <div class="toggle-label"><strong>On-Demand suspended</strong><span>A confirmed session was reported as a no-show. On-Demand access doesn't come back — ongoing matching is unaffected.</span></div>
+    </div>`;
+  return `
+    <div class="must-have-toggle">
+      <div class="toggle-label"><strong>Offering On-Demand this week</strong><span>${t.onDemand ? 'Clients can book a one-time session in the times below' : 'Turn on to take one-time sessions this week'}</span></div>
+      <div class="switch ${t.onDemand ? 'on' : ''}" id="t-ondemand-switch"></div>
+    </div>`;
+}
+
+function bindOnDemandToggle(t) {
   const odSwitch = document.getElementById('t-ondemand-switch');
-  if (odSwitch) odSwitch.addEventListener('click', () => {
+  if (!odSwitch) return;
+  odSwitch.addEventListener('click', () => {
     if (!t.onDemand && !t.agreedToOnDemandPolicy) {
-      openTherapistOnDemandAgreement(() => { t.agreedToOnDemandPolicy = true; t.onDemand = true; renderTherapistProfile(); });
+      openTherapistOnDemandAgreement(() => { t.agreedToOnDemandPolicy = true; t.onDemand = true; renderTherapistHome(); });
     } else {
       t.onDemand = !t.onDemand;
-      renderTherapistProfile();
+      renderTherapistHome();
     }
   });
-  const addBtn = document.getElementById('add-slot-btn');
-  if (addBtn) addBtn.addEventListener('click', () => {
-    const input = document.getElementById('new-slot-input');
-    const label = input.value.trim();
-    if (!label) return;
-    const rank = t.onDemandSlots.length ? Math.max(...t.onDemandSlots.map(s => s.rank)) + 1 : 1;
-    t.onDemandSlots.push({ label, rank });
-    renderTherapistProfile();
-  });
-  document.querySelectorAll('[data-remove-slot]').forEach(el => el.addEventListener('click', () => {
-    t.onDemandSlots.splice(Number(el.dataset.removeSlot), 1);
-    renderTherapistProfile();
-  }));
 }
 
 document.getElementById('btn-like').addEventListener('click', () => {
@@ -3806,3 +3838,90 @@ function openSharedTherapistFromHash() {
 }
 window.addEventListener('hashchange', openSharedTherapistFromHash);
 window.addEventListener('load', openSharedTherapistFromHash);
+
+// ===== THERAPIST SETTINGS =====
+// Account-level preferences, kept deliberately separate from the Profile tab
+// (which is about how clients see you). Nothing here affects matching.
+let therapistSettings = {
+  notifyNewInquiry: true,
+  notifyMessages: true,
+  notifyWeeklySummary: true,
+  notifyProductNews: false,
+  showInSearch: true,
+  hideFromCurrentClients: false
+};
+
+function renderTherapistSettings() {
+  const t = THERAPISTS.find(t => t.id === currentTherapistId);
+  const s = therapistSettings;
+  const row = (key, title, sub) => `
+    <div class="must-have-toggle">
+      <div class="toggle-label"><strong>${title}</strong><span>${sub}</span></div>
+      <div class="switch ${s[key] ? 'on' : ''}" data-setting="${key}"></div>
+    </div>`;
+
+  document.getElementById('t-settings-content').innerHTML = `
+    <div class="t-form-name">${t.name}</div>
+    <p class="portal-note" style="margin-top:4px;">Signed in as ${t.name}${t.licenseNumber ? ` · license ${t.licenseNumber}` : ''}</p>
+
+    <div class="settings-group-title">Notifications</div>
+    ${row('notifyNewInquiry', 'New inquiries', 'When a client reaches out to you')}
+    ${row('notifyMessages', 'Messages', 'Replies in an existing conversation')}
+    ${row('notifyWeeklySummary', 'Weekly summary', 'Your profile views, hearts, and inquiries')}
+    ${row('notifyProductNews', 'Product news', "What's new on Kindred — occasional, never spammy")}
+
+    <div class="settings-group-title">Privacy</div>
+    ${row('showInSearch', 'Appear in matching', 'Turning this off hides you from new matches without deleting anything')}
+    ${row('hideFromCurrentClients', 'Hide my profile from current clients', "They keep their conversation with you, but won't see your public card")}
+    <p class="portal-note">Your ideal-client settings are always private and never shown to clients.</p>
+
+    <div class="settings-group-title">Account</div>
+    <button class="edit-prefs-btn" id="t-settings-profile-btn">Edit my profile</button>
+    <button class="edit-prefs-btn" id="t-settings-logout-btn" style="color:var(--ink-soft);">Log Out</button>
+    <button class="edit-prefs-btn" id="t-settings-delete-btn" style="color:#a8443a;">Delete My Account</button>
+  `;
+
+  document.querySelectorAll('#t-settings-content [data-setting]').forEach(el => {
+    el.addEventListener('click', () => {
+      const k = el.dataset.setting;
+      therapistSettings[k] = !therapistSettings[k];
+      renderTherapistSettings();
+    });
+  });
+  document.getElementById('t-settings-profile-btn').addEventListener('click', () => showTScreen('t-profile'));
+  document.getElementById('t-settings-logout-btn').addEventListener('click', logout);
+  document.getElementById('t-settings-delete-btn').addEventListener('click', openTherapistDeleteSheet);
+}
+
+// Same principle as the client's delete flow: lead with what they'd lose, keep
+// the exit available, and require a second deliberate confirmation.
+function openTherapistDeleteSheet() {
+  const t = THERAPISTS.find(t => t.id === currentTherapistId);
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>Delete your account?</h2>
+    <div class="intake-sub">You don't have to delete to step back from new clients.</div>
+    <div class="keep-card">
+      <p><strong>Pausing keeps your profile, your conversations, and your reviews.</strong> Turn off "Appear in matching" in Settings and you stop receiving new inquiries — nothing else changes.</p>
+      <p class="keep-card-sub">Deleting removes your profile, your ${t.stats.profileViews} profile views, saved conversations, and match history permanently.</p>
+    </div>
+    <button class="primary-btn" style="background:var(--coral);color:white;" id="t-keep-btn">Keep my account</button>
+    <button class="edit-prefs-btn" id="t-pause-btn">Pause new matches instead</button>
+    <button class="edit-prefs-btn" id="t-delete-final" style="color:#a8443a;">Delete my account</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  const close = () => document.getElementById('confirm-modal').classList.add('hidden');
+  document.getElementById('t-keep-btn').addEventListener('click', close);
+  document.getElementById('t-pause-btn').addEventListener('click', () => {
+    therapistSettings.showInSearch = false;
+    close();
+    showToast("You're paused — no new inquiries until you turn it back on.");
+    renderTherapistSettings();
+  });
+  document.getElementById('t-delete-final').addEventListener('click', () => {
+    close();
+    showToast('Your account has been deleted.');
+    logout();
+  });
+}

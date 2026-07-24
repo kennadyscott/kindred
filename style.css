@@ -1919,3 +1919,21 @@ select.t-rate-input,
 }
 .keep-card p { font-size: 14px; line-height: 1.55; margin: 0; color: var(--ink); }
 .keep-card-sub { font-size: 13px !important; color: var(--ink-soft) !important; margin-top: 8px !important; }
+
+/* ===== Therapist settings ===== */
+.settings-group-title {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-soft); margin: 22px 0 8px;
+}
+.od-empty-hint { font-size: 13px; color: var(--ink-soft); margin-top: 8px; }
+/* five tabs need a touch less room each */
+.bottom-nav .nav-btn span:last-child { font-size: 10.5px; }
+
+/* ===== "Everyone I work with" (public tier) ===== */
+.everyone-section-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:26px; }
+.everyone-section-head h3 { font-size:16px; margin:0; }
+.everyone-public {
+  font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  background:#e9e1ee; color:#5b4470; padding:3px 8px; border-radius:999px;
+}
+.everyone-sub { font-size:12.5px; line-height:1.55; color:var(--ink-soft); margin:8px 0 4px; }

@@ -195,20 +195,32 @@
     <div class="t-profile-content" id="t-insights-content"></div>
   </section>
 
+  <!-- ===== THERAPIST: SETTINGS ===== -->
+  <section class="screen hidden" id="screen-t-settings">
+    <header class="top-bar">
+      <div class="logo">Settings</div>
+      <button class="icon-btn" id="therapist-logout-4" aria-label="Log out">🚪</button>
+    </header>
+    <div class="t-profile-content" id="t-settings-content"></div>
+  </section>
+
   <!-- ===== THERAPIST BOTTOM NAV ===== -->
   <nav class="bottom-nav hidden" id="therapist-nav">
-    <button class="nav-btn active" data-tscreen="t-home">
+    <button class="nav-btn active" data-tscreen="t-insights">
       <span class="nav-icon">🏠</span><span>Home</span>
     </button>
     <button class="nav-btn" data-tscreen="t-requests">
-      <span class="nav-icon">📥</span><span>Requests</span>
+      <span class="nav-icon">💌</span><span>Inquiries</span>
       <span class="nav-badge hidden" id="t-nav-badge">0</span>
     </button>
-    <button class="nav-btn" data-tscreen="t-insights">
-      <span class="nav-icon">📊</span><span>Insights</span>
+    <button class="nav-btn" data-tscreen="t-home">
+      <span class="nav-icon">⚡</span><span>On Demand</span>
     </button>
     <button class="nav-btn" data-tscreen="t-profile">
-      <span class="nav-icon">⚙</span><span>Profile</span>
+      <span class="nav-icon">👤</span><span>Profile</span>
+    </button>
+    <button class="nav-btn" data-tscreen="t-settings">
+      <span class="nav-icon">⚙</span><span>Settings</span>
     </button>
   </nav>
 
