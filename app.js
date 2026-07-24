@@ -461,6 +461,13 @@ function languageChipsHtml(languagesArr, showOther, idPrefix) {
 // what's going on yet. Selections still write into intake.needs directly,
 // so nothing downstream (matching, therapist tags) has to know which path
 // a client took.
+// Veteran path only — what a returning client wants different this time.
+const PREV_EXPERIENCE_OPTIONS = [
+  'More direct feedback', 'More structure and homework', 'Less structure, more space to talk',
+  'Someone who challenges me', 'Someone gentler', 'A different approach entirely',
+  'Someone who shares my identity', 'Better at handling trauma', 'Nothing — it worked, I moved'
+];
+
 const UNSURE_OPTIONS = [
   { label: "My mind won't stop racing, or I feel on edge a lot", tag: 'Anxiety' },
   { label: "Something happened and I can't shake it", tag: 'Trauma' },
@@ -475,7 +482,9 @@ const UNSURE_OPTIONS = [
 ];
 
 let intake = {
-  knowsNeeds: null, // 'yes' | 'no' — which onboarding path the client took
+  knowsNeeds: null, // 'no' = new to therapy (symptom-led) | 'yes' = experienced (knows what they want)
+  prevExperience: [],    // veteran path: what they'd change about previous therapy
+  prevNotes: '',         // veteran path: free text for their next therapist
   careFor: null,         // 'myself' | 'child' | 'couples' | 'family'
   childAge: '',          // shown only when careFor === 'child'
   needs: [],
@@ -636,12 +645,28 @@ let intakeStep = 0;
 // Keyed step order so inserting or reordering steps never means renumbering a
 // pile of `intakeStep === N` checks. The 'needs' step renders either the
 // clinical chips or the plain-language list depending on the knows-fork.
-const INTAKE_STEPS = ['careFor', 'knows', 'needs', 'who', 'approach', 'guidance', 'anythingElse', 'aboutYou', 'logistics'];
+const INTAKE_STEPS = ['careFor', 'knows', 'needs', 'who', 'approach', 'experience', 'guidance', 'anythingElse', 'aboutYou', 'logistics'];
+
+// Two genuinely different paths, chosen at the 'knows' step:
+//   'no'  — new to therapy. Matched from SYMPTOMS in plain language. We never
+//           ask them to name a modality, because that question assumes
+//           vocabulary they don't have yet.
+//   'yes' — been in therapy before. They get the modality picker AND a question
+//           about what they want different this time, which is the most useful
+//           matching signal a returning client can give us.
+function activeSteps() {
+  return INTAKE_STEPS.filter(k => {
+    if (k === 'approach' && intake.knowsNeeds === 'no') return false;
+    if (k === 'experience' && intake.knowsNeeds !== 'yes') return false;
+    return true;
+  });
+}
 const intakeContent = document.getElementById('intake-content');
 
 function renderIntakeStep() {
-  const k = INTAKE_STEPS[intakeStep];
-  let html = `<div class="intake-progress">${INTAKE_STEPS.map((_, i) =>
+  const steps = activeSteps();
+  const k = steps[intakeStep];
+  let html = `<div class="intake-progress">${steps.map((_, i) =>
     `<div class="dot ${i <= intakeStep ? 'done' : ''}"></div>`).join('')}</div>`;
 
   if (k === 'careFor') {
@@ -656,16 +681,22 @@ function renderIntakeStep() {
       <input type="text" class="t-rate-input" id="child-age-input" placeholder="e.g. 8" value="${intake.childAge}">` : ''}`;
   } else if (k === 'knows') {
     html += `
-      <h1>Do you know what brings you to therapy?</h1>
-      <div class="intake-sub">Either answer is completely fine — we'll get you to the right therapists either way.</div>
+      <h1>Have you been to therapy before?</h1>
+      <div class="intake-sub">There's no better answer — it just changes which questions are worth your time.</div>
       <div class="option-list" id="knows-list">
-        <div class="option-row ${intake.knowsNeeds === 'yes' ? 'selected' : ''}" data-knows="yes">Yes, I know what I need help with</div>
-        <div class="option-row ${intake.knowsNeeds === 'no' ? 'selected' : ''}" data-knows="no">Not really — help me figure it out</div>
+        <div class="path-card-option ${intake.knowsNeeds === 'no' ? 'selected' : ''}" data-knows="no">
+          <div class="path-card-title">This is new to me</div>
+          <div class="path-card-desc">We'll start with what you've actually been feeling — in plain words, no clinical terms. Kindred works out the rest.</div>
+        </div>
+        <div class="path-card-option ${intake.knowsNeeds === 'yes' ? 'selected' : ''}" data-knows="yes">
+          <div class="path-card-title">I've done this before</div>
+          <div class="path-card-desc">We'll skip the basics and ask what you're looking for directly — including the approach you want and what you'd do differently this time.</div>
+        </div>
       </div>`;
   } else if (k === 'needs' && intake.knowsNeeds === 'no') {
     html += `
       <h1>What's been going on?</h1>
-      <div class="intake-sub">Pick anything that resonates — you don't need the right words for it, and it's okay if nothing quite fits.</div>
+      <div class="intake-sub">Pick anything that sounds like you. You don't need the right words — we'll translate these into what to look for in a therapist.</div>
       <div class="option-list" id="unsure-list">
         ${UNSURE_OPTIONS.map(o => `<div class="option-row ${intake.needs.includes(o.tag) ? 'selected' : ''}" data-unsure-tag="${o.tag}">${o.label}</div>`).join('')}
       </div>`;
@@ -768,6 +799,15 @@ function renderIntakeStep() {
           <div class="switch ${intake.modalityRequired ? 'on' : ''}" id="modality-required-switch"></div>
         </div>
       </div>`;
+  } else if (k === 'experience') {
+    html += `
+      <h1>What would you change about last time?</h1>
+      <div class="intake-sub">You've been here before, so you know what works for you. This is the most useful thing you can tell us — all optional.</div>
+      <div class="chip-grid" id="prev-experience-grid">
+        ${PREV_EXPERIENCE_OPTIONS.map(o => `<div class="chip-option ${intake.prevExperience.includes(o) ? 'selected' : ''}" data-prev-exp="${o}">${o}</div>`).join('')}
+      </div>
+      <div class="match-tag-label">Anything they should know?</div>
+      <textarea class="intake-textarea" id="prev-notes-input" rows="3" placeholder="e.g. I've done CBT for anxiety and want to go deeper into why it started.">${intake.prevNotes || ''}</textarea>`;
   } else if (k === 'guidance') {
     html += `
       <h1>What kind of guidance do you want?</h1>
@@ -851,7 +891,7 @@ function renderIntakeStep() {
   html += `
     <div class="intake-footer">
       ${intakeStep > 0 ? `<button class="btn-back" id="intake-back">Back</button>` : ''}
-      <button class="btn-next" id="intake-next" ${canProceed ? '' : 'disabled'}>${intakeStep === INTAKE_STEPS.length - 1 ? 'See My Matches' : 'Continue'}</button>
+      <button class="btn-next" id="intake-next" ${canProceed ? '' : 'disabled'}>${intakeStep === activeSteps().length - 1 ? 'See My Matches' : 'Continue'}</button>
     </div>`;
 
   intakeContent.innerHTML = html;
@@ -868,7 +908,7 @@ function attachIntakeHandlers() {
     document.getElementById('intake-next').disabled = intake.childAge.trim() === '';
   });
 
-  document.querySelectorAll('#knows-list .option-row').forEach(el => {
+  document.querySelectorAll('#knows-list [data-knows]').forEach(el => {
     el.addEventListener('click', () => { intake.knowsNeeds = el.dataset.knows; renderIntakeStep(); });
   });
 
@@ -1011,6 +1051,16 @@ function attachIntakeHandlers() {
   });
   // "About you" — single-select each, and tapping the selected chip clears it
   // again, because every one of these is optional.
+  document.querySelectorAll('#prev-experience-grid [data-prev-exp]').forEach(el => {
+    el.addEventListener('click', () => {
+      const v = el.dataset.prevExp;
+      const i = intake.prevExperience.indexOf(v);
+      if (i === -1) intake.prevExperience.push(v); else intake.prevExperience.splice(i, 1);
+      renderIntakeStep();
+    });
+  });
+  const prevNotes = document.getElementById('prev-notes-input');
+  if (prevNotes) prevNotes.addEventListener('input', () => { intake.prevNotes = prevNotes.value; });
   document.querySelectorAll('#age-band-grid .chip-option[data-age-band]').forEach(el => {
     el.addEventListener('click', () => {
       intake.ageBand = intake.ageBand === el.dataset.ageBand ? null : el.dataset.ageBand;
@@ -1044,7 +1094,7 @@ function attachIntakeHandlers() {
   if (backBtn) backBtn.addEventListener('click', () => { intakeStep--; renderIntakeStep(); });
 
   document.getElementById('intake-next').addEventListener('click', () => {
-    if (intakeStep < INTAKE_STEPS.length - 1) {
+    if (intakeStep < activeSteps().length - 1) {
       intakeStep++;
       renderIntakeStep();
     } else {

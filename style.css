@@ -1981,3 +1981,12 @@ select.t-rate-input,
 }
 .reorder-btn:disabled { opacity:.3; cursor:default; }
 .reorder-btn:not(:disabled):active { background:var(--cream); }
+
+/* ===== Two-path chooser (new to therapy vs. experienced) ===== */
+.path-card-option {
+  border: 1.5px solid var(--line); border-radius: 16px; padding: 16px;
+  background: white; margin-bottom: 12px; cursor: pointer;
+}
+.path-card-option.selected { border-color: var(--coral); background: #fff6ec; }
+.path-card-title { font-weight: 700; font-size: 15.5px; margin-bottom: 5px; }
+.path-card-desc { font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
