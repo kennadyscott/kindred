@@ -3217,14 +3217,19 @@ function renderTherapistHome() {
 
 function renderRequests() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
-  document.getElementById('t-requests-title').textContent = `Requests — ${t.name}`;
+  document.getElementById('t-requests-title').textContent = 'Inquiries';
   const list = document.getElementById('requests-list');
   const myRequests = matches.filter(m => m.therapist.id === currentTherapistId && m.status !== 'ondemand');
   const myBookings = matches.filter(m => m.therapist.id === currentTherapistId && m.status === 'ondemand');
 
+  const pendingCount = myRequests.filter(m => m.status === 'pending').length;
+
   let html = '';
+  if (pendingCount) {
+    html += `<div class="hello-banner">✨ ${pendingCount === 1 ? 'A tiny hello has arrived!' : `${pendingCount} tiny hellos have arrived!`}</div>`;
+  }
   if (myRequests.length === 0) {
-    html += `<p class="empty-state">No ongoing-client requests yet for ${t.name}.</p>`;
+    html += `<p class="empty-state">No hellos yet. When someone reaches out to you, they'll land right here.</p>`;
   } else {
     html += myRequests.slice().reverse().map(m => {
       if (m.status === 'pending') {
@@ -3495,8 +3500,15 @@ function renderTherapistProfile() {
         return `<div class="chip-option ${selected ? 'selected' : ''} ${disabled ? 'chip-disabled' : ''}" data-toggle-optional-prompt="${q}">${q}</div>`;
       }).join('')}
     </div>
+    ${t.optionalPrompts.length > 1 ? `<p class="reorder-hint">Use ↑ ↓ to set the order clients see these in.</p>` : ''}
     ${t.optionalPrompts.map((p, i) => `
-      <div class="t-form-label">${p.question}</div>
+      <div class="prompt-edit-head">
+        <div class="t-form-label" style="margin:0;">${i + 1}. ${p.question}</div>
+        <div class="reorder-btns">
+          <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+          <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="1" ${i === t.optionalPrompts.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+        </div>
+      </div>
       <textarea class="intake-textarea" data-edit-optional-prompt-answer="${i}" rows="2">${p.answer || ''}</textarea>
       <div class="prompt-photo-row">
         ${p.photo ? `<img class="prompt-photo-thumb" src="${p.photo}">` : ''}
@@ -3671,6 +3683,12 @@ function attachTherapistProfileHandlers(t) {
       reader.readAsDataURL(file);
     });
   });
+  document.querySelectorAll('[data-move-prompt]').forEach(el => el.addEventListener('click', () => {
+    const i = Number(el.dataset.movePrompt), j = i + Number(el.dataset.dir);
+    if (j < 0 || j >= t.optionalPrompts.length) return;
+    [t.optionalPrompts[i], t.optionalPrompts[j]] = [t.optionalPrompts[j], t.optionalPrompts[i]];
+    renderTherapistProfile();
+  }));
   document.querySelectorAll('[data-remove-edit-optional-prompt]').forEach(el => el.addEventListener('click', () => {
     t.optionalPrompts.splice(Number(el.dataset.removeEditOptionalPrompt), 1);
     renderTherapistProfile();
@@ -3925,3 +3943,99 @@ function openTherapistDeleteSheet() {
     logout();
   });
 }
+
+// ===== THERAPIST SEARCH =====
+// Deliberately separate from matching: this is for someone who already knows
+// what (or who) they're looking for — a name a friend gave them, or a modality
+// like "EMDR". Results are the full roster, not filtered to their intake, so a
+// client can look someone up specifically or find a therapist to pass along.
+let searchState = { q: '', state: '', gender: '', format: '' };
+
+function searchableText(t) {
+  return [
+    t.name, displayName(t), t.companyName,
+    (t.credentials || []).join(' '),
+    (t.tags || []).join(' '),
+    (t.modalities || []).join(' '),
+    (t.languages || []).join(' '),
+    t.bestFor,
+    t.location ? `${t.location.city} ${t.location.state}` : ''
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function searchResults() {
+  const q = searchState.q.trim().toLowerCase();
+  return THERAPISTS.filter(t => {
+    if (q && !searchableText(t).includes(q)) return false;
+    if (searchState.state && (t.location || {}).state !== searchState.state) return false;
+    if (searchState.gender && (t.identity || {}).gender !== searchState.gender) return false;
+    if (searchState.format && !(t.formats || []).includes(searchState.format)) return false;
+    return true;
+  });
+}
+
+function renderSearch() {
+  const filters = document.getElementById('search-filters');
+  const results = document.getElementById('search-results');
+
+  const states = [...new Set(THERAPISTS.map(t => (t.location || {}).state).filter(Boolean))].sort();
+  const chip = (group, val, label) => {
+    const on = searchState[group] === val;
+    return `<div class="chip-option ${on ? 'selected' : ''}" data-sfilter="${group}" data-sval="${val}">${label}</div>`;
+  };
+
+  filters.innerHTML = `
+    <div class="search-filter-label">Location</div>
+    <div class="chip-grid">
+      ${chip('state', '', 'Anywhere')}
+      ${states.map(s => chip('state', s, s)).join('')}
+    </div>
+    <div class="search-filter-label">Therapist gender</div>
+    <div class="chip-grid">
+      ${chip('gender', '', 'Any')}
+      ${chip('gender', 'female', 'Female')}
+      ${chip('gender', 'male', 'Male')}
+      ${chip('gender', 'non-binary', 'Non-binary')}
+    </div>
+    <div class="search-filter-label">Session format</div>
+    <div class="chip-grid">
+      ${chip('format', '', 'Either')}
+      ${chip('format', 'video', 'Online')}
+      ${chip('format', 'in-person', 'In person')}
+    </div>`;
+
+  const found = searchResults();
+  const activeFilters = ['state', 'gender', 'format'].filter(k => searchState[k]).length;
+  results.innerHTML = found.length
+    ? `<div class="search-count">${found.length} therapist${found.length === 1 ? '' : 's'}${searchState.q ? ` for “${searchState.q}”` : ''}</div>` +
+      found.map(t => `
+        <div class="search-row" data-search-open="${t.id}">
+          <div class="search-avatar" style="background:${t.gradient}">${t.photo ? `<img src="${t.photo}" alt="">` : t.initials}</div>
+          <div class="search-row-body">
+            <div class="search-row-name">${displayName(t)} <span class="creds">${credentialsLabel(t)}</span></div>
+            <div class="search-row-meta">${[(t.location || {}).state, (t.formats || []).includes('in-person') ? 'In person' : null, (t.formats || []).includes('video') ? 'Online' : null].filter(Boolean).join(' · ')}</div>
+            <div class="search-row-tags">${(t.tags || []).slice(0, 3).join(' · ')}</div>
+          </div>
+        </div>`).join('')
+    : `<p class="empty-state">No therapists match${searchState.q ? ` “${searchState.q}”` : ''}${activeFilters ? ' with those filters' : ''}. Try a broader term — a specialty like “anxiety”, or a modality like “EMDR”.</p>`;
+
+  filters.querySelectorAll('[data-sfilter]').forEach(el => el.addEventListener('click', () => {
+    searchState[el.dataset.sfilter] = el.dataset.sval;
+    renderSearch();
+  }));
+  results.querySelectorAll('[data-search-open]').forEach(el => el.addEventListener('click', () => {
+    const t = THERAPISTS.find(x => x.id === el.dataset.searchOpen);
+    if (t) openDetail(t); // their profile — which carries the Share button
+  }));
+}
+
+document.getElementById('open-search-btn').addEventListener('click', () => {
+  showScreen('search');
+  renderSearch();
+  document.getElementById('search-input').focus();
+});
+document.getElementById('close-search-btn').addEventListener('click', () => showScreen('discover'));
+document.getElementById('search-input').addEventListener('input', (e) => {
+  searchState.q = e.target.value;
+  renderSearch();
+});

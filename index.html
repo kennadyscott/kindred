@@ -97,6 +97,7 @@
   <section class="screen hidden" id="screen-discover">
     <header class="top-bar">
       <div class="logo">Kindred</div>
+      <button class="icon-btn" id="open-search-btn" aria-label="Search therapists">🔍</button>
     </header>
 
     <div class="card-stack" id="card-stack"></div>
@@ -193,6 +194,19 @@
       <button class="icon-btn" id="therapist-logout-3" aria-label="Log out">🚪</button>
     </header>
     <div class="t-profile-content" id="t-insights-content"></div>
+  </section>
+
+  <!-- ===== CLIENT: SEARCH ===== -->
+  <section class="screen hidden" id="screen-search">
+    <header class="top-bar">
+      <div class="logo">Search</div>
+      <button class="icon-btn" id="close-search-btn" aria-label="Close search">✕</button>
+    </header>
+    <div class="search-wrap">
+      <input type="text" class="search-input" id="search-input" placeholder="Try a name, EMDR, anxiety, couples…" autocomplete="off">
+      <div class="search-filters" id="search-filters"></div>
+      <div class="search-results" id="search-results"></div>
+    </div>
   </section>
 
   <!-- ===== THERAPIST: SETTINGS ===== -->
