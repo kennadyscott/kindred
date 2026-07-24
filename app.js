@@ -608,6 +608,7 @@ function getMatchReasons(t) {
   }
   if (intake.languagePref !== 'any' && t.languages.includes(intake.languagePref)) reasons.push(`Speaks ${intake.languagePref}`);
   if (intake.stylePref && STYLE_ALIGN[intake.stylePref] === t.style) reasons.push('Similar style to what you want');
+  if (prevExperienceScore(t) >= 0.5) reasons.push('Matches what you wanted different this time');
   if (intake.ethnicityPref !== 'no-preference' && t.ethnicity === intake.ethnicityPref) reasons.push(`${t.ethnicity} therapist`);
   // Soft identity affinities — surface shared ground, don't hard-filter.
   intake.affinities.filter(a => (t.affinities || []).includes(a)).forEach(a => reasons.push(`Affirming: ${a}`));
@@ -1185,6 +1186,50 @@ function avatarHtml(t, sizeClass) {
 // with this therapist — never reviews or ratings, and no invented number:
 // if the client expressed no preferences at all, this returns null and the
 // badge renders without a percent.
+
+// ===== "WHAT WOULD YOU CHANGE?" BOOSTS (experienced-client path) =====
+// A returning client telling us what didn't work last time is the strongest
+// signal they can give. Like the ideal-client match, these ONLY ever add — a
+// therapist is never pushed down for failing to line up, so nobody is filtered
+// out of a pool they'd otherwise belong in.
+const PREV_EXPERIENCE_SIGNALS = {
+  'More direct feedback':            { style: 'direct' },
+  'Someone who challenges me':       { style: 'direct' },
+  'More structure and homework':     { style: 'direct', modalities: ['CBT', 'DBT', 'ERP', 'ACT'] },
+  'Less structure, more space to talk': { style: 'gentle', modalities: ['IFS', 'Psychodynamic', 'Person-Centered'] },
+  'Someone gentler':                 { style: 'gentle' },
+  'Better at handling trauma':       { tags: ['Trauma', 'PTSD'], modalities: ['EMDR', 'Somatic', 'IFS'] },
+  'Someone who shares my identity':  { identity: true }
+  // 'A different approach entirely' and 'Nothing — it worked, I moved' carry no
+  // directional signal, so they intentionally score nothing.
+};
+
+// 0..1 — how well a therapist answers what this client wants done differently.
+function prevExperienceScore(t) {
+  const picks = (intake.prevExperience || []).filter(p => PREV_EXPERIENCE_SIGNALS[p]);
+  if (!picks.length) return 0;
+  let earned = 0;
+  picks.forEach(p => {
+    const sig = PREV_EXPERIENCE_SIGNALS[p];
+    let hit = false;
+    if (sig.style && t.style === sig.style) hit = true;
+    if (!hit && sig.modalities && (t.modalities || []).some(m => sig.modalities.includes(m))) hit = true;
+    if (!hit && sig.tags && (t.tags || []).some(x => sig.tags.includes(x))) hit = true;
+    if (!hit && sig.identity) {
+      // "shares my identity" amplifies whatever identity preferences they set
+      const idHits = [
+        intake.genderPref !== 'no-preference' && (t.identity || {}).gender === intake.genderPref,
+        intake.ethnicityPref !== 'no-preference' && t.ethnicity === intake.ethnicityPref,
+        (intake.affinities || []).some(a => (t.affinities || []).includes(a)),
+        (intake.faith || []).some(f => (t.faith || []).includes(f))
+      ];
+      if (idHits.some(Boolean)) hit = true;
+    }
+    if (hit) earned++;
+  });
+  return earned / picks.length;
+}
+
 // ===== IDEAL-CLIENT MATCHING =====
 // A therapist privately describes the client they're the strongest fit for. This
 // is NEVER shown to a client and NEVER filters anyone out of anything — a client
@@ -1256,7 +1301,8 @@ function matchPercent(t) {
   // Lining up with a therapist's private ideal only ever ADDS — it can't push a
   // score down, so a client is never penalised for not being their unicorn.
   const idealBoost = Math.round(idealMatchResult(t).score * 6);
-  return Math.min(98, Math.round(62 + (earned / possible) * 36) + idealBoost);
+  const prevBoost = Math.round(prevExperienceScore(t) * 5);
+  return Math.min(98, Math.round(62 + (earned / possible) * 36) + idealBoost + prevBoost);
 }
 
 function matchBadgeHtml(t) {
