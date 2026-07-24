@@ -254,11 +254,11 @@ THERAPISTS.forEach(t => {
   t.idealClient = Object.assign(emptyIdealClient(), THERAPIST_IDEAL[t.id] || {});
 });
 
-const NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
+let NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
 // The full specialty catalog behind "+ Other" — same no-free-text rule as
 // languages: picking from a fixed list is what keeps client needs and
 // therapist specialties matchable.
-const OTHER_SPECIALTIES = [
+let OTHER_SPECIALTIES = [
   'Addiction', 'Adoption', 'Alcohol Use', 'Anger Management', 'Anorexia',
   'Antisocial Personality (ASPD)', 'ARFID', 'Autism', 'Behavioral Issues',
   'Binge Eating Disorder', 'Bipolar Disorder', 'Blended Family', 'Body Image',
@@ -284,7 +284,7 @@ const OTHER_SPECIALTIES = [
   'Traumatic Brain Injury (TBI)', 'Veterans', 'Video Game Addiction',
   'Weight Loss', "Women's Issues"
 ];
-const MODALITY_OPTIONS = ['CBT', 'EMDR', 'ACT', 'EFT', 'Motivational Interviewing'];
+let MODALITY_OPTIONS = ['CBT', 'EMDR', 'ACT', 'EFT', 'Motivational Interviewing'];
 const US_STATES = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'];
 
 const MODALITY_INFO = {
@@ -301,8 +301,8 @@ const MODALITY_INFO = {
 };
 // Client "Types of Therapy" step — set up like languages: common ones as
 // quick pills, everything else behind a "+ Other" dropdown. Single-select.
-const MODALITY_QUICK = ['ERP', 'ACT', 'Motivational Interviewing', 'Somatic', 'EMDR', 'IFS', 'DBT', 'Couples Therapy'];
-const OTHER_MODALITIES = [
+let MODALITY_QUICK = ['ERP', 'ACT', 'Motivational Interviewing', 'Somatic', 'EMDR', 'IFS', 'DBT', 'Couples Therapy'];
+let OTHER_MODALITIES = [
   'Adlerian', 'AEDP', 'Applied Behavioral Analysis (ABA)', 'Art Therapy',
   'Attachment-based', 'Biofeedback', 'Brainspotting',
   'Clinical Supervision and Licensed Supervisors', 'Coaching',
@@ -339,10 +339,10 @@ function openModalityInfo(name) {
 document.getElementById('modality-info-modal').addEventListener('click', (e) => {
   if (e.target.id === 'modality-info-modal') document.getElementById('modality-info-modal').classList.add('hidden');
 });
-const INSURANCE_OPTIONS = ['Aetna', 'BCBS', 'Cigna', 'United', 'EAP'];
+let INSURANCE_OPTIONS = ['Aetna', 'BCBS', 'Cigna', 'United', 'EAP'];
 // Full carrier catalog behind "+ Other" — fixed list, same no-free-text
 // rule as languages and specialties.
-const OTHER_INSURANCES = [
+let OTHER_INSURANCES = [
   '1199SEIU', 'AARP', 'ACI Specialty Benefits', 'Aetna EAP', 'Aetna Medicare',
   'Aetna Student Health', 'All Savers', 'AllOne Health',
   "America's Choice Provider Network (ACPN)", 'AmeriHealth Caritas', 'Anthem',
@@ -399,9 +399,9 @@ const AVAILABILITY_OPTIONS = ['Anytime', 'Early mornings', 'Lunch', 'Evenings', 
 // THEMSELVES, so both sides must pick from these exact lists — a mismatch here
 // would silently break matching (same reason languages are a controlled list).
 // These describe the client, not their preferences about a therapist.
-const CLIENT_AGE_BANDS = ['18–24', '25–34', '35–44', '45–54', '55–64', '65+'];
-const CLIENT_GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Transgender', 'Prefer not to say'];
-const CLIENT_FIELD_OPTIONS = ['First responder', 'Healthcare', 'Military & Veteran', 'Education',
+let CLIENT_AGE_BANDS = ['18–24', '25–34', '35–44', '45–54', '55–64', '65+'];
+let CLIENT_GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Transgender', 'Prefer not to say'];
+let CLIENT_FIELD_OPTIONS = ['First responder', 'Healthcare', 'Military & Veteran', 'Education',
   'Tech', 'Finance & Legal', 'Service industry', 'Student', 'Full-time parent', 'Creative', 'Other'];
 // What a therapist will accept as payment. 'Either' = no constraint.
 const PAYMENT_TYPE_OPTIONS = ['Insurance', 'Cash pay', 'Either'];
@@ -436,8 +436,8 @@ const FAITH_OPTIONS = ['Buddhist', 'Christian', 'Hindu', 'Jewish', 'Muslim', 'Se
 // dropdown pulled from OTHER_LANGUAGES instead of free text, so language
 // names stay consistent between what a therapist selects and what a client
 // filters by — a typo in either place would silently break matching.
-const LANGUAGE_QUICK_OPTIONS = ['English', 'Spanish', 'Mandarin'];
-const OTHER_LANGUAGES = ['American Sign Language', 'Arabic', 'Bengali', 'Burmese', 'Cantonese', 'Czech', 'Dutch', 'French', 'German', 'Greek', 'Haitian Creole', 'Hausa', 'Hebrew', 'Hindi', 'Hmong', 'Hungarian', 'Igbo', 'Indonesian', 'Italian', 'Japanese', 'Khmer', 'Korean', 'Lao', 'Nepali', 'Persian (Farsi)', 'Polish', 'Portuguese', 'Punjabi', 'Romanian', 'Russian', 'Serbian', 'Sinhala', 'Somali', 'Swahili', 'Swedish', 'Tagalog', 'Thai', 'Turkish', 'Ukrainian', 'Urdu', 'Vietnamese', 'Yoruba'];
+let LANGUAGE_QUICK_OPTIONS = ['English', 'Spanish', 'Mandarin'];
+let OTHER_LANGUAGES = ['American Sign Language', 'Arabic', 'Bengali', 'Burmese', 'Cantonese', 'Czech', 'Dutch', 'French', 'German', 'Greek', 'Haitian Creole', 'Hausa', 'Hebrew', 'Hindi', 'Hmong', 'Hungarian', 'Igbo', 'Indonesian', 'Italian', 'Japanese', 'Khmer', 'Korean', 'Lao', 'Nepali', 'Persian (Farsi)', 'Polish', 'Portuguese', 'Punjabi', 'Romanian', 'Russian', 'Serbian', 'Sinhala', 'Somali', 'Swahili', 'Swedish', 'Tagalog', 'Thai', 'Turkish', 'Ukrainian', 'Urdu', 'Vietnamese', 'Yoruba'];
 
 function languageChipsHtml(languagesArr, showOther, idPrefix) {
   const custom = languagesArr.filter(l => !LANGUAGE_QUICK_OPTIONS.includes(l));
@@ -462,7 +462,7 @@ function languageChipsHtml(languagesArr, showOther, idPrefix) {
 // so nothing downstream (matching, therapist tags) has to know which path
 // a client took.
 // Veteran path only — what a returning client wants different this time.
-const PREV_EXPERIENCE_OPTIONS = [
+let PREV_EXPERIENCE_OPTIONS = [
   'More direct feedback', 'More structure and homework', 'Less structure, more space to talk',
   'Someone who challenges me', 'Someone gentler', 'A different approach entirely',
   'Someone who shares my identity', 'Better at handling trauma', 'Nothing — it worked, I moved'
@@ -723,6 +723,31 @@ function matchParams() {
     p_limit: 50
   };
 }
+
+// Controlled vocabularies: the DB is the source of truth (see supabase/API.md
+// — the clients had already drifted from each other before this existed). The
+// baked lists above are the offline fallback; this refreshes them at boot.
+async function loadVocab() {
+  if (!dbReady()) return;
+  try {
+    const v = await dbRpc('get_vocab', {});
+    const take = (key, assign) => { if (Array.isArray(v[key]) && v[key].length) assign(v[key]); };
+    take('specialty_core',  x => { NEED_OPTIONS = x; });
+    take('specialty_more',  x => { OTHER_SPECIALTIES = x; });
+    take('modality_core',   x => { MODALITY_OPTIONS = x; });
+    take('modality_quick',  x => { MODALITY_QUICK = x; });
+    take('modality_more',   x => { OTHER_MODALITIES = x; });
+    take('insurance_core',  x => { INSURANCE_OPTIONS = x; });
+    take('insurance_more',  x => { OTHER_INSURANCES = x; });
+    take('language_quick',  x => { LANGUAGE_QUICK_OPTIONS = x; });
+    take('language_more',   x => { OTHER_LANGUAGES = x; });
+    take('age_band',        x => { CLIENT_AGE_BANDS = x; });
+    take('client_gender',   x => { CLIENT_GENDER_OPTIONS = x; });
+    take('client_field',    x => { CLIENT_FIELD_OPTIONS = x; });
+    take('prev_experience', x => { PREV_EXPERIENCE_OPTIONS = x; });
+  } catch (e) { /* offline or vocab not deployed yet — baked lists stand */ }
+}
+loadVocab();
 
 let deckLoading = false;
 let deckFetchSeq = 0;
