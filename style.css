@@ -1905,3 +1905,17 @@ select.t-rate-input,
   color: #8a7a55; background: #f3e9d2; padding: 2px 7px; border-radius: 999px; margin-left: 6px;
 }
 .chip-option.chip-disabled { opacity: .4; pointer-events: none; }
+
+/* ===== Share a therapist ===== */
+.share-therapist-btn {
+  margin-top: 10px; background: white;
+  border: 1.5px solid var(--coral); color: var(--coral-dark);
+}
+
+/* ===== Delete-account "keep it" card ===== */
+.keep-card {
+  background: #fff6ec; border: 1.5px solid #f0d9c2;
+  border-radius: 14px; padding: 14px; margin: 14px 0;
+}
+.keep-card p { font-size: 14px; line-height: 1.55; margin: 0; color: var(--ink); }
+.keep-card-sub { font-size: 13px !important; color: var(--ink-soft) !important; margin-top: 8px !important; }

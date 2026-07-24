@@ -1568,6 +1568,30 @@ function checkForNewMatches() {
   renderMatches();
 }
 
+// ===== SHARE A THERAPIST =====
+// Word of mouth is how most people actually find a therapist. This shares the
+// THERAPIST's public profile — never anything about the client doing the
+// sharing. The link deep-links straight to that therapist (see the #therapist=
+// handler at the bottom of this file).
+function shareTherapist(t) {
+  const url = `${location.origin}${location.pathname}#therapist=${t.id}`;
+  const text = `I found ${displayName(t)} on Kindred${t.bestFor ? ` — “${t.bestFor}”` : ''}`;
+  if (navigator.share) {
+    navigator.share({ title: `${displayName(t)} on Kindred`, text, url })
+      .then(() => showToast('Shared — thank you for passing it on.'))
+      .catch(() => {}); // dismissing the share sheet isn't an error
+    return;
+  }
+  const fallback = `${text}\n${url}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(fallback)
+      .then(() => showToast('Link copied — paste it to whoever needs it.'))
+      .catch(() => showToast('Copy this: ' + url));
+  } else {
+    showToast('Copy this: ' + url);
+  }
+}
+
 function showToast(message) {
   const toast = document.getElementById('waitlist-toast');
   if (message) toast.textContent = message;
@@ -1615,7 +1639,8 @@ function openDetail(t, opts = {}) {
     ${profileFeedHtml(t)}
     ${preview
       ? `<button class="primary-btn" style="margin-top:20px;background:white;border:1.5px solid var(--coral);color:var(--coral-dark);" id="detail-close-btn">Close Preview</button>`
-      : `<button class="primary-btn" style="margin-top:20px;background:var(--coral);color:white;" id="detail-like-btn">Add to Shortlist</button>`}
+      : `<button class="primary-btn" style="margin-top:20px;background:var(--coral);color:white;" id="detail-like-btn">Add to Shortlist</button>
+         <button class="primary-btn share-therapist-btn" id="detail-share-btn">↗ Share this therapist with someone</button>`}
   `;
   detailModal.classList.remove('hidden');
   detailSheet.querySelectorAll('[data-info]').forEach(el => {
@@ -1628,6 +1653,10 @@ function openDetail(t, opts = {}) {
       detailModal.classList.add('hidden');
       const topCard = cardStack.lastElementChild;
       if (topCard && topCard.dataset.id === t.id && topCard._forceSwipe) topCard._forceSwipe('like');
+    });
+    document.getElementById('detail-share-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      shareTherapist(t);
     });
   }
 }
@@ -1873,6 +1902,63 @@ function clientProfileSummaryHtml(m) {
 }
 
 // Client-side preview of exactly what a therapist sees when sharing is on.
+// ===== DELETE ACCOUNT (client) =====
+// Deleting is permanent and people often reach for it when they just want a
+// break. Leading with what they'd lose — the therapists they've saved — gives
+// them a real reason to stay without guilt-tripping or hiding the delete.
+function openDeleteAccountSheet() {
+  const savedCount = matches.filter(m => m.status === 'matched' || m.status === 'pending').length;
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>Delete your account?</h2>
+    <div class="intake-sub">Before you go — you don't have to delete anything to take a break.</div>
+
+    <div class="keep-card">
+      <p><strong>Keep the app downloaded so you can save all your favorite therapists</strong> in case you need them in the future.</p>
+      <p class="keep-card-sub">${savedCount ? `You have ${savedCount} therapist${savedCount === 1 ? '' : 's'} saved. Finding someone who fits is the hard part — you won't have to do it twice.` : `Finding someone who fits is the hard part. Keeping your account means you won't have to do it twice.`}</p>
+      <p class="keep-card-sub">It's free to keep, and nothing happens while you're away — no emails, no notifications.</p>
+    </div>
+
+    <p class="modality-info-text">Deleting is permanent. Your saved therapists, matches, conversations, and preferences are all removed and can't be recovered.</p>
+
+    <button class="primary-btn" style="background:var(--coral);color:white;" id="keep-account-btn">Keep my account</button>
+    <button class="edit-prefs-btn" id="logout-instead-btn">Just log me out instead</button>
+    <button class="edit-prefs-btn" id="confirm-delete-btn" style="color:#a8443a;">Delete my account</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  const close = () => document.getElementById('confirm-modal').classList.add('hidden');
+  document.getElementById('keep-account-btn').addEventListener('click', () => {
+    close();
+    showToast('Your account is safe — your therapists are still here.');
+  });
+  document.getElementById('logout-instead-btn').addEventListener('click', () => { close(); logout(); });
+  document.getElementById('confirm-delete-btn').addEventListener('click', () => { close(); confirmDeleteAccount(); });
+}
+
+// Second, deliberate confirmation — a destructive, irreversible action should
+// never be one tap away.
+function confirmDeleteAccount() {
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>This can't be undone</h2>
+    <div class="intake-sub">Everything you've saved will be permanently deleted.</div>
+    <button class="primary-btn" style="background:var(--coral);color:white;" id="delete-cancel-btn">Never mind, keep my account</button>
+    <button class="edit-prefs-btn" id="delete-final-btn" style="color:#a8443a;">Yes, delete everything</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  const close = () => document.getElementById('confirm-modal').classList.add('hidden');
+  document.getElementById('delete-cancel-btn').addEventListener('click', close);
+  document.getElementById('delete-final-btn').addEventListener('click', () => {
+    close();
+    matches.length = 0;
+    savedResources.length = 0;
+    showToast('Your account has been deleted.');
+    logout();
+  });
+}
+
 function openSharedProfilePreview() {
   const sheet = document.getElementById('confirm-sheet');
   sheet.innerHTML = `
@@ -3690,10 +3776,12 @@ function renderProfileScreen() {
 
       <button class="edit-prefs-btn" id="edit-prefs-btn">Edit My Preferences</button>
       <button class="edit-prefs-btn" id="client-logout-btn" style="color:var(--ink-soft);">Log Out</button>
+      <button class="edit-prefs-btn" id="delete-account-btn" style="color:var(--ink-soft);">Delete My Account</button>
     </div>
   `;
   document.getElementById('edit-prefs-btn').addEventListener('click', startIntake);
   document.getElementById('client-logout-btn').addEventListener('click', logout);
+  document.getElementById('delete-account-btn').addEventListener('click', openDeleteAccountSheet);
   document.getElementById('preview-shared-btn').addEventListener('click', openSharedProfilePreview);
   screen.querySelectorAll('[data-share-toggle]').forEach(el => el.addEventListener('click', () => {
     const m = matches.find(m => m.therapist.id === el.dataset.shareToggle && m.status === 'matched');
@@ -3705,3 +3793,16 @@ function renderProfileScreen() {
 }
 
 showScreen('account-type');
+
+// ===== SHARED-THERAPIST DEEP LINK =====
+// A link someone was sent (…#therapist=t3) opens straight to that therapist's
+// profile. If they land on the login screen first the hash stays in the URL, so
+// it still opens once they're in — nothing is lost.
+function openSharedTherapistFromHash() {
+  const m = location.hash.match(/therapist=([\w-]+)/);
+  if (!m || accountType !== 'client') return;
+  const t = THERAPISTS.find(x => x.id === m[1]);
+  if (t) openDetail(t);
+}
+window.addEventListener('hashchange', openSharedTherapistFromHash);
+window.addEventListener('load', openSharedTherapistFromHash);
