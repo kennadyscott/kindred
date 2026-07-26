@@ -1962,6 +1962,13 @@ select.t-rate-input,
 .edit-section-body { padding:4px 16px 18px; }
 .edit-section-body .t-form-label:first-child { margin-top:12px; }
 
+/* a lighter collapsible nested inside a section (e.g. the prompt picker) */
+.edit-subsection { background:var(--cream); margin-top:6px; }
+.edit-subsection > summary { padding:12px 14px; }
+.edit-subsection .edit-section-title { font-size:14px; }
+.edit-subsection > .edit-section-body { padding:0 14px 14px; }
+.edit-subsection > .edit-section-body .t-form-label:first-child { margin-top:10px; }
+
 /* checkbox drop-down (specialties / types of therapy) */
 .cbx-field { margin-top:2px; }
 .cbx-chips { margin-bottom:8px; }
@@ -2081,10 +2088,45 @@ select.t-rate-input,
 
 /* ===== "Get to know them" — visually its own section ===== */
 .get-to-know {
-  margin-top: 34px;
+  margin-top: 44px;
   background: #ffffff;
   border: 1px solid var(--line);
   border-radius: 20px;
-  padding: 18px 16px 20px;
+  padding: 24px 18px 26px;
 }
 .get-to-know .section-title { margin-top: 4px; }
+/* bold, stand-out heading for the feed */
+.get-to-know-title {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-align: center;
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--sand);
+}
+/* more air between every item in the feed */
+.get-to-know > .prompt-block,
+.get-to-know > .feed-media { margin-top: 22px; }
+.get-to-know > .prompt-block:first-of-type,
+.get-to-know > .feed-media:first-of-type { margin-top: 0; }
+
+/* centered specialty capsules with room under the heading */
+.spec-tags { justify-content: center; margin-top: 14px; }
+.spec-title { text-align: center; }
+
+/* "not accepting new clients" ribbon over the card image */
+.not-accepting-banner {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  z-index: 4;
+  background: rgba(43, 33, 40, 0.82);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  padding: 7px 12px;
+  backdrop-filter: blur(2px);
+}

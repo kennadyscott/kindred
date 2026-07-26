@@ -258,6 +258,8 @@ THERAPISTS.forEach(t => {
   }
   // top-three specialties (client-facing view shows 2 of these + 1 overlap)
   if (!t.topSpecialties || !t.topSpecialties.length) t.topSpecialties = (t.tags || []).slice(0, 3);
+  // sliding scale is its own flag now; seed it from any legacy self-pay note
+  if (t.acceptsSlidingScale === undefined) t.acceptsSlidingScale = /sliding/i.test(t.selfPayNote || '');
 });
 
 let NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
@@ -529,6 +531,7 @@ let intake = {
   languagePref: 'any', languageRequired: false, languageOtherOpen: false,
   format: 'no-preference',
   availability: [],      // when the client can usually meet — multi-select
+  mustBeAccepting: false,// only surface therapists open to new clients right now
   // About the client THEMSELVES (not preferences about a therapist). Used only
   // to see whether they line up with a therapist's private ideal-client spec.
   // All optional — skipping simply means those dimensions never count.
@@ -570,11 +573,18 @@ const navBadge = document.getElementById('nav-badge');
 // ===================================================================
 // COMPATIBILITY LOGIC
 // ===================================================================
+// Sliding scale is a first-class flag now, but older/seeded profiles may only
+// mention it in their free-text self-pay note — honor both.
+function hasSlidingScale(t) {
+  return !!t.acceptsSlidingScale || /sliding/i.test(t.selfPayNote || '');
+}
 function isCompatible(t, mode) {
   // Unverified licenses never reach clients — verification is the floor,
   // not a ranking signal.
   if (!t.licenseVerified) return false;
-  if (mode === 'ongoing' && !t.acceptingOngoing) return false;
+  // Not-accepting therapists still show (with a "save for later" banner) unless
+  // the client asked to see only those open to new clients right now.
+  if (mode === 'ongoing' && !t.acceptingOngoing && intake.mustBeAccepting) return false;
   if (mode === 'ondemand' && (!t.onDemand || t.onDemandBanned || t.onDemandSlots.length === 0)) return false;
 
   // Generalists don't need a literal tag overlap — that's the whole point
@@ -600,10 +610,10 @@ function isCompatible(t, mode) {
 
   // No insurance + needs a sliding scale = only show therapists who offer one.
   // "The therapist is more important" deliberately adds no payment filter.
-  if (intake.hasInsurance === 'no' && intake.noInsurancePref === 'sliding-scale' && !/sliding/i.test(t.selfPayNote || '')) return false;
+  if (intake.hasInsurance === 'no' && intake.noInsurancePref === 'sliding-scale' && !hasSlidingScale(t)) return false;
 
   const range = BUDGET_RANGES.find(r => r.label === intake.budgetRange);
-  if (range && range.slidingScale && !/sliding/i.test(t.selfPayNote || '')) return false;
+  if (range && range.slidingScale && !hasSlidingScale(t)) return false;
   if (range && !range.slidingScale && range.max != null && t.rateMin > range.max) return false;
 
   return true;
@@ -631,7 +641,7 @@ function getMatchReasons(t) {
     reasons.push(`Licensed in ${intake.state}`);
   }
   if (intake.hasInsurance === 'yes' && intake.insurance !== 'any' && t.insuranceList.includes(intake.insurance)) reasons.push(`Accepts ${intake.insurance}`);
-  if (intake.hasInsurance === 'no' && intake.noInsurancePref === 'sliding-scale' && /sliding/i.test(t.selfPayNote || '')) reasons.push('Sliding scale available');
+  if (intake.hasInsurance === 'no' && intake.noInsurancePref === 'sliding-scale' && hasSlidingScale(t)) reasons.push('Sliding scale available');
   if (intake.lgbtqRequired && t.identity.lgbtqAffirming) reasons.push('LGBTQ+ Affirming');
   if (intake.genderPref !== 'no-preference' && t.identity.gender === intake.genderPref) {
     reasons.push({ female: 'Female therapist', male: 'Male therapist', nonbinary: 'Nonbinary therapist' }[t.identity.gender] || 'Preferred gender');
@@ -947,6 +957,10 @@ function renderIntakeStep() {
       <div class="chip-grid" id="availability-grid">
         ${AVAILABILITY_OPTIONS.map(a => `<div class="chip-option ${intake.availability.includes(a) ? 'selected' : ''}" data-availability="${a}">${a}</div>`).join('')}
       </div>
+      <div class="must-have-toggle">
+        <div class="toggle-label"><strong>Only accepting new clients</strong><span>Hide anyone you could only save for later</span></div>
+        <div class="switch ${intake.mustBeAccepting ? 'on' : ''}" id="accepting-required-switch"></div>
+      </div>
       <div class="t-form-label">Your state</div>
       <select id="intake-state">
         <option value="">Select a state</option>
@@ -1162,6 +1176,8 @@ function attachIntakeHandlers() {
   if (genderReqSwitch) genderReqSwitch.addEventListener('click', () => { intake.genderRequired = !intake.genderRequired; renderIntakeStep(); });
   const lgbtqSwitch = document.getElementById('lgbtq-switch');
   if (lgbtqSwitch) lgbtqSwitch.addEventListener('click', () => { intake.lgbtqRequired = !intake.lgbtqRequired; renderIntakeStep(); });
+  const acceptingReqSwitch = document.getElementById('accepting-required-switch');
+  if (acceptingReqSwitch) acceptingReqSwitch.addEventListener('click', () => { intake.mustBeAccepting = !intake.mustBeAccepting; renderIntakeStep(); });
   document.querySelectorAll('#ethnicity-grid .chip-option').forEach(el => {
     el.addEventListener('click', () => { intake.ethnicityPref = el.dataset.ethnicity; renderIntakeStep(); });
   });
@@ -1609,9 +1625,10 @@ function therapistPhotos(t) {
   return [t.media && t.media.office, t.media && t.media.outOfOffice].filter(Boolean).slice(0, 4);
 }
 
-// The "Get to know them" feed alternates picture, blurb, picture, blurb… Images
-// = video (if any) then up to 4 photos. Blurbs = the therapist's chosen answers,
-// capped at 5. If one runs out, the remaining items of the other still show.
+// The "Get to know them" feed leads with a blurb, then alternates media, blurb,
+// media, blurb… so words carry it and more blurbs get to breathe. Media = video
+// (if any) then up to 4 photos. If one list runs out, the rest of the other
+// still shows.
 function profileFeedHtml(t) {
   const firstName = displayName(t).replace(/^Dr\.?\s*/i, '').split(' ')[0];
 
@@ -1636,8 +1653,8 @@ function profileFeedHtml(t) {
   const out = [];
   const n = Math.max(images.length, shownBlurbs.length);
   for (let i = 0; i < n; i++) {
-    if (images[i]) out.push(images[i]);        // picture…
-    if (shownBlurbs[i]) out.push(shownBlurbs[i]); // …then blurb
+    if (shownBlurbs[i]) out.push(shownBlurbs[i]); // blurb first…
+    if (images[i]) out.push(images[i]);           // …then media (video leads)
   }
   return out.join('');
 }
@@ -1673,6 +1690,7 @@ function buildCard(t) {
       <div class="stamp pass">Pass</div>
       ${matchBadgeHtml(t)}
       ${languageBadgeHtml(t)}
+      ${!t.acceptingOngoing ? `<div class="not-accepting-banner">Not currently accepting clients — save for later</div>` : ''}
     </div>
     <div class="card-body">
       <div class="card-name-row"><h2 class="serif-name">${displayName(t)}</h2>${isInTop5(t) ? `<span class="top5-chip" title="In your Top 5">★</span>` : ''}${t.licenseVerified ? `<span class="verified-chip" title="License verified via Stripe Identity">✓ Verified</span>` : ''}</div>
@@ -1950,6 +1968,7 @@ function profileCardHtml(t, opts = {}) {
       ${t.photo ? `<img class="card-photo-img" src="${t.photo}" alt="">` : `<div class="initials">${t.initials}</div>`}
       ${preview ? '' : matchBadgeHtml(t)}
       ${preview ? '' : languageBadgeHtml(t)}
+      ${!t.acceptingOngoing ? `<div class="not-accepting-banner">Not currently accepting clients — save for later</div>` : ''}
     </div>
     <div class="card-name-row" style="margin-top:14px;"><h2>${displayName(t)}</h2><span class="creds">${credentialsLabel(t)}</span></div>
     ${t.pronouns ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
@@ -1959,12 +1978,12 @@ function profileCardHtml(t, opts = {}) {
     </div>
     ${detailFactsHtml(t, { preview })}
     ${t.bestFor ? `<div class="best-for">${t.bestFor}</div>` : ''}
-    <div class="section-title">Specialties</div>
-    <div class="tag-row">${displayedSpecialties(t).map(tagHtml).join('')}</div>
+    <div class="section-title spec-title">Specialties</div>
+    <div class="tag-row spec-tags">${displayedSpecialties(t).map(tagHtml).join('')}</div>
     ${practiceBadgeHtml(t)}
     ${preview ? '' : matchTagsHtml(t)}
     <div class="get-to-know">
-      <div class="section-title">Get to know them</div>
+      <div class="get-to-know-title">Get to Know Them</div>
       ${profileFeedHtml(t)}
     </div>`;
 }
@@ -2864,7 +2883,7 @@ const OPTIONAL_PROMPTS = [
   'How I can help...'
 ];
 const MAX_OPTIONAL_PROMPTS = 5;
-const MAX_FEED_BLURBS = 5;  // most little blurbs shown in the get-to-know feed
+const MAX_FEED_BLURBS = 7;  // most little blurbs shown in the get-to-know feed
 const MAX_PHOTOS = 4;       // up to 4 photos (+ 1 video) alternate with blurbs
 const NEW_THERAPIST_GRADIENTS = [
   'linear-gradient(135deg,#c97b9e,#a3557a)',
@@ -3471,8 +3490,12 @@ function renderTherapistHome() {
 
   // ===== Ongoing availability =====
   html += `<div class="avail-section-title">🌱 Open for new ongoing clients</div>`;
+  html += `<div class="must-have-toggle">
+      <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>${t.acceptingOngoing ? 'New clients can find and book you' : "You're shown to clients but marked not accepting — they can save you for later"}</span></div>
+      <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-home-ongoing-switch"></div>
+    </div>`;
   if (!t.acceptingOngoing) {
-    html += `<p class="portal-note">You're not accepting new ongoing clients right now. Turn that on in your Profile to open weekly slots.</p>`;
+    html += `<p class="portal-note">You're not accepting new ongoing clients right now. Flip the switch above (or the one on your Profile) to open weekly slots.</p>`;
   } else {
     html += `<div class="avail-sub">${openOngoing} open weekly ${openOngoing === 1 ? 'slot' : 'slots'} · recurring times a new client can book</div>`;
     if (sortedAvail.length === 0) {
@@ -3527,6 +3550,13 @@ function renderTherapistHome() {
     btn.addEventListener('click', () => { t.availabilitySlots.splice(Number(btn.dataset.removeAvail), 1); renderTherapistHome(); });
   });
   bindOnDemandToggle(t);
+  const homeOngoingSwitch = document.getElementById('t-home-ongoing-switch');
+  if (homeOngoingSwitch) homeOngoingSwitch.addEventListener('click', () => {
+    t.acceptingOngoing = !t.acceptingOngoing;
+    t.nextAvailableRank = t.acceptingOngoing ? 1 : null;
+    t.nextAvailableLabel = t.acceptingOngoing ? 'This week' : 'Not accepting new ongoing clients';
+    renderTherapistHome();
+  });
   const addAvailBtn = document.getElementById('add-avail-btn');
   if (addAvailBtn) addAvailBtn.addEventListener('click', () => {
     const day = document.getElementById('avail-day').value;
@@ -3691,8 +3721,8 @@ let profileMode = 'edit'; // 'ideal' | 'view' | 'edit' — the profile tab's thr
 
 // Collapsible Edit-Profile sections + checkbox dropdowns keep their open/closed
 // state across the full re-renders that chip toggles trigger.
-let editSectionsOpen  = { first: true, getToKnow: false, additional: false, everyone: false };
-let editDropdownOpen  = { spec: false, modality: false };
+let editSectionsOpen  = { first: true, additional: false, getToKnow: false, promptPicker: false };
+let editDropdownOpen  = { spec: false, modality: false, 'ideal-needs': false, 'ideal-modalities': false };
 
 // A drop-down whose options are checkboxes. Selected values also show as
 // removable chips above it. Re-renders on change, but the <details> open state
@@ -3750,10 +3780,10 @@ function renderTherapistProfile() {
       <input type="text" class="t-rate-input" id="ideal-field-typed" placeholder="…or type your own, press Enter">` : ''}
 
       <div class="t-form-label">What they want to work on</div>
-      ${idealMultiSelectHtml(t, "needs", specialtyAll(), 'Add a focus…')}
+      ${checkboxDropdownHtml(t.idealClient.needs, specialtyAll(), 'ideal-needs', 'Choose what they want to work on…')}
 
       <div class="t-form-label">Type of Therapy</div>
-      ${idealMultiSelectHtml(t, "modalities", modalityAll(), 'Add a therapy type…')}
+      ${checkboxDropdownHtml(t.idealClient.modalities, modalityAll(), 'ideal-modalities', 'Choose the therapy types…')}
 
       <div class="t-form-label">Payment <span class="ideal-hard">practical — must line up</span></div>
       <div class="chip-grid">${PAYMENT_TYPE_OPTIONS.map(p => `<div class="chip-option ${t.idealClient.payment === p ? 'selected' : ''}" data-ideal-pay="${p}">${p}</div>`).join('')}</div>
@@ -3809,10 +3839,12 @@ function renderTherapistProfile() {
 
         <div class="t-form-label">Session cost (per session, $)</div>
         <input type="number" class="t-rate-input" id="t-rate-input" value="${t.rateMin}">
+        <div class="must-have-toggle">
+          <div class="toggle-label"><strong>Accepts sliding scale</strong><span>Shown to clients who need flexible pricing</span></div>
+          <div class="switch ${t.acceptsSlidingScale ? 'on' : ''}" id="t-sliding-switch"></div>
+        </div>
         <div class="t-form-label">Insurance accepted</div>
         <div class="chip-grid">${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${t.insuranceList.includes(i) ? 'selected' : ''}" data-toggle-insurance="${i}">${i}</div>`).join('')}</div>
-        <div class="t-form-label">If you don't take insurance, what should clients know? (optional)</div>
-        <input type="text" class="t-rate-input" id="t-selfpaynote-input" placeholder="e.g. Sliding scale available" value="${t.selfPayNote || ''}">
 
         <div class="t-form-label">Website</div>
         <input type="text" class="t-rate-input" id="t-website-input" placeholder="e.g. yourpractice.com" value="${t.website || ''}">
@@ -3839,53 +3871,12 @@ function renderTherapistProfile() {
       </div>
     </details>
 
-    <!-- ===== GET TO KNOW YOU ===== -->
-    <details class="edit-section" data-edit-section="getToKnow" ${editSectionsOpen.getToKnow ? 'open' : ''}>
-      <summary><span class="edit-section-title">Get to know you</span><span class="edit-section-hint">your story, in your words</span><span class="edit-caret">▾</span></summary>
-      <div class="edit-section-body">
-        <div class="t-form-label">Who I am in the office...</div>
-        <textarea class="intake-textarea" id="t-persona-in" rows="2" placeholder="What sessions with you actually feel like">${t.persona.inOffice || ''}</textarea>
-        <div class="t-form-label">Who I am out of the office...</div>
-        <textarea class="intake-textarea" id="t-persona-out" rows="2" placeholder="The human behind the license">${t.persona.outOfOffice || ''}</textarea>
-
-        <div class="t-form-label" style="margin-top:16px;">In your words</div>
-        ${MANDATORY_PROMPTS.map((q, i) => `
-          <div class="t-form-label">${q}</div>
-          <textarea class="intake-textarea" data-edit-mandatory-prompt-index="${i}" rows="2">${t.mandatoryPromptAnswers[i] || ''}</textarea>
-        `).join('')}
-        <div class="t-form-label" style="margin-top:12px;">Pick up to ${MAX_OPTIONAL_PROMPTS} more (${t.optionalPrompts.length}/${MAX_OPTIONAL_PROMPTS} selected)</div>
-        <div class="chip-grid">
-          ${OPTIONAL_PROMPTS.map(q => {
-            const selected = t.optionalPrompts.some(p => p.question === q);
-            const disabled = !selected && t.optionalPrompts.length >= MAX_OPTIONAL_PROMPTS;
-            return `<div class="chip-option ${selected ? 'selected' : ''} ${disabled ? 'chip-disabled' : ''}" data-toggle-optional-prompt="${q}">${q}</div>`;
-          }).join('')}
-        </div>
-        ${t.optionalPrompts.length > 1 ? `<p class="reorder-hint">Use ↑ ↓ to set the order clients see these in.</p>` : ''}
-        ${t.optionalPrompts.map((p, i) => `
-          <div class="prompt-edit-head">
-            <div class="t-form-label" style="margin:0;">${i + 1}. ${p.question}</div>
-            <div class="reorder-btns">
-              <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
-              <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="1" ${i === t.optionalPrompts.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
-            </div>
-          </div>
-          <textarea class="intake-textarea" data-edit-optional-prompt-answer="${i}" rows="2">${p.answer || ''}</textarea>
-          <div class="prompt-photo-row">
-            ${p.photo ? `<img class="prompt-photo-thumb" src="${p.photo}">` : ''}
-            <input type="file" accept="image/*" data-edit-optional-prompt-photo="${i}">
-          </div>
-          <button type="button" class="text-btn" data-remove-edit-optional-prompt="${i}">Remove this prompt</button>
-        `).join('')}
-      </div>
-    </details>
-
     <!-- ===== SECTION 2 · ADDITIONAL DETAILS ===== -->
     <details class="edit-section" data-edit-section="additional" ${editSectionsOpen.additional ? 'open' : ''}>
-      <summary><span class="edit-section-title">Additional Details</span><span class="edit-section-hint">availability, identity, languages</span><span class="edit-caret">▾</span></summary>
+      <summary><span class="edit-section-title">Additional Details</span><span class="edit-section-hint">availability, identity, therapy types</span><span class="edit-caret">▾</span></summary>
       <div class="edit-section-body">
         <div class="must-have-toggle" style="margin-top:2px;">
-          <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>Shown in Discover for new long-term matches</span></div>
+          <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>Off keeps you in Discover with a "save for later" banner</span></div>
           <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
         </div>
 
@@ -3903,20 +3894,32 @@ function renderTherapistProfile() {
 
         <div class="t-form-label">Languages you speak</div>
         ${languageChipsHtml(t.languages, profileShowOtherLanguage, 'tp')}
+
+        <div class="t-form-label" style="margin-top:16px;">Types of Therapy</div>
+        ${checkboxDropdownHtml(t.modalities, modalityAll(), 'modality', 'Choose the therapy types you offer…')}
       </div>
     </details>
 
-    <!-- ===== SECTION 3 · BROADER THAN IDEAL CLIENT ===== -->
-    <details class="edit-section" data-edit-section="everyone" ${editSectionsOpen.everyone ? 'open' : ''}>
-      <summary><span class="edit-section-title">Everyone I work with</span><span class="everyone-public">Broader than Ideal Client</span><span class="edit-caret">▾</span></summary>
+    <!-- ===== SECTION 3 · GET TO KNOW YOU ===== -->
+    <details class="edit-section" data-edit-section="getToKnow" ${editSectionsOpen.getToKnow ? 'open' : ''}>
+      <summary><span class="edit-section-title">Get to know you</span><span class="edit-section-hint">your story, in words &amp; photos</span><span class="edit-caret">▾</span></summary>
       <div class="edit-section-body">
-        <p class="everyone-sub">The full range you're able to take on. Being broad here doesn't dilute your ideal matches — it just means more of the right people can find you.</p>
 
-        <div class="t-form-label">Types of Therapy</div>
-        ${checkboxDropdownHtml(t.modalities, modalityAll(), 'modality', 'Choose the therapy types you offer…')}
+        <!-- collapsible prompt picker, up top -->
+        <details class="edit-section edit-subsection" data-edit-section="promptPicker" ${editSectionsOpen.promptPicker ? 'open' : ''}>
+          <summary><span class="edit-section-title">Pick up to ${MAX_OPTIONAL_PROMPTS} more prompts</span><span class="edit-section-hint">${t.optionalPrompts.length}/${MAX_OPTIONAL_PROMPTS} chosen</span><span class="edit-caret">▾</span></summary>
+          <div class="edit-section-body">
+            <div class="chip-grid">
+              ${OPTIONAL_PROMPTS.map(q => {
+                const selected = t.optionalPrompts.some(p => p.question === q);
+                const disabled = !selected && t.optionalPrompts.length >= MAX_OPTIONAL_PROMPTS;
+                return `<div class="chip-option ${selected ? 'selected' : ''} ${disabled ? 'chip-disabled' : ''}" data-toggle-optional-prompt="${q}">${q}</div>`;
+              }).join('')}
+            </div>
+          </div>
+        </details>
 
-        <div class="t-form-label" style="margin-top:18px;">Photos & video</div>
-        <div class="intake-sub">These build the "get to know you" feed clients scroll through. Reorder photos with ↑ ↓ — that's the order clients see them in.</div>
+        <p class="intake-sub" style="margin-top:14px;">Answer a few little blurbs and drop in a photo between them — clients scroll a feed that alternates your words and your world.</p>
 
         <div class="media-row">
           <div class="media-thumb">${t.photo ? `<img src="${t.photo}">` : '<span>—</span>'}</div>
@@ -3928,26 +3931,70 @@ function renderTherapistProfile() {
           <div class="media-row-text"><strong>Quick video</strong><span>A 15–30s hello — clients hear your voice first</span></div>
           <label class="media-upload-btn">${t.media.video ? 'Replace' : 'Add'}<input type="file" accept="video/*" data-media-upload="video" hidden></label>
         </div>
+
         ${(() => {
+          // Interleave the fixed blurbs with the gallery photo slots so the edit
+          // screen mirrors the alternating feed. Each photo carries a suggested
+          // subject so therapists know what makes the strongest set.
+          const PHOTO_GUIDE = [
+            'Your office — where sessions happen',
+            'Out of office — life outside work',
+            'One more — your choice: a pet, a hobby, a favorite spot',
+            "Anything else that's you"
+          ];
+          const blurbEls = [
+            `<div class="t-form-label">Who I am in the office...</div>
+             <textarea class="intake-textarea" id="t-persona-in" rows="2" placeholder="What sessions with you actually feel like">${t.persona.inOffice || ''}</textarea>`,
+            `<div class="t-form-label">Who I am out of the office...</div>
+             <textarea class="intake-textarea" id="t-persona-out" rows="2" placeholder="The human behind the license">${t.persona.outOfOffice || ''}</textarea>`,
+            ...MANDATORY_PROMPTS.map((q, i) => `<div class="t-form-label">${q}</div>
+             <textarea class="intake-textarea" data-edit-mandatory-prompt-index="${i}" rows="2">${t.mandatoryPromptAnswers[i] || ''}</textarea>`)
+          ];
           const photos = therapistPhotos(t);
-          const rows = photos.map((src, i) => `
+          const photoEls = photos.map((src, i) => `
             <div class="media-row gallery-row">
               <div class="media-thumb"><img src="${src}"></div>
-              <div class="media-row-text"><strong>Photo ${i + 1}</strong><span>Shown in your get-to-know feed</span></div>
+              <div class="media-row-text"><strong>Photo ${i + 1}</strong><span>${PHOTO_GUIDE[i] || 'Shown in your get-to-know feed'}</span></div>
               <div class="reorder-btns">
                 <button type="button" class="reorder-btn" data-move-photo="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
                 <button type="button" class="reorder-btn" data-move-photo="${i}" data-dir="1" ${i === photos.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
                 <button type="button" class="text-btn" data-remove-photo="${i}">Remove</button>
               </div>
-            </div>`).join('');
-          const addRow = photos.length < MAX_PHOTOS ? `
-            <label class="media-add-row">
-              <span class="media-thumb"><span>＋</span></span>
-              <span class="media-row-text"><strong>Add a photo</strong><span>Up to ${MAX_PHOTOS} — office, life outside work, anything you.</span></span>
-              <input type="file" accept="image/*" data-add-photo hidden>
-            </label>` : `<p class="portal-note">Photo limit reached (${MAX_PHOTOS}). Remove one to add another.</p>`;
-          return rows + addRow;
+            </div>`);
+          if (photos.length < MAX_PHOTOS) {
+            photoEls.push(`
+              <label class="media-add-row">
+                <span class="media-thumb"><span>＋</span></span>
+                <span class="media-row-text"><strong>Add a photo — ${PHOTO_GUIDE[photos.length] || 'anything you'}</strong><span>A good set: your office, life outside work, and one more that's you. Up to ${MAX_PHOTOS}.</span></span>
+                <input type="file" accept="image/*" data-add-photo hidden>
+              </label>`);
+          }
+          let out = '';
+          const n = Math.max(blurbEls.length, photoEls.length);
+          for (let i = 0; i < n; i++) {
+            if (blurbEls[i]) out += blurbEls[i];
+            if (photoEls[i]) out += photoEls[i];
+          }
+          return out;
         })()}
+
+        ${t.optionalPrompts.length ? `<div class="t-form-label" style="margin-top:18px;">Your chosen prompts</div>` : ''}
+        ${t.optionalPrompts.length > 1 ? `<p class="reorder-hint">Use ↑ ↓ to set the order clients see these in.</p>` : ''}
+        ${t.optionalPrompts.map((p, i) => `
+          <div class="prompt-edit-head">
+            <div class="t-form-label" style="margin:0;">${i + 1}. ${p.question}</div>
+            <div class="reorder-btns">
+              <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+              <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="1" ${i === t.optionalPrompts.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+            </div>
+          </div>
+          <textarea class="intake-textarea" data-edit-optional-prompt-answer="${i}" rows="2">${p.answer || ''}</textarea>
+          <div class="prompt-photo-row">
+            ${p.photo ? `<img class="prompt-photo-thumb" src="${p.photo}">` : ''}
+            <input type="file" accept="image/*" data-edit-optional-prompt-photo="${i}">
+          </div>
+          <button type="button" class="text-btn" data-remove-edit-optional-prompt="${i}">Remove this prompt</button>
+        `).join('')}
       </div>
     </details>
     </div>
@@ -3980,13 +4027,22 @@ function attachTherapistProfileHandlers(t) {
   if (tNameInput) tNameInput.addEventListener('input', () => { t.name = tNameInput.value; });
   const tWebsiteInput = document.getElementById('t-website-input');
   if (tWebsiteInput) tWebsiteInput.addEventListener('input', () => { t.website = tWebsiteInput.value.trim().replace(/^https?:\/\//, ''); });
+  const tSlidingSwitch = document.getElementById('t-sliding-switch');
+  if (tSlidingSwitch) tSlidingSwitch.addEventListener('click', () => { t.acceptsSlidingScale = !t.acceptsSlidingScale; renderTherapistProfile(); });
   // remember which collapsible sections / dropdowns are open across re-renders
   document.querySelectorAll('details[data-edit-section]').forEach(el => el.addEventListener('toggle', () => { editSectionsOpen[el.dataset.editSection] = el.open; }));
   document.querySelectorAll('details[data-dd]').forEach(el => el.addEventListener('toggle', () => { editDropdownOpen[el.dataset.dd] = el.open; }));
-  // checkbox dropdowns (specialties / types of therapy)
-  const cbxArr = k => (k === 'spec' ? t.tags : t.modalities);
+  // checkbox dropdowns — one component, several targets (public specialties &
+  // types of therapy, plus the private ideal-client needs & modalities)
+  const cbxArr = k => ({
+    'spec': t.tags,
+    'modality': t.modalities,
+    'ideal-needs': t.idealClient.needs,
+    'ideal-modalities': t.idealClient.modalities,
+  })[k] || null;
   document.querySelectorAll('input[data-cbx]').forEach(el => el.addEventListener('change', () => {
-    const arr = cbxArr(el.dataset.cbx), v = el.value, i = arr.indexOf(v);
+    const arr = cbxArr(el.dataset.cbx); if (!arr) return;
+    const v = el.value, i = arr.indexOf(v);
     if (i === -1) arr.push(v);
     else {
       arr.splice(i, 1);
@@ -3995,7 +4051,8 @@ function attachTherapistProfileHandlers(t) {
     renderTherapistProfile();
   }));
   document.querySelectorAll('[data-cbx-chip]').forEach(el => el.addEventListener('click', () => {
-    const arr = cbxArr(el.dataset.cbxChip), v = el.dataset.val, i = arr.indexOf(v);
+    const arr = cbxArr(el.dataset.cbxChip); if (!arr) return;
+    const v = el.dataset.val, i = arr.indexOf(v);
     if (i !== -1) arr.splice(i, 1);
     if (el.dataset.cbxChip === 'spec') { const j = (t.topSpecialties || []).indexOf(v); if (j !== -1) t.topSpecialties.splice(j, 1); }
     renderTherapistProfile();
@@ -4190,7 +4247,12 @@ function attachTherapistProfileHandlers(t) {
     t.optionalPrompts.splice(Number(el.dataset.removeEditOptionalPrompt), 1);
     renderTherapistProfile();
   }));
-  document.getElementById('t-ongoing-switch').addEventListener('click', () => { t.acceptingOngoing = !t.acceptingOngoing; renderTherapistProfile(); });
+  document.getElementById('t-ongoing-switch').addEventListener('click', () => {
+    t.acceptingOngoing = !t.acceptingOngoing;
+    t.nextAvailableRank = t.acceptingOngoing ? 1 : null;
+    t.nextAvailableLabel = t.acceptingOngoing ? 'This week' : 'Not accepting new ongoing clients';
+    renderTherapistProfile();
+  });
 }
 
 // ===== ON-DEMAND CONTROLS =====
