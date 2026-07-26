@@ -4468,6 +4468,7 @@ function openOnDemandInfo() {
     <ul class="policy-list">
       <li><strong>Not for crises.</strong> It's not crisis care — anyone in crisis should call or text 988 or their local emergency line.</li>
       <li><strong>Cash-pay only.</strong> No insurance is billed for On-Demand sessions.</li>
+      <li><strong>Clients pay up front.</strong> The client's card is authorized when they request a slot and charged the moment you accept — you never chase payment.</li>
       <li><strong>You meet outside the app.</strong> Kindred handles the request and payment; you schedule and hold the actual session on your own platform.</li>
       <li><strong>5% processing fee.</strong> Kindred keeps 5% of the session cost to run On-Demand; the client also covers the Stripe processing fee.</li>
     </ul>
@@ -4644,7 +4645,6 @@ function renderTherapistSettings() {
 
     <div class="settings-group-title">Privacy</div>
     ${row('showInSearch', 'Appear in matching', 'Turning this off hides you from new matches without deleting anything')}
-    ${row('hideFromCurrentClients', 'Hide my profile from current clients', "They keep their conversation with you, but won't see your public card")}
     <p class="portal-note">Your ideal-client settings are always private and never shown to clients.</p>
 
     <div class="settings-group-title">Account</div>
