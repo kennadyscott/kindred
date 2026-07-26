@@ -245,6 +245,13 @@ const THERAPIST_IDEAL = {
         availability: [], mustHaves: ['needs'] }
 };
 
+// Demo-only: a few names waiting on therapists who are currently full, so the
+// Inquiries → Waitlist section has something to show.
+const WAITLIST_SEED = {
+  t3: ['Jordan M.', 'Alex R.'],
+  t5: ['Sam T.', 'Priya K.', 'Devon L.']
+};
+
 THERAPISTS.forEach(t => {
   const id = THERAPIST_IDENTITY[t.id] || {};
   t.ethnicity = id.ethnicity || '';
@@ -260,6 +267,13 @@ THERAPISTS.forEach(t => {
   if (!t.topSpecialties || !t.topSpecialties.length) t.topSpecialties = (t.tags || []).slice(0, 3);
   // sliding scale is its own flag now; seed it from any legacy self-pay note
   if (t.acceptsSlidingScale === undefined) t.acceptsSlidingScale = /sliding/i.test(t.selfPayNote || '');
+  // waitlist (demo): therapists who are full default to offering one, and a
+  // couple carry seeded names so the Inquiries → Waitlist section has content
+  if (t.offerWaitlist === undefined) t.offerWaitlist = !t.acceptingOngoing;
+  if (!Array.isArray(t.waitlist)) t.waitlist = (WAITLIST_SEED[t.id] || []).map(name => ({ name }));
+  // conversations the therapist started from the waitlist (kept off the shared
+  // `matches` array so they never leak into the demo client's own match list)
+  if (!Array.isArray(t.startedConversations)) t.startedConversations = [];
 });
 
 let NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
@@ -3461,9 +3475,13 @@ function renderTherapistInsights() {
   ];
   container.innerHTML = `
     <div class="home-accepting-card">
-      <div class="must-have-toggle" style="margin:0;">
+      <div class="must-have-toggle card-toggle">
         <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>${t.acceptingOngoing ? 'New clients can find and book you' : "You're shown in Discover marked not accepting — clients can save you for later"}</span></div>
         <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-insights-ongoing-switch"></div>
+      </div>
+      <div class="must-have-toggle card-toggle">
+        <div class="toggle-label"><strong>Offer a waitlist</strong><span>${t.offerWaitlist ? "Clients who find you while you're full can join your waitlist" : 'Off — clients can only save you for later'}</span></div>
+        <div class="switch ${t.offerWaitlist ? 'on' : ''}" id="t-insights-waitlist-switch"></div>
       </div>
     </div>
     <div class="intake-sub" style="margin-bottom:14px;">How clients are finding and responding to your profile.</div>
@@ -3483,6 +3501,11 @@ function renderTherapistInsights() {
     t.acceptingOngoing = !t.acceptingOngoing;
     t.nextAvailableRank = t.acceptingOngoing ? 1 : null;
     t.nextAvailableLabel = t.acceptingOngoing ? 'This week' : 'Not accepting new ongoing clients';
+    renderTherapistInsights();
+  });
+  const insWaitlistSwitch = document.getElementById('t-insights-waitlist-switch');
+  if (insWaitlistSwitch) insWaitlistSwitch.addEventListener('click', () => {
+    t.offerWaitlist = !t.offerWaitlist;
     renderTherapistInsights();
   });
 }
@@ -3527,38 +3550,9 @@ function renderTherapistHome() {
 
   let html = onDemandToggleHtml(t);
 
-  // ===== Ongoing availability =====
-  html += `<div class="avail-section-title">🌱 Open for new ongoing clients</div>`;
-  html += `<div class="must-have-toggle">
-      <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>${t.acceptingOngoing ? 'New clients can find and book you' : "You're shown to clients but marked not accepting — they can save you for later"}</span></div>
-      <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-home-ongoing-switch"></div>
-    </div>`;
-  if (!t.acceptingOngoing) {
-    html += `<p class="portal-note">You're not accepting new ongoing clients right now. Flip the switch above (or the one on your Profile) to open weekly slots.</p>`;
-  } else {
-    html += `<div class="avail-sub">${openOngoing} open weekly ${openOngoing === 1 ? 'slot' : 'slots'} · recurring times a new client can book</div>`;
-    if (sortedAvail.length === 0) {
-      html += `<p class="portal-note">No open weekly slots yet — add the recurring times you could take a new client.</p>`;
-    } else {
-      html += sortedAvail.map(s => {
-        const filledBy = ongoingBookings.find(m => m.scheduledDay === s.day && m.scheduledTime === s.time);
-        return `<div class="avail-slot ${filledBy ? 'filled' : 'open'}">
-          <div class="avail-when"><span class="avail-day">${s.day}</span><span class="avail-time">${s.time}</span></div>
-          <span class="avail-status ${filledBy ? 'booked' : ''}">${filledBy ? 'Booked' : 'Open'}</span>
-          ${filledBy ? '' : `<button class="appt-remove" data-remove-avail="${s.i}">✕</button>`}
-        </div>`;
-      }).join('');
-    }
-    html += `
-      <div class="schedule-row">
-        <select id="avail-day">${DAYS_OF_WEEK.map(d => `<option value="${d}">${d}</option>`).join('')}</select>
-        <input type="time" id="avail-time" value="10:00">
-      </div>
-      <button class="message-btn-full" id="add-avail-btn">+ Add open slot</button>`;
-  }
-
   // ===== On-demand availability =====
-  html += `<div class="avail-section-title" style="margin-top:22px;">⚡ On-demand this week</div>`;
+  // (Ongoing-client controls live on Home + Edit Profile — this tab is On-Demand only.)
+  html += `<div class="avail-section-title">⚡ On-demand this week</div>`;
   if (t.onDemandBanned) {
     html += `<p class="portal-note">On-demand access is suspended after a reported no-show. Ongoing matching is unaffected.</p>`;
   } else if (!t.onDemand) {
@@ -3617,65 +3611,72 @@ function renderTherapistHome() {
   });
 }
 
+// Card for an accepted/started conversation (shared between Active & Archived).
+function convoCardHtml(m) {
+  const gi = matches.indexOf(m);
+  const archived = !!m.archived;
+  return `<div class="request-card resolved">
+    <span class="resolved-tag matched">✓ Accepted</span> — now chatting
+    ${m.clientName ? `<div class="request-need" style="margin-top:6px;">Client: <strong>${m.clientName}</strong></div>` : ''}
+    ${m.scheduledDay ? `<div class="request-need" style="margin-top:6px;">Recurring: <strong>${m.scheduledDay}s at ${m.scheduledTime}</strong></div>` : ''}
+    <button class="message-btn-full" data-action="message" style="margin-top:10px;">💬 Message</button>
+    ${m.booked
+      ? `<div class="booked-flag">✓ Booked as a client — counted in your stats</div>`
+      : `<button class="message-btn-full booked-btn" data-book-mi="${gi}" style="margin-top:8px;">📅 I booked this client</button>`}
+    <button class="text-btn convo-archive-btn" data-${archived ? 'unarchive' : 'archive'}-match="${gi}">${archived ? '↩ Move back to active' : '🗄 Archive'}</button>
+  </div>`;
+}
+// Card for a conversation the therapist started from the waitlist.
+function startedCardHtml(c, idx) {
+  const archived = !!c.archived;
+  return `<div class="request-card resolved">
+    <span class="resolved-tag matched">✓ Conversation</span>
+    <div class="request-need" style="margin-top:6px;">Client: <strong>${c.name}</strong></div>
+    <button class="message-btn-full" data-action="message" style="margin-top:10px;">💬 Message</button>
+    <button class="text-btn convo-archive-btn" data-${archived ? 'unarchive' : 'archive'}-started="${idx}">${archived ? '↩ Move back to active' : '🗄 Archive'}</button>
+  </div>`;
+}
+function inquirySectionHtml(key, title, count, body) {
+  return `<details class="edit-section inquiry-section" data-inquiry-section="${key}" ${inquiriesOpen[key] ? 'open' : ''}>
+    <summary><span class="edit-section-title">${title}</span><span class="edit-section-hint">${count}</span><span class="edit-caret">▾</span></summary>
+    <div class="edit-section-body">${body || `<p class="empty-state" style="margin:8px 0;">Nothing here yet.</p>`}</div>
+  </details>`;
+}
+
 function renderRequests() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
   document.getElementById('t-requests-title').textContent = 'Inquiries';
   const list = document.getElementById('requests-list');
   const myRequests = matches.filter(m => m.therapist.id === currentTherapistId && m.status !== 'ondemand');
   const myBookings = matches.filter(m => m.therapist.id === currentTherapistId && m.status === 'ondemand');
-
   const pendingCount = myRequests.filter(m => m.status === 'pending').length;
 
-  let html = '';
-  if (pendingCount) {
-    html += `<div class="hello-banner">✨ ${pendingCount === 1 ? 'A tiny hello has arrived!' : `${pendingCount} tiny hellos have arrived!`}</div>`;
-  }
-  if (myRequests.length === 0) {
-    html += `<p class="empty-state">No hellos yet. When someone reaches out to you, they'll land right here.</p>`;
-  } else {
-    html += myRequests.slice().reverse().map((m, i) => {
-      if (m.status === 'pending') {
-        // Private to the therapist: flags the clients they said they're the
-        // strongest fit for. Clients never see this, and not having it changes
-        // nothing about whether they can reach this therapist.
-        const ideal = idealMatchResult(t);
-        return `<div class="request-card${ideal.isIdeal ? ' ideal-match' : ''}">
-          ${ideal.isIdeal ? `<div class="ideal-flag" title="Matches the ideal client you described — only you can see this">✦ Ideal match${ideal.reasons.length ? ` · ${ideal.reasons.join(' · ')}` : ''}</div>` : ''}
-          <div class="request-need">Looking for support with: <strong>${m.needsSnapshot.length ? m.needsSnapshot.join(', ') : 'general support'}</strong></div>
-          ${m.desiredFrequency ? `<div class="request-need">Hoping to meet: <strong>${m.desiredFrequency}</strong></div>` : ''}
-          ${m.introMessage ? `<div class="request-intro">&ldquo;${m.introMessage}&rdquo;</div>` : ''}
-          <button class="message-btn-full" data-action="message">💬 Message before deciding</button>
-          ${m._showScheduleForm ? `
-            <div class="t-form-label">Set a recurring time for this client</div>
-            <div class="schedule-row">
-              <select id="schedule-day">${DAYS_OF_WEEK.map(d => `<option value="${d}">${d}</option>`).join('')}</select>
-              <input type="time" id="schedule-time" value="10:00">
-            </div>
-            <button class="message-btn-full" data-action="confirm-schedule">Confirm Schedule</button>
-          ` : `
-            <div class="request-actions">
-              <button class="decline-btn" data-decision="decline">Decline</button>
-              <button class="accept-btn" data-decision="accept">Accept</button>
-            </div>
-          `}
-        </div>`;
-      }
-      if (m.status === 'matched') {
-        return `<div class="request-card resolved">
-          <span class="resolved-tag matched">✓ Accepted</span> — now chatting
-          ${m.scheduledDay ? `<div class="request-need" style="margin-top:6px;">Recurring: <strong>${m.scheduledDay}s at ${m.scheduledTime}</strong></div>` : ''}
-          <button class="message-btn-full" data-action="message" style="margin-top:10px;">💬 Message</button>
-          ${m.booked
-            ? `<div class="booked-flag">✓ Booked as a client — counted in your stats</div>`
-            : `<button class="message-btn-full booked-btn" data-book="${i}" style="margin-top:8px;">📅 I booked this client</button>`}
-        </div>`;
-      }
-      return `<div class="request-card resolved"><span class="resolved-tag declined">Declined</span></div>`;
-    }).join('');
-  }
-  myBookings.forEach((m, i) => {
+  const pendingCardHtml = m => {
+    const ideal = idealMatchResult(t);
+    return `<div class="request-card${ideal.isIdeal ? ' ideal-match' : ''}">
+      ${ideal.isIdeal ? `<div class="ideal-flag" title="Matches the ideal client you described — only you can see this">✦ Ideal match${ideal.reasons.length ? ` · ${ideal.reasons.join(' · ')}` : ''}</div>` : ''}
+      <div class="request-need">Looking for support with: <strong>${m.needsSnapshot.length ? m.needsSnapshot.join(', ') : 'general support'}</strong></div>
+      ${m.desiredFrequency ? `<div class="request-need">Hoping to meet: <strong>${m.desiredFrequency}</strong></div>` : ''}
+      ${m.introMessage ? `<div class="request-intro">&ldquo;${m.introMessage}&rdquo;</div>` : ''}
+      <button class="message-btn-full" data-action="message">💬 Message before deciding</button>
+      ${m._showScheduleForm ? `
+        <div class="t-form-label">Set a recurring time for this client</div>
+        <div class="schedule-row">
+          <select id="schedule-day">${DAYS_OF_WEEK.map(d => `<option value="${d}">${d}</option>`).join('')}</select>
+          <input type="time" id="schedule-time" value="10:00">
+        </div>
+        <button class="message-btn-full" data-action="confirm-schedule">Confirm Schedule</button>
+      ` : `
+        <div class="request-actions">
+          <button class="decline-btn" data-decision="decline">Decline</button>
+          <button class="accept-btn" data-decision="accept">Accept</button>
+        </div>
+      `}
+    </div>`;
+  };
+  const bookingCardHtml = (m, i) => {
     if (m.paymentStatus === 'authorized') {
-      html += `<div class="request-card">
+      return `<div class="request-card">
         <div class="request-need">On-Demand request — <strong>${m.slotLabel}</strong> · $${m.amountPaid} authorized</div>
         <div class="request-intro">The client's card is on hold — it's only charged if you accept. Accepting commits you to showing up: a reported no-show refunds them in full and suspends your On-Demand access.</div>
         <div class="decision-row">
@@ -3683,54 +3684,85 @@ function renderRequests() {
           <button class="accept-btn" data-od-accept="${i}">Accept — process $${m.amountPaid}</button>
         </div>
       </div>`;
-    } else if (m.paymentStatus === 'paid') {
-      html += `<div class="confirmed-session">One-time session confirmed — ${m.slotLabel} · $${m.amountPaid} paid</div>`;
-    } else if (m.paymentStatus === 'noshow-refunded') {
-      html += `<div class="confirmed-session cancelled">No-show reported — ${m.slotLabel} · $${m.amountPaid} refunded to the client · your On-Demand access is suspended</div>`;
-    } else {
-      html += `<div class="confirmed-session cancelled">${m.slotLabel} — ${refundStatusLabel(m.paymentStatus)}</div>`;
     }
-  });
+    if (m.paymentStatus === 'paid') return `<div class="confirmed-session">One-time session confirmed — ${m.slotLabel} · $${m.amountPaid} paid</div>`;
+    if (m.paymentStatus === 'noshow-refunded') return `<div class="confirmed-session cancelled">No-show reported — ${m.slotLabel} · $${m.amountPaid} refunded to the client · your On-Demand access is suspended</div>`;
+    return `<div class="confirmed-session cancelled">${m.slotLabel} — ${refundStatusLabel(m.paymentStatus)}</div>`;
+  };
+
+  // ----- Active conversations -----
+  const pendings   = myRequests.filter(m => m.status === 'pending');
+  const activeConvos = myRequests.filter(m => m.status === 'matched' && !m.archived);
+  const activeStarted = t.startedConversations.map((c, idx) => ({ c, idx })).filter(x => !x.c.archived);
+  const activeBody =
+    pendings.slice().reverse().map(pendingCardHtml).join('') +
+    activeConvos.slice().reverse().map(convoCardHtml).join('') +
+    activeStarted.map(x => startedCardHtml(x.c, x.idx)).join('') +
+    myBookings.map(bookingCardHtml).join('');
+  const activeCount = pendings.length + activeConvos.length + activeStarted.length + myBookings.length;
+
+  // ----- Waitlist -----
+  const waitlistBody = t.waitlist.map((w, idx) => `
+    <div class="request-card waitlist-card">
+      <div class="waitlist-name">${w.name}</div>
+      <button class="message-btn-full" data-start-waitlist="${idx}">Start conversation</button>
+    </div>`).join('');
+
+  // ----- Archived -----
+  const archivedConvos = myRequests.filter(m => m.status === 'matched' && m.archived);
+  const archivedStarted = t.startedConversations.map((c, idx) => ({ c, idx })).filter(x => x.c.archived);
+  const archivedBody =
+    archivedConvos.slice().reverse().map(convoCardHtml).join('') +
+    archivedStarted.map(x => startedCardHtml(x.c, x.idx)).join('');
+  const archivedCount = archivedConvos.length + archivedStarted.length;
+
+  let html = '';
+  if (pendingCount) html += `<div class="hello-banner">✨ ${pendingCount === 1 ? 'A tiny hello has arrived!' : `${pendingCount} tiny hellos have arrived!`}</div>`;
+  html += inquirySectionHtml('active', 'Active conversations', activeCount ? `${activeCount}` : '0', activeBody);
+  html += inquirySectionHtml('waitlist', 'Waitlist', t.waitlist.length ? `${t.waitlist.length} waiting` : '0', waitlistBody);
+  html += inquirySectionHtml('archived', 'Archived', archivedCount ? `${archivedCount}` : '0', archivedBody);
 
   list.innerHTML = html;
-  list.querySelectorAll('[data-od-accept]').forEach(btn => {
-    btn.addEventListener('click', () => acceptOndemandBooking(myBookings[Number(btn.dataset.odAccept)]));
-  });
-  list.querySelectorAll('[data-od-decline]').forEach(btn => {
-    btn.addEventListener('click', () => declineOndemandBooking(myBookings[Number(btn.dataset.odDecline)]));
-  });
-  list.querySelectorAll('[data-decision="decline"]').forEach(btn => {
-    btn.addEventListener('click', () => declineRequest(currentTherapistId));
-  });
-  list.querySelectorAll('[data-decision="accept"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const m = matches.find(m => m.therapist.id === currentTherapistId && m.status === 'pending');
-      if (m) { m._showScheduleForm = true; renderRequests(); }
-    });
-  });
-  list.querySelectorAll('[data-action="confirm-schedule"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const day = document.getElementById('schedule-day').value;
-      const time = document.getElementById('schedule-time').value;
-      confirmAcceptWithSchedule(currentTherapistId, day, time);
-    });
-  });
-  list.querySelectorAll('[data-action="message"]').forEach(btn => {
-    btn.addEventListener('click', () => openChat(t, 'therapist'));
-  });
-  const revRequests = myRequests.slice().reverse();
-  list.querySelectorAll('[data-book]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const m = revRequests[Number(btn.dataset.book)];
-      if (!m) return;
-      m.booked = true;
-      showToast('Booked — added to your Clients Booked count.');
-      renderRequests();
-    });
-  });
+
+  // remember which sections are open across re-renders
+  list.querySelectorAll('details[data-inquiry-section]').forEach(el => el.addEventListener('toggle', () => { inquiriesOpen[el.dataset.inquirySection] = el.open; }));
+
+  list.querySelectorAll('[data-od-accept]').forEach(btn => btn.addEventListener('click', () => acceptOndemandBooking(myBookings[Number(btn.dataset.odAccept)])));
+  list.querySelectorAll('[data-od-decline]').forEach(btn => btn.addEventListener('click', () => declineOndemandBooking(myBookings[Number(btn.dataset.odDecline)])));
+  list.querySelectorAll('[data-decision="decline"]').forEach(btn => btn.addEventListener('click', () => declineRequest(currentTherapistId)));
+  list.querySelectorAll('[data-decision="accept"]').forEach(btn => btn.addEventListener('click', () => {
+    const m = matches.find(m => m.therapist.id === currentTherapistId && m.status === 'pending');
+    if (m) { m._showScheduleForm = true; renderRequests(); }
+  }));
+  list.querySelectorAll('[data-action="confirm-schedule"]').forEach(btn => btn.addEventListener('click', () => {
+    confirmAcceptWithSchedule(currentTherapistId, document.getElementById('schedule-day').value, document.getElementById('schedule-time').value);
+  }));
+  list.querySelectorAll('[data-action="message"]').forEach(btn => btn.addEventListener('click', () => openChat(t, 'therapist')));
+  list.querySelectorAll('[data-book-mi]').forEach(btn => btn.addEventListener('click', () => {
+    const m = matches[Number(btn.dataset.bookMi)];
+    if (!m) return;
+    m.booked = true;
+    showToast('Booked — added to your Clients Booked count.');
+    renderRequests();
+  }));
+  list.querySelectorAll('[data-archive-match]').forEach(btn => btn.addEventListener('click', () => { matches[Number(btn.dataset.archiveMatch)].archived = true; showToast('Conversation archived.'); renderRequests(); }));
+  list.querySelectorAll('[data-unarchive-match]').forEach(btn => btn.addEventListener('click', () => { matches[Number(btn.dataset.unarchiveMatch)].archived = false; renderRequests(); }));
+  list.querySelectorAll('[data-archive-started]').forEach(btn => btn.addEventListener('click', () => { t.startedConversations[Number(btn.dataset.archiveStarted)].archived = true; showToast('Conversation archived.'); renderRequests(); }));
+  list.querySelectorAll('[data-unarchive-started]').forEach(btn => btn.addEventListener('click', () => { t.startedConversations[Number(btn.dataset.unarchiveStarted)].archived = false; renderRequests(); }));
+  list.querySelectorAll('[data-start-waitlist]').forEach(btn => btn.addEventListener('click', () => {
+    const idx = Number(btn.dataset.startWaitlist);
+    const entry = t.waitlist[idx];
+    if (!entry) return;
+    t.waitlist.splice(idx, 1);
+    t.startedConversations.push({ name: entry.name, archived: false });
+    inquiriesOpen.active = true;
+    showToast(`Started a conversation with ${entry.name}.`);
+    renderRequests();
+  }));
   updateTNavBadge();
 }
 
+let inquiriesOpen = { active: true, waitlist: true, archived: false }; // Inquiries collapsible sections
 let tSpecOtherOpen = false, tModOtherOpen = false; // transient "+ Other" panels
 let idealFieldOtherOpen = false; // ideal-client field "+ Other" dropdown
 
