@@ -3434,6 +3434,12 @@ function renderTherapistInsights() {
     { label: 'On-Demand sessions booked', value: (t.stats.onDemandBooked || 0) + odBookedCount, delta: 'all time' }
   ];
   container.innerHTML = `
+    <div class="home-accepting-card">
+      <div class="must-have-toggle" style="margin:0;">
+        <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>${t.acceptingOngoing ? 'New clients can find and book you' : "You're shown in Discover marked not accepting — clients can save you for later"}</span></div>
+        <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-insights-ongoing-switch"></div>
+      </div>
+    </div>
     <div class="intake-sub" style="margin-bottom:14px;">How clients are finding and responding to your profile.</div>
     <div class="stat-grid">
       ${tiles.map(s => `
@@ -3446,6 +3452,13 @@ function renderTherapistInsights() {
     </div>
     <div class="portal-note" style="margin-top:12px;">Counts reflect this demo session plus seeded history — real analytics arrive with the production backend.</div>
   `;
+  const insOngoingSwitch = document.getElementById('t-insights-ongoing-switch');
+  if (insOngoingSwitch) insOngoingSwitch.addEventListener('click', () => {
+    t.acceptingOngoing = !t.acceptingOngoing;
+    t.nextAvailableRank = t.acceptingOngoing ? 1 : null;
+    t.nextAvailableLabel = t.acceptingOngoing ? 'This week' : 'Not accepting new ongoing clients';
+    renderTherapistInsights();
+  });
 }
 
 document.querySelectorAll('#therapist-nav .nav-btn').forEach(btn => {
