@@ -1990,3 +1990,23 @@ select.t-rate-input,
 .path-card-option.selected { border-color: var(--coral); background: #fff6ec; }
 .path-card-title { font-weight: 700; font-size: 15.5px; margin-bottom: 5px; }
 .path-card-desc { font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
+
+/* ===== Profile 3-way segmented toggle (Ideal / View / Edit) ===== */
+.profile-modes {
+  display: flex; gap: 4px; background: var(--cream, #f4efe8);
+  border-radius: 12px; padding: 4px; margin-bottom: 20px;
+}
+.pmode {
+  flex: 1; border: none; background: transparent; cursor: pointer;
+  padding: 10px 6px; border-radius: 9px; font: inherit; font-size: 12.5px;
+  font-weight: 600; color: var(--ink-soft); white-space: nowrap;
+}
+.pmode.active { background: white; color: var(--coral-dark); box-shadow: 0 1px 4px rgba(0,0,0,.10); }
+/* show only the active region; the other two stay in the DOM (handlers intact) */
+#t-profile-content[data-mode="edit"]  .pm-ideal,
+#t-profile-content[data-mode="edit"]  .pm-view,
+#t-profile-content[data-mode="ideal"] .pm-edit,
+#t-profile-content[data-mode="ideal"] .pm-view,
+#t-profile-content[data-mode="view"]  .pm-edit,
+#t-profile-content[data-mode="view"]  .pm-ideal { display: none; }
+.pm-view .primary-btn { display: none; } /* it's a preview here, not the swipe card */

@@ -1863,12 +1863,13 @@ function updateNavBadge() {
 const detailModal = document.getElementById('detail-modal');
 const detailSheet = document.getElementById('detail-sheet');
 
-function openDetail(t, opts = {}) {
+// The client-facing profile body. Shared so a therapist's "View Profile" tab
+// renders exactly what a client sees — one source of truth, no drift.
+// opts.inline omits the close/like/share buttons (the tab has its own chrome).
+function profileCardHtml(t, opts = {}) {
   const preview = opts.preview === true;
-  if (!preview) t.stats.profileViews++;
-  detailSheet.innerHTML = `
-    <div class="sheet-close"></div>
-    ${preview ? `<div class="preview-banner">👀 This is what clients see when they view your profile</div>` : ''}
+  return `
+    ${preview && !opts.inline ? `<div class="preview-banner">👀 This is what clients see when they view your profile</div>` : ''}
     <div class="card-photo detail-photo" style="background:${t.gradient};">
       ${t.photo ? `<img class="card-photo-img" src="${t.photo}" alt="">` : `<div class="initials">${t.initials}</div>`}
       ${preview ? '' : matchBadgeHtml(t)}
@@ -1887,7 +1888,15 @@ function openDetail(t, opts = {}) {
     ${practiceBadgeHtml(t)}
     ${preview ? '' : matchTagsHtml(t)}
     <div class="section-title">Get to know them</div>
-    ${profileFeedHtml(t)}
+    ${profileFeedHtml(t)}`;
+}
+
+function openDetail(t, opts = {}) {
+  const preview = opts.preview === true;
+  if (!preview) t.stats.profileViews++;
+  detailSheet.innerHTML = `
+    <div class="sheet-close"></div>
+    ${profileCardHtml(t, { preview })}
     ${preview
       ? `<button class="primary-btn" style="margin-top:20px;background:white;border:1.5px solid var(--coral);color:var(--coral-dark);" id="detail-close-btn">Close Preview</button>`
       : `<button class="primary-btn" style="margin-top:20px;background:var(--coral);color:white;" id="detail-like-btn">Add to Shortlist</button>
@@ -3569,14 +3578,22 @@ function renderRequests() {
 
 let tSpecOtherOpen = false, tModOtherOpen = false; // transient "+ Other" panels
 
+let profileMode = 'edit'; // 'ideal' | 'view' | 'edit' — the profile tab's three-way toggle
 function renderTherapistProfile() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
   const container = document.getElementById('t-profile-content');
   container.innerHTML = `
     <div class="t-form-name">${t.name} <span class="t-form-creds">${credentialsLabel(t)}</span></div>
-    <button class="primary-btn" style="background:white;border:1.5px solid var(--coral);color:var(--coral-dark);margin-bottom:20px;" id="preview-profile-btn">👀 Preview My Profile as a Client</button>
 
-    <div class="ideal-section">
+    <div class="profile-modes" role="tablist">
+      <button class="pmode ${profileMode === 'ideal' ? 'active' : ''}" data-pmode="ideal" role="tab">✦ Ideal Client</button>
+      <button class="pmode ${profileMode === 'view' ? 'active' : ''}" data-pmode="view" role="tab">👀 View Profile</button>
+      <button class="pmode ${profileMode === 'edit' ? 'active' : ''}" data-pmode="edit" role="tab">✎ Edit Profile</button>
+    </div>
+
+    <div class="pm-view">${profileCardHtml(t, { preview: true, inline: true })}</div>
+
+    <div class="pm-ideal"><div class="ideal-section">
       <div class="ideal-section-head">
         <h3>✦ Your ideal client</h3>
         <span class="ideal-private">Private — only you see this</span>
@@ -3610,8 +3627,9 @@ function renderTherapistProfile() {
         const full = t.idealClient.mustHaves.length >= MAX_MUST_HAVES && !on;
         return `<div class="chip-option ${on ? 'selected' : ''}${full ? ' chip-disabled' : ''}" data-ideal-must="${d.key}">${d.label}</div>`;
       }).join('')}</div>
-    </div>
+    </div></div>
 
+    <div class="pm-edit">
     <div class="t-form-label">Pronouns (optional)</div>
     <input type="text" class="t-rate-input" id="t-pronouns-input" placeholder="e.g. she/her" value="${t.pronouns || ''}">
     <div class="must-have-toggle">
@@ -3772,13 +3790,18 @@ function renderTherapistProfile() {
       <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>Shown in Discover for new long-term matches</span></div>
       <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
     </div>
-
+    </div>
   `;
+  container.dataset.mode = profileMode;
+  container.querySelectorAll('[data-pmode]').forEach(b => b.addEventListener('click', () => {
+    profileMode = b.dataset.pmode;
+    renderTherapistProfile();
+    document.getElementById('t-profile-content').scrollTop = 0;
+  }));
   attachTherapistProfileHandlers(t);
 }
 
 function attachTherapistProfileHandlers(t) {
-  document.getElementById('preview-profile-btn').addEventListener('click', () => openDetail(t, { preview: true }));
   const tPronounsInput = document.getElementById('t-pronouns-input');
   if (tPronounsInput) tPronounsInput.addEventListener('input', () => { t.pronouns = tPronounsInput.value; });
   const tShowPronounsSwitch = document.getElementById('t-show-pronouns-switch');
