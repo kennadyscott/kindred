@@ -3627,7 +3627,7 @@ function renderTherapistHome() {
     // ----- price (talks to what the client is charged) -----
     html += `<div class="t-form-label">Your On-Demand session price ($)</div>
       <input type="number" class="t-rate-input" id="od-rate-input" value="${t.onDemandRate}">
-      <p class="portal-note" style="margin-top:4px;">The client pays <strong>$${p.clientTotal.toFixed(2)}</strong> — your $${p.price.toFixed(2)} plus the Stripe fee $${p.stripeFee.toFixed(2)}. Kindred keeps 5% ($${p.kindredCut.toFixed(2)}); you net <strong>$${p.therapistNet.toFixed(2)}</strong>.</p>`;
+      <p class="portal-note" style="margin-top:4px;">The client pays <strong>$${p.clientTotal.toFixed(2)}</strong> — your $${p.price.toFixed(2)} plus the Stripe fee $${p.stripeFee.toFixed(2)}. Kindred keeps 5%; you net <strong>$${p.therapistNet.toFixed(2)}</strong>.</p>`;
 
     // ----- weekly calendar picker (buttons, not free text) -----
     html += `<div class="t-form-label" style="margin-top:16px;">Add openings for this week</div>`;
