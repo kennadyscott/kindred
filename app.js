@@ -1625,37 +1625,29 @@ function therapistPhotos(t) {
   return [t.media && t.media.office, t.media && t.media.outOfOffice].filter(Boolean).slice(0, 4);
 }
 
-// The "Get to know them" feed leads with a blurb, then alternates media, blurb,
-// media, blurb… so words carry it and more blurbs get to breathe. Media = video
-// (if any) then up to 4 photos. If one list runs out, the rest of the other
-// still shows.
+// The "Get to know them" feed renders the therapist's ordered blocks (prompts &
+// photos) exactly as they arranged them. The quick-hello video slots in right
+// after the first blurb so words still lead.
 function profileFeedHtml(t) {
   const firstName = displayName(t).replace(/^Dr\.?\s*/i, '').split(' ')[0];
-
-  const images = [];
-  if (t.media && t.media.video) {
-    images.push(`
+  const videoHtml = (t.media && t.media.video) ? `
       <div class="feed-media feed-video">
         <video src="${t.media.video}" controls preload="metadata" playsinline></video>
         <div class="feed-caption">A quick hello from ${firstName}</div>
-      </div>`);
-  }
-  therapistPhotos(t).forEach(src => images.push(feedPhotoHtml(src)));
-
-  const blurbs = [];
-  if (t.mandatoryPromptAnswers && t.mandatoryPromptAnswers[0]) blurbs.push(promptCardHtml(MANDATORY_PROMPTS[0], t.mandatoryPromptAnswers[0]));
-  if (t.mandatoryPromptAnswers && t.mandatoryPromptAnswers[1]) blurbs.push(promptCardHtml(MANDATORY_PROMPTS[1], t.mandatoryPromptAnswers[1]));
-  if (t.persona && t.persona.inOffice) blurbs.push(promptCardHtml('Who I am in the office...', t.persona.inOffice));
-  if (t.persona && t.persona.outOfOffice) blurbs.push(promptCardHtml('Who I am out of the office...', t.persona.outOfOffice));
-  (t.optionalPrompts || []).forEach(p => { if (p.answer) blurbs.push(promptCardHtml(p.question, p.answer)); });
-  const shownBlurbs = blurbs.slice(0, MAX_FEED_BLURBS);
+      </div>` : '';
 
   const out = [];
-  const n = Math.max(images.length, shownBlurbs.length);
-  for (let i = 0; i < n; i++) {
-    if (shownBlurbs[i]) out.push(shownBlurbs[i]); // blurb first…
-    if (images[i]) out.push(images[i]);           // …then media (video leads)
-  }
+  let videoIn = false;
+  getToKnowBlocks(t).forEach(b => {
+    if (b.type === 'prompt') {
+      if (!b.answer) return;                       // skip a prompt they haven't answered
+      out.push(promptCardHtml(b.question, b.answer));
+      if (videoHtml && !videoIn) { out.push(videoHtml); videoIn = true; } // video after first blurb
+    } else if (b.type === 'photo' && b.src) {
+      out.push(feedPhotoHtml(b.src));
+    }
+  });
+  if (videoHtml && !videoIn) out.unshift(videoHtml); // no answered blurbs yet — lead with video
   return out.join('');
 }
 
@@ -2884,6 +2876,40 @@ const OPTIONAL_PROMPTS = [
 ];
 const MAX_OPTIONAL_PROMPTS = 5;
 const MAX_FEED_BLURBS = 7;  // most little blurbs shown in the get-to-know feed
+
+// The get-to-know feed is now one ordered list of draggable BLOCKS — each block
+// is either a prompt (a little blurb) or a photo. Mandatory prompts are gone;
+// the therapist picks up to 7 prompts from this pool and arranges the blocks
+// however they like (we recommend alternating a photo and a blurb).
+const GET_TO_KNOW_PROMPTS = [
+  'Who I am in the office...',
+  'Who I am out of the office...',
+  ...MANDATORY_PROMPTS,
+  ...OPTIONAL_PROMPTS
+];
+const MAX_GET_TO_KNOW_PROMPTS = 7;
+
+// Build t.blocks once from whatever the profile already had (persona, the old
+// mandatory answers, and optional prompts), interleaved with photos. After this
+// first pass, t.blocks is the single source of truth for the feed and editor.
+function getToKnowBlocks(t) {
+  if (Array.isArray(t.blocks)) return t.blocks;
+  const prompts = [];
+  if (t.persona && t.persona.inOffice)  prompts.push({ type: 'prompt', question: 'Who I am in the office...',  answer: t.persona.inOffice });
+  if (t.persona && t.persona.outOfOffice) prompts.push({ type: 'prompt', question: 'Who I am out of the office...', answer: t.persona.outOfOffice });
+  if (Array.isArray(t.mandatoryPromptAnswers)) MANDATORY_PROMPTS.forEach((q, i) => { if (t.mandatoryPromptAnswers[i]) prompts.push({ type: 'prompt', question: q, answer: t.mandatoryPromptAnswers[i] }); });
+  (t.optionalPrompts || []).forEach(p => { if (p.question) prompts.push({ type: 'prompt', question: p.question, answer: p.answer || '' }); });
+  const kept = prompts.slice(0, MAX_GET_TO_KNOW_PROMPTS);
+  const photos = therapistPhotos(t).map(src => ({ type: 'photo', src }));
+  // default arrangement: blurb, photo, blurb, photo…
+  const out = [];
+  const n = Math.max(kept.length, photos.length);
+  for (let i = 0; i < n; i++) { if (kept[i]) out.push(kept[i]); if (photos[i]) out.push(photos[i]); }
+  t.blocks = out;
+  return t.blocks;
+}
+function blockPromptCount(t) { return getToKnowBlocks(t).filter(b => b.type === 'prompt').length; }
+function blockPhotoCount(t)  { return getToKnowBlocks(t).filter(b => b.type === 'photo').length; }
 const MAX_PHOTOS = 4;       // up to 4 photos (+ 1 video) alternate with blurbs
 const NEW_THERAPIST_GRADIENTS = [
   'linear-gradient(135deg,#c97b9e,#a3557a)',
@@ -3735,19 +3761,26 @@ let profileMode = 'edit'; // 'ideal' | 'view' | 'edit' — the profile tab's thr
 // Collapsible Edit-Profile sections + checkbox dropdowns keep their open/closed
 // state across the full re-renders that chip toggles trigger.
 let editSectionsOpen  = { first: true, additional: false, getToKnow: false, promptPicker: false };
-let editDropdownOpen  = { spec: false, modality: false, 'ideal-needs': false, 'ideal-modalities': false };
+let editDropdownOpen  = { spec: false, modality: false, 'ideal-needs': false, 'ideal-modalities': false, 'top-spec': false };
+let dragBlockIndex = null; // which get-to-know block is being dragged
 
 // A drop-down whose options are checkboxes. Selected values also show as
 // removable chips above it. Re-renders on change, but the <details> open state
 // is persisted in editDropdownOpen so the panel stays put.
-function checkboxDropdownHtml(selected, options, key, summaryLabel) {
+function checkboxDropdownHtml(selected, options, key, summaryLabel, max) {
+  const capped = max ? selected.length >= max : false;
+  const summary = selected.length ? `${selected.length}${max ? `/${max}` : ''} selected` : summaryLabel;
   return `
     <div class="cbx-field">
       ${selected.length ? `<div class="chip-grid cbx-chips">${selected.map(v => `<div class="chip-option selected" data-cbx-chip="${key}" data-val="${v}">${v} ✕</div>`).join('')}</div>` : ''}
       <details class="cbx-dd" data-dd="${key}" ${editDropdownOpen[key] ? 'open' : ''}>
-        <summary><span>${selected.length ? `${selected.length} selected` : summaryLabel}</span><span class="cbx-caret">▾</span></summary>
+        <summary><span>${summary}</span><span class="cbx-caret">▾</span></summary>
         <div class="cbx-dd-list">
-          ${options.map(o => `<label class="cbx-row"><input type="checkbox" data-cbx="${key}" value="${o}" ${selected.includes(o) ? 'checked' : ''}><span>${o}</span></label>`).join('')}
+          ${options.map(o => {
+            const on = selected.includes(o);
+            const dis = !on && capped;
+            return `<label class="cbx-row ${dis ? 'cbx-row-disabled' : ''}"><input type="checkbox" data-cbx="${key}" value="${o}" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''}><span>${o}</span></label>`;
+          }).join('')}
         </div>
       </details>
     </div>`;
@@ -3872,15 +3905,10 @@ function renderTherapistProfile() {
         <div class="t-form-label">In one line, who do you work best with?</div>
         <input type="text" class="t-rate-input" id="t-bestfor-input" placeholder="e.g. I work best with new parents navigating postpartum anxiety" value="${t.bestFor || ''}">
 
-        <div class="t-form-label">Specialties / needs you work with</div>
+        <div class="t-form-label">Your top 3 specialties <span class="ideal-hint">these lead your profile — clients see two of these plus one that matches their need</span></div>
+        ${checkboxDropdownHtml(t.topSpecialties || [], specialtyAll(), 'top-spec', 'Pick your headline specialties…', 3)}
+        <div class="t-form-label" style="margin-top:14px;">Specialties / needs you work with <span class="ideal-hint">the full set — your top 3 are included automatically</span></div>
         ${checkboxDropdownHtml(t.tags, specialtyAll(), 'spec', 'Choose the specialties you work with…')}
-        <div class="t-form-label" style="margin-top:14px;">Your top 3 specialties <span class="ideal-hint">these lead your profile — clients see two of these plus one that matches their need (${(t.topSpecialties || []).length}/3)</span></div>
-        <div class="chip-grid">${(t.tags.length ? t.tags : ['Add specialties above first']).map(x => {
-          const on = (t.topSpecialties || []).includes(x);
-          const full = (t.topSpecialties || []).length >= 3 && !on;
-          const real = t.tags.includes(x);
-          return `<div class="chip-option ${on ? 'selected' : ''}${full || !real ? ' chip-disabled' : ''}" ${real ? `data-top-spec="${x}"` : ''}>${x}</div>`;
-        }).join('')}</div>
       </div>
     </details>
 
@@ -3918,96 +3946,65 @@ function renderTherapistProfile() {
       <summary><span class="edit-section-title">Get to know you</span><span class="edit-section-hint">your story, in words &amp; photos</span><span class="edit-caret">▾</span></summary>
       <div class="edit-section-body">
 
-        <!-- collapsible prompt picker, up top -->
-        <details class="edit-section edit-subsection" data-edit-section="promptPicker" ${editSectionsOpen.promptPicker ? 'open' : ''}>
-          <summary><span class="edit-section-title">Pick up to ${MAX_OPTIONAL_PROMPTS} more prompts</span><span class="edit-section-hint">${t.optionalPrompts.length}/${MAX_OPTIONAL_PROMPTS} chosen</span><span class="edit-caret">▾</span></summary>
-          <div class="edit-section-body">
-            <div class="chip-grid">
-              ${OPTIONAL_PROMPTS.map(q => {
-                const selected = t.optionalPrompts.some(p => p.question === q);
-                const disabled = !selected && t.optionalPrompts.length >= MAX_OPTIONAL_PROMPTS;
-                return `<div class="chip-option ${selected ? 'selected' : ''} ${disabled ? 'chip-disabled' : ''}" data-toggle-optional-prompt="${q}">${q}</div>`;
-              }).join('')}
-            </div>
-          </div>
-        </details>
-
-        <p class="intake-sub" style="margin-top:14px;">Answer a few little blurbs and drop in a photo between them — clients scroll a feed that alternates your words and your world.</p>
-
-        <div class="media-row">
-          <div class="media-thumb">${t.photo ? `<img src="${t.photo}">` : '<span>—</span>'}</div>
-          <div class="media-row-text"><strong>Lead photo</strong><span>The first thing clients see — most like you</span></div>
-          <label class="media-upload-btn">${t.photo ? 'Change' : 'Add'}<input type="file" accept="image/*" data-media-upload="photo" hidden></label>
-        </div>
-        <div class="media-row">
-          <div class="media-thumb">${t.media.video ? '🎬' : '<span>—</span>'}</div>
-          <div class="media-row-text"><strong>Quick video</strong><span>A 15–30s hello — clients hear your voice first</span></div>
-          <label class="media-upload-btn">${t.media.video ? 'Replace' : 'Add'}<input type="file" accept="video/*" data-media-upload="video" hidden></label>
-        </div>
-
         ${(() => {
-          // Interleave the fixed blurbs with the gallery photo slots so the edit
-          // screen mirrors the alternating feed. Each photo carries a suggested
-          // subject so therapists know what makes the strongest set.
-          const PHOTO_GUIDE = [
-            'Your office — where sessions happen',
-            'Out of office — life outside work',
-            'One more — your choice: a pet, a hobby, a favorite spot',
-            "Anything else that's you"
-          ];
-          const blurbEls = [
-            `<div class="t-form-label">Who I am in the office...</div>
-             <textarea class="intake-textarea" id="t-persona-in" rows="2" placeholder="What sessions with you actually feel like">${t.persona.inOffice || ''}</textarea>`,
-            `<div class="t-form-label">Who I am out of the office...</div>
-             <textarea class="intake-textarea" id="t-persona-out" rows="2" placeholder="The human behind the license">${t.persona.outOfOffice || ''}</textarea>`,
-            ...MANDATORY_PROMPTS.map((q, i) => `<div class="t-form-label">${q}</div>
-             <textarea class="intake-textarea" data-edit-mandatory-prompt-index="${i}" rows="2">${t.mandatoryPromptAnswers[i] || ''}</textarea>`)
-          ];
-          const photos = therapistPhotos(t);
-          const photoEls = photos.map((src, i) => `
-            <div class="media-row gallery-row">
-              <div class="media-thumb"><img src="${src}"></div>
-              <div class="media-row-text"><strong>Photo ${i + 1}</strong><span>${PHOTO_GUIDE[i] || 'Shown in your get-to-know feed'}</span></div>
-              <div class="reorder-btns">
-                <button type="button" class="reorder-btn" data-move-photo="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
-                <button type="button" class="reorder-btn" data-move-photo="${i}" data-dir="1" ${i === photos.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
-                <button type="button" class="text-btn" data-remove-photo="${i}">Remove</button>
-              </div>
-            </div>`);
-          if (photos.length < MAX_PHOTOS) {
-            photoEls.push(`
-              <label class="media-add-row">
-                <span class="media-thumb"><span>＋</span></span>
-                <span class="media-row-text"><strong>Add a photo — ${PHOTO_GUIDE[photos.length] || 'anything you'}</strong><span>A good set: your office, life outside work, and one more that's you. Up to ${MAX_PHOTOS}.</span></span>
-                <input type="file" accept="image/*" data-add-photo hidden>
-              </label>`);
-          }
-          let out = '';
-          const n = Math.max(blurbEls.length, photoEls.length);
-          for (let i = 0; i < n; i++) {
-            if (blurbEls[i]) out += blurbEls[i];
-            if (photoEls[i]) out += photoEls[i];
-          }
-          return out;
-        })()}
+          const blocks = getToKnowBlocks(t);
+          const promptCount = blockPromptCount(t);
 
-        ${t.optionalPrompts.length ? `<div class="t-form-label" style="margin-top:18px;">Your chosen prompts</div>` : ''}
-        ${t.optionalPrompts.length > 1 ? `<p class="reorder-hint">Use ↑ ↓ to set the order clients see these in.</p>` : ''}
-        ${t.optionalPrompts.map((p, i) => `
-          <div class="prompt-edit-head">
-            <div class="t-form-label" style="margin:0;">${i + 1}. ${p.question}</div>
-            <div class="reorder-btns">
-              <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
-              <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="1" ${i === t.optionalPrompts.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+          // collapsible prompt picker, up top
+          const picker = `
+            <details class="edit-section edit-subsection" data-edit-section="promptPicker" ${editSectionsOpen.promptPicker ? 'open' : ''}>
+              <summary><span class="edit-section-title">Pick up to ${MAX_GET_TO_KNOW_PROMPTS} prompts</span><span class="edit-section-hint">${promptCount}/${MAX_GET_TO_KNOW_PROMPTS} chosen</span><span class="edit-caret">▾</span></summary>
+              <div class="edit-section-body">
+                <div class="chip-grid">
+                  ${GET_TO_KNOW_PROMPTS.map(q => {
+                    const selected = blocks.some(b => b.type === 'prompt' && b.question === q);
+                    const disabled = !selected && promptCount >= MAX_GET_TO_KNOW_PROMPTS;
+                    return `<div class="chip-option ${selected ? 'selected' : ''} ${disabled ? 'chip-disabled' : ''}" data-toggle-block-prompt="${q}">${q}</div>`;
+                  }).join('')}
+                </div>
+              </div>
+            </details>`;
+
+          // lead photo + video are fixed, above the draggable feed
+          const media = `
+            <div class="media-row">
+              <div class="media-thumb">${t.photo ? `<img src="${t.photo}">` : '<span>—</span>'}</div>
+              <div class="media-row-text"><strong>Lead photo</strong><span>The first thing clients see — most like you</span></div>
+              <label class="media-upload-btn">${t.photo ? 'Change' : 'Add'}<input type="file" accept="image/*" data-media-upload="photo" hidden></label>
             </div>
-          </div>
-          <textarea class="intake-textarea" data-edit-optional-prompt-answer="${i}" rows="2">${p.answer || ''}</textarea>
-          <div class="prompt-photo-row">
-            ${p.photo ? `<img class="prompt-photo-thumb" src="${p.photo}">` : ''}
-            <input type="file" accept="image/*" data-edit-optional-prompt-photo="${i}">
-          </div>
-          <button type="button" class="text-btn" data-remove-edit-optional-prompt="${i}">Remove this prompt</button>
-        `).join('')}
+            <div class="media-row">
+              <div class="media-thumb">${t.media.video ? '🎬' : '<span>—</span>'}</div>
+              <div class="media-row-text"><strong>Quick video</strong><span>A 15–30s hello — clients hear your voice first</span></div>
+              <label class="media-upload-btn">${t.media.video ? 'Replace' : 'Add'}<input type="file" accept="video/*" data-media-upload="video" hidden></label>
+            </div>`;
+
+          const hint = `<p class="intake-sub" style="margin-top:14px;">Drag the blocks by the ⠿ handle to arrange your feed. We recommend alternating a photo and a blurb.</p>`;
+
+          // the draggable feed itself — prompts & photos in one ordered list
+          const cards = blocks.map((b, i) => {
+            const handle = `<span class="block-drag" aria-hidden="true">⠿</span>`;
+            const remove = `<button type="button" class="block-remove" data-remove-block="${i}" aria-label="Remove">✕</button>`;
+            const moves = `
+              <button type="button" class="reorder-btn" data-move-block="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+              <button type="button" class="reorder-btn" data-move-block="${i}" data-dir="1" ${i === blocks.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>`;
+            if (b.type === 'photo') {
+              return `<div class="feed-block feed-block-photo" draggable="true" data-block-index="${i}">
+                <div class="feed-block-head">${handle}<span class="feed-block-tag">📷 Photo</span><div class="reorder-btns">${moves}</div>${remove}</div>
+                <div class="feed-block-photo-body"><img src="${b.src}"></div>
+              </div>`;
+            }
+            return `<div class="feed-block feed-block-prompt" draggable="true" data-block-index="${i}">
+              <div class="feed-block-head">${handle}<span class="feed-block-tag">${b.question}</span><div class="reorder-btns">${moves}</div>${remove}</div>
+              <textarea class="intake-textarea" data-block-answer="${i}" rows="2" placeholder="Finish the thought in your own voice…">${b.answer || ''}</textarea>
+            </div>`;
+          }).join('');
+
+          const addPhoto = blockPhotoCount(t) < MAX_PHOTOS
+            ? `<label class="media-add-row"><span class="media-thumb"><span>＋</span></span><span class="media-row-text"><strong>Add a photo</strong><span>Your office, life outside work, and one more that's you. Up to ${MAX_PHOTOS}.</span></span><input type="file" accept="image/*" data-add-block-photo hidden></label>`
+            : `<p class="portal-note">Photo limit reached (${MAX_PHOTOS}). Remove one to add another.</p>`;
+
+          return picker + media + hint + `<div class="feed-blocks">${cards}</div>` + addPhoto;
+        })()}
       </div>
     </details>
     </div>
@@ -4053,7 +4050,16 @@ function attachTherapistProfileHandlers(t) {
     'ideal-needs': t.idealClient.needs,
     'ideal-modalities': t.idealClient.modalities,
   })[k] || null;
+  // top-3 is capped and auto-joins the working specialty set
+  const toggleTopSpec = v => {
+    if (!Array.isArray(t.topSpecialties)) t.topSpecialties = [];
+    const i = t.topSpecialties.indexOf(v);
+    if (i !== -1) t.topSpecialties.splice(i, 1);
+    else if (t.topSpecialties.length < 3) { t.topSpecialties.push(v); if (!t.tags.includes(v)) t.tags.push(v); }
+    renderTherapistProfile();
+  };
   document.querySelectorAll('input[data-cbx]').forEach(el => el.addEventListener('change', () => {
+    if (el.dataset.cbx === 'top-spec') { toggleTopSpec(el.value); return; }
     const arr = cbxArr(el.dataset.cbx); if (!arr) return;
     const v = el.value, i = arr.indexOf(v);
     if (i === -1) arr.push(v);
@@ -4064,6 +4070,7 @@ function attachTherapistProfileHandlers(t) {
     renderTherapistProfile();
   }));
   document.querySelectorAll('[data-cbx-chip]').forEach(el => el.addEventListener('click', () => {
+    if (el.dataset.cbxChip === 'top-spec') { toggleTopSpec(el.dataset.val); return; }
     const arr = cbxArr(el.dataset.cbxChip); if (!arr) return;
     const v = el.dataset.val, i = arr.indexOf(v);
     if (i !== -1) arr.splice(i, 1);
@@ -4155,33 +4162,56 @@ function attachTherapistProfileHandlers(t) {
       reader.readAsDataURL(file);
     }
   }));
-  // get-to-know photos array (up to MAX_PHOTOS)
-  const addPhoto = document.querySelector('[data-add-photo]');
-  if (addPhoto) addPhoto.addEventListener('change', () => {
-    const file = addPhoto.files[0];
+  // ===== get-to-know draggable blocks (prompts + photos) =====
+  document.querySelectorAll('[data-toggle-block-prompt]').forEach(el => el.addEventListener('click', () => {
+    const q = el.dataset.toggleBlockPrompt;
+    const blocks = getToKnowBlocks(t);
+    const i = blocks.findIndex(b => b.type === 'prompt' && b.question === q);
+    if (i !== -1) blocks.splice(i, 1);
+    else if (blockPromptCount(t) < MAX_GET_TO_KNOW_PROMPTS) blocks.push({ type: 'prompt', question: q, answer: '' });
+    renderTherapistProfile();
+  }));
+  document.querySelectorAll('textarea[data-block-answer]').forEach(el => el.addEventListener('input', () => {
+    getToKnowBlocks(t)[Number(el.dataset.blockAnswer)].answer = el.value;
+  }));
+  document.querySelectorAll('[data-remove-block]').forEach(el => el.addEventListener('click', () => {
+    getToKnowBlocks(t).splice(Number(el.dataset.removeBlock), 1);
+    renderTherapistProfile();
+  }));
+  document.querySelectorAll('[data-move-block]').forEach(el => el.addEventListener('click', () => {
+    const blocks = getToKnowBlocks(t);
+    const i = Number(el.dataset.moveBlock), j = i + Number(el.dataset.dir);
+    if (j < 0 || j >= blocks.length) return;
+    [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+    renderTherapistProfile();
+  }));
+  const addBlockPhoto = document.querySelector('[data-add-block-photo]');
+  if (addBlockPhoto) addBlockPhoto.addEventListener('change', () => {
+    const file = addBlockPhoto.files[0];
     if (!file) return;
-    if (!Array.isArray(t.media.photos)) t.media.photos = therapistPhotos(t);
-    if (t.media.photos.length >= MAX_PHOTOS) return;
+    if (blockPhotoCount(t) >= MAX_PHOTOS) return;
     const reader = new FileReader();
-    reader.onload = () => { t.media.photos.push(reader.result); renderTherapistProfile(); };
+    reader.onload = () => { getToKnowBlocks(t).push({ type: 'photo', src: reader.result }); renderTherapistProfile(); };
     reader.readAsDataURL(file);
   });
-  document.querySelectorAll('[data-remove-photo]').forEach(el => el.addEventListener('click', () => {
-    if (!Array.isArray(t.media.photos)) t.media.photos = therapistPhotos(t);
-    t.media.photos.splice(Number(el.dataset.removePhoto), 1);
-    renderTherapistProfile();
-  }));
-  document.querySelectorAll('[data-move-photo]').forEach(el => el.addEventListener('click', () => {
-    if (!Array.isArray(t.media.photos)) t.media.photos = therapistPhotos(t);
-    const i = Number(el.dataset.movePhoto), j = i + Number(el.dataset.dir);
-    if (j < 0 || j >= t.media.photos.length) return;
-    [t.media.photos[i], t.media.photos[j]] = [t.media.photos[j], t.media.photos[i]];
-    renderTherapistProfile();
-  }));
-  const personaIn = document.getElementById('t-persona-in');
-  if (personaIn) personaIn.addEventListener('input', () => { t.persona.inOffice = personaIn.value; });
-  const personaOut = document.getElementById('t-persona-out');
-  if (personaOut) personaOut.addEventListener('input', () => { t.persona.outOfOffice = personaOut.value; });
+  // drag & drop reordering of the feed blocks
+  document.querySelectorAll('[data-block-index]').forEach(el => {
+    el.addEventListener('dragstart', e => { dragBlockIndex = Number(el.dataset.blockIndex); el.classList.add('dragging'); if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('dragend', () => { dragBlockIndex = null; el.classList.remove('dragging'); });
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      const to = Number(el.dataset.blockIndex);
+      if (dragBlockIndex === null || dragBlockIndex === to) return;
+      const blocks = getToKnowBlocks(t);
+      const [moved] = blocks.splice(dragBlockIndex, 1);
+      blocks.splice(to, 0, moved);
+      dragBlockIndex = null;
+      renderTherapistProfile();
+    });
+  });
   document.querySelectorAll('[data-set-gender]').forEach(el => el.addEventListener('click', () => {
     t.identity.gender = el.dataset.setGender;
     renderTherapistProfile();
@@ -4224,42 +4254,6 @@ function attachTherapistProfileHandlers(t) {
   const tSelfPayNoteInput = document.getElementById('t-selfpaynote-input');
   if (tSelfPayNoteInput) tSelfPayNoteInput.addEventListener('input', () => { t.selfPayNote = tSelfPayNoteInput.value; });
   document.getElementById('t-rate-input').addEventListener('change', (e) => { t.rateMin = Number(e.target.value) || 0; });
-  document.querySelectorAll('textarea[data-edit-mandatory-prompt-index]').forEach(el => {
-    el.addEventListener('input', () => { t.mandatoryPromptAnswers[Number(el.dataset.editMandatoryPromptIndex)] = el.value; });
-  });
-  document.querySelectorAll('[data-toggle-optional-prompt]').forEach(el => el.addEventListener('click', () => {
-    const q = el.dataset.toggleOptionalPrompt;
-    const i = t.optionalPrompts.findIndex(p => p.question === q);
-    if (i !== -1) {
-      t.optionalPrompts.splice(i, 1);
-    } else if (t.optionalPrompts.length < MAX_OPTIONAL_PROMPTS) {
-      t.optionalPrompts.push({ question: q, answer: '', photo: null });
-    }
-    renderTherapistProfile();
-  }));
-  document.querySelectorAll('textarea[data-edit-optional-prompt-answer]').forEach(el => {
-    el.addEventListener('input', () => { t.optionalPrompts[Number(el.dataset.editOptionalPromptAnswer)].answer = el.value; });
-  });
-  document.querySelectorAll('input[data-edit-optional-prompt-photo]').forEach(el => {
-    el.addEventListener('change', () => {
-      const file = el.files[0];
-      if (!file) return;
-      const idx = Number(el.dataset.editOptionalPromptPhoto);
-      const reader = new FileReader();
-      reader.onload = () => { t.optionalPrompts[idx].photo = reader.result; renderTherapistProfile(); };
-      reader.readAsDataURL(file);
-    });
-  });
-  document.querySelectorAll('[data-move-prompt]').forEach(el => el.addEventListener('click', () => {
-    const i = Number(el.dataset.movePrompt), j = i + Number(el.dataset.dir);
-    if (j < 0 || j >= t.optionalPrompts.length) return;
-    [t.optionalPrompts[i], t.optionalPrompts[j]] = [t.optionalPrompts[j], t.optionalPrompts[i]];
-    renderTherapistProfile();
-  }));
-  document.querySelectorAll('[data-remove-edit-optional-prompt]').forEach(el => el.addEventListener('click', () => {
-    t.optionalPrompts.splice(Number(el.dataset.removeEditOptionalPrompt), 1);
-    renderTherapistProfile();
-  }));
   document.getElementById('t-ongoing-switch').addEventListener('click', () => {
     t.acceptingOngoing = !t.acceptingOngoing;
     t.nextAvailableRank = t.acceptingOngoing ? 1 : null;

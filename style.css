@@ -2007,6 +2007,30 @@ select.t-rate-input,
 .media-add-row .media-thumb { background:var(--cream); }
 .gallery-row .reorder-btns { align-items:center; }
 
+/* disabled checkbox rows (e.g. top-3 once full) */
+.cbx-row-disabled { opacity:.4; cursor:default; }
+
+/* ===== Get-to-know draggable feed blocks ===== */
+.feed-blocks { display:flex; flex-direction:column; gap:12px; margin-top:6px; }
+.feed-block {
+  border:1px solid var(--line); border-radius:14px; background:#fff; padding:10px 12px;
+  transition:box-shadow .12s ease, border-color .12s ease;
+}
+.feed-block.dragging { opacity:.5; }
+.feed-block.drag-over { border-color:var(--coral); box-shadow:0 0 0 2px rgba(224,122,95,.25); }
+.feed-block-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.block-drag { cursor:grab; color:var(--ink-soft); font-size:15px; line-height:1; letter-spacing:-2px; user-select:none; }
+.feed-block-tag { flex:1; font-size:12.5px; font-weight:700; color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.feed-block-head .reorder-btns { flex:none; }
+.block-remove {
+  flex:none; border:none; background:none; color:var(--ink-soft); font-size:14px;
+  cursor:pointer; padding:2px 4px; line-height:1;
+}
+.block-remove:hover { color:#a8443a; }
+.feed-block .intake-textarea { margin:0; }
+.feed-block-photo-body img { width:100%; max-height:180px; object-fit:cover; border-radius:10px; display:block; }
+.feed-block-photo { cursor:grab; }
+
 /* ===== "A tiny hello has arrived" banner ===== */
 .hello-banner {
   background: linear-gradient(135deg, #f6e3b0, #efd7f0);
