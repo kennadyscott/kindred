@@ -251,6 +251,8 @@ const WAITLIST_SEED = {
   t3: ['Jordan M.', 'Alex R.'],
   t5: ['Sam T.', 'Priya K.', 'Devon L.']
 };
+// Demo: a therapist licensed (and Stripe-verified) in more than one state.
+const LICENSE_SEED = { t1: ['TX', 'CA'] };
 
 THERAPISTS.forEach(t => {
   const id = THERAPIST_IDENTITY[t.id] || {};
@@ -274,6 +276,9 @@ THERAPISTS.forEach(t => {
   // conversations the therapist started from the waitlist (kept off the shared
   // `matches` array so they never leak into the demo client's own match list)
   if (!Array.isArray(t.startedConversations)) t.startedConversations = [];
+  // states the therapist is licensed AND Stripe-verified in — only these count
+  // for matching. Seeded from their base state (+ a demo multi-state therapist).
+  if (!Array.isArray(t.licensedStates)) t.licensedStates = LICENSE_SEED[t.id] || (t.location && t.location.state ? [t.location.state] : []);
 });
 
 let NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
@@ -616,8 +621,10 @@ function isCompatible(t, mode) {
   if (intake.format !== 'no-preference' && !t.formats.includes(intake.format)) return false;
 
   // State always matters — even online, a therapist has to be licensed
-  // where the client lives. City only matters for meeting in person.
-  if (intake.state && t.location.state !== intake.state) return false;
+  // where the client lives. Multi-state therapists match on any verified state.
+  // City only matters for meeting in person.
+  const licensed = (t.licensedStates && t.licensedStates.length) ? t.licensedStates : (t.location.state ? [t.location.state] : []);
+  if (intake.state && !licensed.includes(intake.state)) return false;
   if (intake.format === 'in-person' && intake.city.trim() && t.location.city.trim().toLowerCase() !== intake.city.trim().toLowerCase()) return false;
 
   if (intake.hasInsurance === 'yes' && intake.insurance !== 'any' && !t.insuranceList.includes(intake.insurance)) return false;
@@ -1644,24 +1651,21 @@ function therapistPhotos(t) {
 // after the first blurb so words still lead.
 function profileFeedHtml(t) {
   const firstName = displayName(t).replace(/^Dr\.?\s*/i, '').split(' ')[0];
-  const videoHtml = (t.media && t.media.video) ? `
-      <div class="feed-media feed-video">
-        <video src="${t.media.video}" controls preload="metadata" playsinline></video>
-        <div class="feed-caption">A quick hello from ${firstName}</div>
-      </div>` : '';
-
   const out = [];
-  let videoIn = false;
   getToKnowBlocks(t).forEach(b => {
     if (b.type === 'prompt') {
       if (!b.answer) return;                       // skip a prompt they haven't answered
       out.push(promptCardHtml(b.question, b.answer));
-      if (videoHtml && !videoIn) { out.push(videoHtml); videoIn = true; } // video after first blurb
     } else if (b.type === 'photo' && b.src) {
       out.push(feedPhotoHtml(b.src));
+    } else if (b.type === 'video' && b.src) {
+      out.push(`
+        <div class="feed-media feed-video">
+          <video src="${b.src}" controls preload="metadata" playsinline></video>
+          <div class="feed-caption">A quick hello from ${firstName}</div>
+        </div>`);
     }
   });
-  if (videoHtml && !videoIn) out.unshift(videoHtml); // no answered blurbs yet — lead with video
   return out.join('');
 }
 
@@ -2228,6 +2232,37 @@ function openStripeVerification(licenseNumber, onVerified) {
         document.getElementById('confirm-modal').classList.add('hidden');
         onVerified();
       };
+    }, 1400);
+  });
+}
+
+// Verify a state license through Stripe Identity. A state can only be added to
+// a therapist's licensed set AFTER this succeeds — that's the gate.
+function openStripeStateVerification(t, state, onVerified) {
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <div class="stripe-sheet-brand">stripe <span>| Identity</span></div>
+    <h2>Verify your ${state} license</h2>
+    <div class="intake-sub">Kindred uses Stripe Identity to confirm your professional license against the ${state} state registry. You can only match with clients in ${state} once this is verified. In the real flow this takes about a minute.</div>
+    <div id="stripe-verify-status"></div>
+    <button class="primary-btn stripe-primary-btn" id="stripe-start-btn">Start verification</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  const close = () => document.getElementById('confirm-modal').classList.add('hidden');
+  const sc = sheet.querySelector('.sheet-close');
+  if (sc) sc.addEventListener('click', close);
+  document.getElementById('stripe-start-btn').addEventListener('click', () => {
+    const status = document.getElementById('stripe-verify-status');
+    const btn = document.getElementById('stripe-start-btn');
+    btn.disabled = true;
+    btn.textContent = 'Verifying…';
+    status.innerHTML = `<div class="portal-note" style="margin-bottom:10px;">Checking your ${state} license against the state registry…</div>`;
+    setTimeout(() => {
+      status.innerHTML = `<div class="license-verified-box" style="margin-bottom:10px;">✓ ${state} license verified</div>`;
+      btn.textContent = 'Done';
+      btn.disabled = false;
+      btn.onclick = () => { close(); onVerified(); };
     }, 1400);
   });
 }
@@ -2919,11 +2954,15 @@ function getToKnowBlocks(t) {
   const out = [];
   const n = Math.max(kept.length, photos.length);
   for (let i = 0; i < n; i++) { if (kept[i]) out.push(kept[i]); if (photos[i]) out.push(photos[i]); }
+  // the quick-hello video is a draggable block too — slot it right after the
+  // first block by default so words still lead
+  if (t.media && t.media.video) out.splice(Math.min(1, out.length), 0, { type: 'video', src: t.media.video });
   t.blocks = out;
   return t.blocks;
 }
 function blockPromptCount(t) { return getToKnowBlocks(t).filter(b => b.type === 'prompt').length; }
 function blockPhotoCount(t)  { return getToKnowBlocks(t).filter(b => b.type === 'photo').length; }
+function blockHasVideo(t)    { return getToKnowBlocks(t).some(b => b.type === 'video'); }
 const MAX_PHOTOS = 4;       // up to 4 photos (+ 1 video) alternate with blurbs
 const NEW_THERAPIST_GRADIENTS = [
   'linear-gradient(135deg,#c97b9e,#a3557a)',
@@ -3946,12 +3985,25 @@ function renderTherapistProfile() {
 
     <!-- ===== SECTION 2 · ADDITIONAL DETAILS ===== -->
     <details class="edit-section" data-edit-section="additional" ${editSectionsOpen.additional ? 'open' : ''}>
-      <summary><span class="edit-section-title">Additional Details</span><span class="edit-section-hint">availability, identity, therapy types</span><span class="edit-caret">▾</span></summary>
+      <summary><span class="edit-section-title">Additional Details</span><span class="edit-section-hint">licensure, identity, therapy types</span><span class="edit-caret">▾</span></summary>
       <div class="edit-section-body">
         <div class="must-have-toggle" style="margin-top:2px;">
           <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>Off keeps you in Discover with a "save for later" banner</span></div>
           <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
         </div>
+
+        <div class="t-form-label">Licensed states <span class="ideal-hint">clients only match with therapists licensed in their state</span></div>
+        ${(t.licensedStates && t.licensedStates.length)
+          ? `<div class="chip-grid">${t.licensedStates.map(s => `<div class="chip-option selected licensed-state-chip">${s} <span class="lic-verified" title="Verified via Stripe">✓</span> <button type="button" class="lic-remove" data-remove-licensed-state="${s}" aria-label="Remove ${s}">✕</button></div>`).join('')}</div>`
+          : `<p class="portal-note" style="margin:2px 0 8px;">No states verified yet. Verify a license below to start matching with clients there.</p>`}
+        <div class="add-slot-row">
+          <select id="t-license-state-select">
+            <option value="">Add a state…</option>
+            ${US_STATES.filter(s => !(t.licensedStates || []).includes(s)).map(s => `<option value="${s}">${s}</option>`).join('')}
+          </select>
+          <button id="t-verify-license-btn">Verify with Stripe</button>
+        </div>
+        <p class="portal-note">Each state's license is verified through Stripe. A state only becomes available for matching after it's verified.</p>
 
         <div class="t-form-label">Gender</div>
         <div class="chip-grid">
@@ -3997,45 +4049,49 @@ function renderTherapistProfile() {
               </div>
             </details>`;
 
-          // lead photo + video are fixed, above the draggable feed
+          // lead photo stays fixed (it's the swipe-card image, not feed content)
           const media = `
             <div class="media-row">
               <div class="media-thumb">${t.photo ? `<img src="${t.photo}">` : '<span>—</span>'}</div>
-              <div class="media-row-text"><strong>Lead photo</strong><span>The first thing clients see — most like you</span></div>
+              <div class="media-row-text"><strong>Lead photo</strong><span>Your swipe-card image — the first thing clients see</span></div>
               <label class="media-upload-btn">${t.photo ? 'Change' : 'Add'}<input type="file" accept="image/*" data-media-upload="photo" hidden></label>
-            </div>
-            <div class="media-row">
-              <div class="media-thumb">${t.media.video ? '🎬' : '<span>—</span>'}</div>
-              <div class="media-row-text"><strong>Quick video</strong><span>A 15–30s hello — clients hear your voice first</span></div>
-              <label class="media-upload-btn">${t.media.video ? 'Replace' : 'Add'}<input type="file" accept="video/*" data-media-upload="video" hidden></label>
             </div>`;
 
-          const hint = `<p class="intake-sub" style="margin-top:14px;">Drag the blocks by the ⠿ handle to arrange your feed. We recommend alternating a photo and a blurb.</p>`;
+          const hint = `<p class="intake-sub" style="margin-top:14px;">Drag any block by the ⠿ handle to arrange your feed — a line shows where it'll land. We recommend alternating a photo and a blurb.</p>`;
 
-          // the draggable feed itself — prompts & photos in one ordered list
+          // the draggable feed itself — prompts, photos & the video in one list
           const cards = blocks.map((b, i) => {
             const handle = `<span class="block-drag" aria-hidden="true">⠿</span>`;
             const remove = `<button type="button" class="block-remove" data-remove-block="${i}" aria-label="Remove">✕</button>`;
-            const moves = `
-              <button type="button" class="reorder-btn" data-move-block="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
-              <button type="button" class="reorder-btn" data-move-block="${i}" data-dir="1" ${i === blocks.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>`;
             if (b.type === 'photo') {
               return `<div class="feed-block feed-block-photo" draggable="true" data-block-index="${i}">
-                <div class="feed-block-head">${handle}<span class="feed-block-tag">📷 Photo</span><div class="reorder-btns">${moves}</div>${remove}</div>
+                <div class="feed-block-head">${handle}<span class="feed-block-tag">📷 Photo</span>${remove}</div>
                 <div class="feed-block-photo-body"><img src="${b.src}"></div>
               </div>`;
             }
+            if (b.type === 'video') {
+              return `<div class="feed-block feed-block-video" draggable="true" data-block-index="${i}">
+                <div class="feed-block-head">${handle}<span class="feed-block-tag">🎬 Quick video</span>${remove}</div>
+                <div class="feed-block-video-body">
+                  ${b.src ? `<video src="${b.src}" controls preload="metadata" playsinline></video>` : '<div class="video-empty">A 15–30s hello — clients hear your voice first</div>'}
+                  <label class="media-upload-btn">${b.src ? 'Replace' : 'Add'}<input type="file" accept="video/*" data-replace-block-video="${i}" hidden></label>
+                </div>
+              </div>`;
+            }
             return `<div class="feed-block feed-block-prompt" draggable="true" data-block-index="${i}">
-              <div class="feed-block-head">${handle}<span class="feed-block-tag">${b.question}</span><div class="reorder-btns">${moves}</div>${remove}</div>
-              <textarea class="intake-textarea" data-block-answer="${i}" rows="2" placeholder="Finish the thought in your own voice…">${b.answer || ''}</textarea>
+              <div class="feed-block-head">${handle}<span class="feed-block-tag feed-block-question">${b.question}</span>${remove}</div>
+              <textarea class="intake-textarea" data-block-answer="${i}" rows="3" placeholder="Finish the thought in your own voice…">${b.answer || ''}</textarea>
             </div>`;
           }).join('');
 
           const addPhoto = blockPhotoCount(t) < MAX_PHOTOS
             ? `<label class="media-add-row"><span class="media-thumb"><span>＋</span></span><span class="media-row-text"><strong>Add a photo</strong><span>Your office, life outside work, and one more that's you. Up to ${MAX_PHOTOS}.</span></span><input type="file" accept="image/*" data-add-block-photo hidden></label>`
             : `<p class="portal-note">Photo limit reached (${MAX_PHOTOS}). Remove one to add another.</p>`;
+          const addVideo = blockHasVideo(t)
+            ? ''
+            : `<label class="media-add-row"><span class="media-thumb"><span>🎬</span></span><span class="media-row-text"><strong>Add a quick video</strong><span>A 15–30s hello — it becomes a draggable block too.</span></span><input type="file" accept="video/*" data-add-block-video hidden></label>`;
 
-          return picker + media + hint + `<div class="feed-blocks">${cards}</div>` + addPhoto;
+          return picker + media + hint + `<div class="feed-blocks">${cards}</div>` + addPhoto + addVideo;
         })()}
       </div>
     </details>
@@ -4207,14 +4263,9 @@ function attachTherapistProfileHandlers(t) {
     getToKnowBlocks(t)[Number(el.dataset.blockAnswer)].answer = el.value;
   }));
   document.querySelectorAll('[data-remove-block]').forEach(el => el.addEventListener('click', () => {
-    getToKnowBlocks(t).splice(Number(el.dataset.removeBlock), 1);
-    renderTherapistProfile();
-  }));
-  document.querySelectorAll('[data-move-block]').forEach(el => el.addEventListener('click', () => {
     const blocks = getToKnowBlocks(t);
-    const i = Number(el.dataset.moveBlock), j = i + Number(el.dataset.dir);
-    if (j < 0 || j >= blocks.length) return;
-    [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+    const [removed] = blocks.splice(Number(el.dataset.removeBlock), 1);
+    if (removed && removed.type === 'video') t.media.video = null; // keep the store in sync
     renderTherapistProfile();
   }));
   const addBlockPhoto = document.querySelector('[data-add-block-photo]');
@@ -4226,29 +4277,87 @@ function attachTherapistProfileHandlers(t) {
     reader.onload = () => { getToKnowBlocks(t).push({ type: 'photo', src: reader.result }); renderTherapistProfile(); };
     reader.readAsDataURL(file);
   });
-  // drag & drop reordering of the feed blocks
-  document.querySelectorAll('[data-block-index]').forEach(el => {
-    el.addEventListener('dragstart', e => { dragBlockIndex = Number(el.dataset.blockIndex); el.classList.add('dragging'); if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'; });
-    el.addEventListener('dragend', () => { dragBlockIndex = null; el.classList.remove('dragging'); });
-    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; });
-    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-    el.addEventListener('drop', e => {
+  const addBlockVideo = document.querySelector('[data-add-block-video]');
+  if (addBlockVideo) addBlockVideo.addEventListener('change', () => {
+    const file = addBlockVideo.files[0];
+    if (!file || blockHasVideo(t)) return;
+    const src = URL.createObjectURL(file);      // object URL keeps big videos out of data URLs
+    t.media.video = src;
+    getToKnowBlocks(t).push({ type: 'video', src });
+    renderTherapistProfile();
+  });
+  document.querySelectorAll('[data-replace-block-video]').forEach(el => el.addEventListener('change', () => {
+    const file = el.files[0];
+    if (!file) return;
+    const src = URL.createObjectURL(file);
+    const blocks = getToKnowBlocks(t);
+    const b = blocks[Number(el.dataset.replaceBlockVideo)];
+    if (b) b.src = src;
+    t.media.video = src;
+    renderTherapistProfile();
+  }));
+  // ----- drag & drop with a live drop indicator (container-level = robust) -----
+  const feedContainer = document.querySelector('.feed-blocks');
+  if (feedContainer) {
+    const clearIndicators = () => feedContainer.querySelectorAll('.drop-before, .drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
+    feedContainer.querySelectorAll('[data-block-index]').forEach(el => {
+      el.addEventListener('dragstart', e => {
+        dragBlockIndex = Number(el.dataset.blockIndex);
+        el.classList.add('dragging');
+        if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(dragBlockIndex)); } catch (_) {} }
+      });
+      el.addEventListener('dragend', () => { dragBlockIndex = null; el.classList.remove('dragging'); clearIndicators(); });
+    });
+    feedContainer.addEventListener('dragover', e => {
       e.preventDefault();
-      el.classList.remove('drag-over');
-      const to = Number(el.dataset.blockIndex);
-      if (dragBlockIndex === null || dragBlockIndex === to) return;
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      clearIndicators();
+      const others = [...feedContainer.querySelectorAll('[data-block-index]:not(.dragging)')];
+      let marked = false;
+      for (const b of others) {
+        const rect = b.getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) { b.classList.add('drop-before'); marked = true; break; }
+      }
+      if (!marked && others.length) others[others.length - 1].classList.add('drop-after');
+    });
+    feedContainer.addEventListener('drop', e => {
+      e.preventDefault();
+      if (dragBlockIndex === null) { clearIndicators(); return; }
       const blocks = getToKnowBlocks(t);
-      const [moved] = blocks.splice(dragBlockIndex, 1);
+      const beforeEl = feedContainer.querySelector('.drop-before');
+      const afterEl = feedContainer.querySelector('.drop-after');
+      let to;
+      if (beforeEl) to = Number(beforeEl.dataset.blockIndex);
+      else if (afterEl) to = Number(afterEl.dataset.blockIndex) + 1;
+      else to = blocks.length;
+      const from = dragBlockIndex;
+      const [moved] = blocks.splice(from, 1);
+      if (from < to) to--;                       // account for the removed item
       blocks.splice(to, 0, moved);
       dragBlockIndex = null;
       renderTherapistProfile();
     });
-  });
+  }
   document.querySelectorAll('[data-set-gender]').forEach(el => el.addEventListener('click', () => {
     t.identity.gender = el.dataset.setGender;
     renderTherapistProfile();
   }));
   document.getElementById('t-lgbtq-switch').addEventListener('click', () => { t.identity.lgbtqAffirming = !t.identity.lgbtqAffirming; renderTherapistProfile(); });
+  const verifyLicBtn = document.getElementById('t-verify-license-btn');
+  if (verifyLicBtn) verifyLicBtn.addEventListener('click', () => {
+    const s = (document.getElementById('t-license-state-select') || {}).value;
+    if (!s) { showToast('Pick a state to verify.'); return; }
+    openStripeStateVerification(t, s, () => {
+      if (!Array.isArray(t.licensedStates)) t.licensedStates = [];
+      if (!t.licensedStates.includes(s)) t.licensedStates.push(s);
+      showToast(`${s} license verified via Stripe ✓`);
+      renderTherapistProfile();
+    });
+  });
+  document.querySelectorAll('[data-remove-licensed-state]').forEach(el => el.addEventListener('click', () => {
+    t.licensedStates = (t.licensedStates || []).filter(s => s !== el.dataset.removeLicensedState);
+    renderTherapistProfile();
+  }));
   document.querySelectorAll('#tp-languages-grid [data-language]').forEach(el => el.addEventListener('click', () => {
     const l = el.dataset.language;
     const i = t.languages.indexOf(l);

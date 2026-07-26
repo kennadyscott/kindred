@@ -2026,18 +2026,33 @@ select.t-rate-input,
 /* disabled checkbox rows (e.g. top-3 once full) */
 .cbx-row-disabled { opacity:.4; cursor:default; }
 
+/* verified licensed-state chips */
+.licensed-state-chip { display:inline-flex; align-items:center; gap:5px; }
+.licensed-state-chip .lic-verified { color:var(--moss, #5a7d5a); font-weight:800; }
+.lic-remove { border:none; background:none; cursor:pointer; color:var(--ink-soft); font-size:12px; padding:0 0 0 2px; line-height:1; }
+.lic-remove:hover { color:#a8443a; }
+
 /* ===== Get-to-know draggable feed blocks ===== */
-.feed-blocks { display:flex; flex-direction:column; gap:12px; margin-top:6px; }
+.feed-blocks { display:flex; flex-direction:column; gap:14px; margin-top:6px; }
 .feed-block {
+  position:relative;
   border:1px solid var(--line); border-radius:14px; background:#fff; padding:10px 12px;
   transition:box-shadow .12s ease, border-color .12s ease;
 }
-.feed-block.dragging { opacity:.5; }
-.feed-block.drag-over { border-color:var(--coral); box-shadow:0 0 0 2px rgba(224,122,95,.25); }
-.feed-block-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
-.block-drag { cursor:grab; color:var(--ink-soft); font-size:15px; line-height:1; letter-spacing:-2px; user-select:none; }
-.feed-block-tag { flex:1; font-size:12.5px; font-weight:700; color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.feed-block-head .reorder-btns { flex:none; }
+.feed-block.dragging { opacity:.4; }
+/* drop indicator: a coral line in the gap showing exactly where it'll land */
+.feed-block.drop-before::before,
+.feed-block.drop-after::after {
+  content:''; position:absolute; left:0; right:0; height:3px;
+  background:var(--coral); border-radius:2px;
+}
+.feed-block.drop-before::before { top:-8px; }
+.feed-block.drop-after::after { bottom:-8px; }
+.feed-block-head { display:flex; align-items:flex-start; gap:8px; margin-bottom:8px; }
+.block-drag { cursor:grab; color:var(--ink-soft); font-size:16px; line-height:1.2; letter-spacing:-2px; user-select:none; flex:none; padding-top:1px; }
+.feed-block-tag { flex:1; font-size:12.5px; font-weight:700; color:var(--ink); min-width:0; }
+/* the prompt question shows in full so they can answer it */
+.feed-block-question { font-size:13.5px; line-height:1.4; white-space:normal; }
 .block-remove {
   flex:none; border:none; background:none; color:var(--ink-soft); font-size:14px;
   cursor:pointer; padding:2px 4px; line-height:1;
@@ -2045,7 +2060,11 @@ select.t-rate-input,
 .block-remove:hover { color:#a8443a; }
 .feed-block .intake-textarea { margin:0; }
 .feed-block-photo-body img { width:100%; max-height:180px; object-fit:cover; border-radius:10px; display:block; }
-.feed-block-photo { cursor:grab; }
+.feed-block-video-body { display:flex; flex-direction:column; gap:8px; }
+.feed-block-video-body video { width:100%; max-height:200px; border-radius:10px; background:#000; }
+.feed-block-video-body .video-empty { font-size:12px; color:var(--ink-soft); padding:14px; text-align:center; background:var(--cream); border-radius:10px; }
+.feed-block-video-body .media-upload-btn { align-self:flex-start; }
+.feed-block-photo, .feed-block-video { cursor:grab; }
 
 /* ===== "A tiny hello has arrived" banner ===== */
 .hello-banner {
