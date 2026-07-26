@@ -1993,15 +1993,16 @@ select.t-rate-input,
 
 /* ===== Profile 3-way segmented toggle (Ideal / View / Edit) ===== */
 .profile-modes {
-  display: flex; gap: 4px; background: var(--cream, #f4efe8);
-  border-radius: 12px; padding: 4px; margin-bottom: 20px;
+  display: flex; gap: 4px; background: #ffffff;
+  border: 1px solid var(--line); border-radius: 12px; padding: 4px; margin-bottom: 20px;
 }
 .pmode {
   flex: 1; border: none; background: transparent; cursor: pointer;
   padding: 10px 6px; border-radius: 9px; font: inherit; font-size: 12.5px;
   font-weight: 600; color: var(--ink-soft); white-space: nowrap;
 }
-.pmode.active { background: white; color: var(--coral-dark); box-shadow: 0 1px 4px rgba(0,0,0,.10); }
+/* active item gets a colored capsule on top of it */
+.pmode.active { background: var(--coral); color: #ffffff; }
 /* show only the active region; the other two stay in the DOM (handlers intact) */
 #t-profile-content[data-mode="edit"]  .pm-ideal,
 #t-profile-content[data-mode="edit"]  .pm-view,
@@ -2010,3 +2011,10 @@ select.t-rate-input,
 #t-profile-content[data-mode="view"]  .pm-edit,
 #t-profile-content[data-mode="view"]  .pm-ideal { display: none; }
 .pm-view .primary-btn { display: none; } /* it's a preview here, not the swipe card */
+
+/* ===== "I booked this client" (inquiries) ===== */
+.booked-btn { background: #eaf3ea !important; color: #3f6b46 !important; }
+.booked-flag {
+  margin-top: 8px; font-size: 13px; font-weight: 600; color: #3f6b46;
+  background: #eaf3ea; border-radius: 10px; padding: 8px 10px; text-align: center;
+}

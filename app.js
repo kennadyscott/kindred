@@ -3322,11 +3322,17 @@ function renderTherapistInsights() {
   // on this therapist right now (pending or matched), on top of the seeded
   // historical baseline.
   const liveTop5 = matches.filter(m => m.therapist.id === t.id && (m.status === 'pending' || m.status === 'matched')).length;
+  // clients booked = ongoing matches the therapist marked booked + paid on-demand sessions
+  const ongoingBooked = matches.filter(m => m.therapist.id === t.id && m.booked).length;
+  const odBookedCount = matches.filter(m => m.therapist.id === t.id && m.status === 'ondemand' && m.paymentStatus === 'paid').length;
+  const clientsBooked = (t.stats.clientsBooked || 0) + ongoingBooked + odBookedCount;
   const tiles = [
     { label: 'Profile views', value: t.stats.profileViews, delta: `+${t.stats.weekViews} this week` },
-    { label: 'Hearts', value: t.stats.hearts, delta: `+${t.stats.weekHearts} this week` },
+    { label: 'Potential clients saved your profile', value: t.stats.hearts, delta: `+${t.stats.weekHearts} this week` },
     { label: "In clients' Top 5", value: t.stats.top5 + liveTop5, delta: 'active request slots' },
-    { label: 'Conversations started', value: t.stats.conversationsStarted, delta: 'all time' }
+    { label: 'Conversations started', value: t.stats.conversationsStarted, delta: 'all time' },
+    { label: 'Clients booked through Kindred', value: clientsBooked, delta: 'ongoing + on-demand' },
+    { label: 'On-Demand sessions booked', value: (t.stats.onDemandBooked || 0) + odBookedCount, delta: 'all time' }
   ];
   container.innerHTML = `
     <div class="intake-sub" style="margin-bottom:14px;">How clients are finding and responding to your profile.</div>
@@ -3339,21 +3345,8 @@ function renderTherapistInsights() {
         </div>
       `).join('')}
     </div>
-    <div class="pref-item" style="margin-top:16px;">
-      <div class="pref-label">Your website</div>
-      <div class="pref-value" style="margin-bottom:8px;">${t.website ? `Shown on your profile as <strong>🌐 ${t.website}</strong>` : 'Add your practice website — it appears on your full profile for clients.'}</div>
-      <div class="add-slot-row">
-        <input type="text" id="t-website-input" placeholder="e.g. yourpractice.com" value="${t.website || ''}">
-        <button id="t-website-save-btn">Save</button>
-      </div>
-    </div>
     <div class="portal-note" style="margin-top:12px;">Counts reflect this demo session plus seeded history — real analytics arrive with the production backend.</div>
   `;
-  document.getElementById('t-website-save-btn').addEventListener('click', () => {
-    t.website = document.getElementById('t-website-input').value.trim().replace(/^https?:\/\//, '');
-    showToast(t.website ? 'Website saved — now on your profile.' : 'Website removed.');
-    renderTherapistInsights();
-  });
 }
 
 document.querySelectorAll('#therapist-nav .nav-btn').forEach(btn => {
@@ -3491,7 +3484,7 @@ function renderRequests() {
   if (myRequests.length === 0) {
     html += `<p class="empty-state">No hellos yet. When someone reaches out to you, they'll land right here.</p>`;
   } else {
-    html += myRequests.slice().reverse().map(m => {
+    html += myRequests.slice().reverse().map((m, i) => {
       if (m.status === 'pending') {
         // Private to the therapist: flags the clients they said they're the
         // strongest fit for. Clients never see this, and not having it changes
@@ -3523,6 +3516,9 @@ function renderRequests() {
           <span class="resolved-tag matched">✓ Accepted</span> — now chatting
           ${m.scheduledDay ? `<div class="request-need" style="margin-top:6px;">Recurring: <strong>${m.scheduledDay}s at ${m.scheduledTime}</strong></div>` : ''}
           <button class="message-btn-full" data-action="message" style="margin-top:10px;">💬 Message</button>
+          ${m.booked
+            ? `<div class="booked-flag">✓ Booked as a client — counted in your stats</div>`
+            : `<button class="message-btn-full booked-btn" data-book="${i}" style="margin-top:8px;">📅 I booked this client</button>`}
         </div>`;
       }
       return `<div class="request-card resolved"><span class="resolved-tag declined">Declined</span></div>`;
@@ -3572,6 +3568,16 @@ function renderRequests() {
   });
   list.querySelectorAll('[data-action="message"]').forEach(btn => {
     btn.addEventListener('click', () => openChat(t, 'therapist'));
+  });
+  const revRequests = myRequests.slice().reverse();
+  list.querySelectorAll('[data-book]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = revRequests[Number(btn.dataset.book)];
+      if (!m) return;
+      m.booked = true;
+      showToast('Booked — added to your Clients Booked count.');
+      renderRequests();
+    });
   });
   updateTNavBadge();
 }
@@ -4167,6 +4173,13 @@ function renderTherapistSettings() {
     ${row('hideFromCurrentClients', 'Hide my profile from current clients', "They keep their conversation with you, but won't see your public card")}
     <p class="portal-note">Your ideal-client settings are always private and never shown to clients.</p>
 
+    <div class="settings-group-title">Your website</div>
+    <p class="portal-note" style="margin-top:0;">${t.website ? `Shown on your profile as <strong>🌐 ${t.website}</strong>` : 'Add your practice website — it appears on your full profile for clients.'}</p>
+    <div class="add-slot-row">
+      <input type="text" id="t-website-input" placeholder="e.g. yourpractice.com" value="${t.website || ''}">
+      <button id="t-website-save-btn">Save</button>
+    </div>
+
     <div class="settings-group-title">Account</div>
     <button class="edit-prefs-btn" id="t-settings-profile-btn">Edit my profile</button>
     <button class="edit-prefs-btn" id="t-settings-logout-btn" style="color:var(--ink-soft);">Log Out</button>
@@ -4179,6 +4192,11 @@ function renderTherapistSettings() {
       therapistSettings[k] = !therapistSettings[k];
       renderTherapistSettings();
     });
+  });
+  document.getElementById('t-website-save-btn').addEventListener('click', () => {
+    t.website = document.getElementById('t-website-input').value.trim().replace(/^https?:\/\//, '');
+    showToast(t.website ? 'Website saved — now on your profile.' : 'Website removed.');
+    renderTherapistSettings();
   });
   document.getElementById('t-settings-profile-btn').addEventListener('click', () => showTScreen('t-profile'));
   document.getElementById('t-settings-logout-btn').addEventListener('click', logout);
