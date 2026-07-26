@@ -399,10 +399,33 @@ const AVAILABILITY_OPTIONS = ['Anytime', 'Early mornings', 'Lunch', 'Evenings', 
 // THEMSELVES, so both sides must pick from these exact lists — a mismatch here
 // would silently break matching (same reason languages are a controlled list).
 // These describe the client, not their preferences about a therapist.
-let CLIENT_AGE_BANDS = ['18–24', '25–34', '35–44', '45–54', '55–64', '65+'];
+// Life-stage bands the therapist picks in their ideal client. The CLIENT never
+// sees these — they enter their exact age, and ageToBand() maps it to a band on
+// the matching side. min/max inclusive.
+const IDEAL_AGE_BANDS = [
+  { label: 'Toddlers',  sub: '0–4',   min: 0,  max: 4   },
+  { label: 'Children',  sub: '5–10',  min: 5,  max: 10  },
+  { label: 'Preteen',   sub: '11–13', min: 11, max: 13  },
+  { label: 'Teens',     sub: '14–17', min: 14, max: 17  },
+  { label: 'Adults',    sub: '18–64', min: 18, max: 64  },
+  { label: 'Seniors',   sub: '65+',   min: 65, max: 200 }
+];
+function ageToBand(age) {
+  const n = parseInt(age, 10);
+  if (isNaN(n)) return null;
+  const b = IDEAL_AGE_BANDS.find(x => n >= x.min && n <= x.max);
+  return b ? b.label : null;
+}
+
 let CLIENT_GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Transgender', 'Prefer not to say'];
-let CLIENT_FIELD_OPTIONS = ['First responder', 'Healthcare', 'Military & Veteran', 'Education',
-  'Tech', 'Finance & Legal', 'Service industry', 'Student', 'Full-time parent', 'Creative', 'Other'];
+// Ideal-client gender: no "prefer not to say" — you can't target the absence of an answer.
+const IDEAL_GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Transgender'];
+
+// Field of work: common pills, then "Other" opens the fuller list + free text.
+const FIELD_PRIMARY = ['First responder', 'Healthcare', 'Military & Veteran', 'Education', 'Entrepreneur', 'Full-time parent'];
+let FIELD_MORE = ['Tech', 'Finance & Legal', 'Legal', 'Service industry', 'Retail', 'Hospitality',
+  'Student', 'Creative', 'Skilled trades', 'Government', 'Nonprofit', 'Sales', 'Agriculture',
+  'Transportation', 'Manufacturing', 'Small business owner', 'Remote / gig work', 'Between jobs', 'Retired'];
 // What a therapist will accept as payment. 'Either' = no constraint.
 const PAYMENT_TYPE_OPTIONS = ['Insurance', 'Cash pay', 'Either'];
 // The ideal-fit dimensions a therapist can mark as a "must have" (max 3).
@@ -503,9 +526,10 @@ let intake = {
   // About the client THEMSELVES (not preferences about a therapist). Used only
   // to see whether they line up with a therapist's private ideal-client spec.
   // All optional — skipping simply means those dimensions never count.
-  ageBand: null,         // one of CLIENT_AGE_BANDS
+  age: '',               // the client's EXACT age; ageToBand() maps it for matching
   selfGender: null,      // one of CLIENT_GENDER_OPTIONS — the client's own gender
-  field: null,           // one of CLIENT_FIELD_OPTIONS — what they do
+  field: null,           // FIELD_PRIMARY / FIELD_MORE, or a typed-in value
+  fieldOtherOpen: false,
   city: '', state: '',
   insurance: 'any',
   hasInsurance: null,        // 'yes' | 'no' — gate question before any carrier picking
@@ -715,7 +739,7 @@ function matchParams() {
     p_format: intake.format !== 'no-preference' ? intake.format : null,
     p_insurance: (intake.hasInsurance === 'yes' && intake.insurance !== 'any') ? intake.insurance : null,
     p_state: intake.state || null,
-    p_age_band: intake.ageBand || null,
+    p_age_band: ageToBand(intake.age), // send the derived life-stage band
     p_self_gender: intake.selfGender || null,
     p_field: intake.field || null,
     p_has_insurance: intake.hasInsurance === 'yes' ? true : intake.hasInsurance === 'no' ? false : null,
@@ -741,9 +765,8 @@ async function loadVocab() {
     take('insurance_more',  x => { OTHER_INSURANCES = x; });
     take('language_quick',  x => { LANGUAGE_QUICK_OPTIONS = x; });
     take('language_more',   x => { OTHER_LANGUAGES = x; });
-    take('age_band',        x => { CLIENT_AGE_BANDS = x; });
     take('client_gender',   x => { CLIENT_GENDER_OPTIONS = x; });
-    take('client_field',    x => { CLIENT_FIELD_OPTIONS = x; });
+    take('field_more',      x => { FIELD_MORE = x; });
     take('prev_experience', x => { PREV_EXPERIENCE_OPTIONS = x; });
   } catch (e) { /* offline or vocab not deployed yet — baked lists stand */ }
 }
@@ -984,17 +1007,22 @@ function renderIntakeStep() {
       <h1>A little about you</h1>
       <div class="intake-sub">Some therapists work especially closely with certain groups. This helps us spot those matches for you — all of it is optional, and skipping never limits who you can see.</div>
       <div class="match-tag-label" style="margin-top:0;">Your age</div>
-      <div class="chip-grid" id="age-band-grid">
-        ${CLIENT_AGE_BANDS.map(a => `<div class="chip-option ${intake.ageBand === a ? 'selected' : ''}" data-age-band="${a}">${a}</div>`).join('')}
-      </div>
+      <input type="number" inputmode="numeric" min="0" max="120" class="t-rate-input" id="age-input" placeholder="e.g. 34" value="${intake.age}">
       <div class="match-tag-label">Your gender</div>
       <div class="chip-grid" id="self-gender-grid">
         ${CLIENT_GENDER_OPTIONS.map(g => `<div class="chip-option ${intake.selfGender === g ? 'selected' : ''}" data-self-gender="${g}">${g}</div>`).join('')}
       </div>
       <div class="match-tag-label">What you do</div>
       <div class="chip-grid" id="field-grid">
-        ${CLIENT_FIELD_OPTIONS.map(f => `<div class="chip-option ${intake.field === f ? 'selected' : ''}" data-field="${f}">${f}</div>`).join('')}
-      </div>`;
+        ${FIELD_PRIMARY.map(f => `<div class="chip-option ${intake.field === f ? 'selected' : ''}" data-field="${f}">${f}</div>`).join('')}
+        ${(intake.field && !FIELD_PRIMARY.includes(intake.field)) ? `<div class="chip-option selected" data-field="${intake.field}">${intake.field}</div>` : ''}
+        <div class="chip-option ${intake.fieldOtherOpen ? 'selected' : ''}" id="field-other-btn">${intake.fieldOtherOpen ? 'Done' : '+ Other'}</div>
+      </div>
+      ${intake.fieldOtherOpen ? `
+      <div class="other-language-row">
+        <select id="field-other-select"><option value="">Choose…</option>${FIELD_MORE.map(f => `<option value="${f}" ${intake.field === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
+      </div>
+      <input type="text" class="t-rate-input" id="field-typed" placeholder="…or type your own" value="${(intake.field && !FIELD_PRIMARY.includes(intake.field) && !FIELD_MORE.includes(intake.field)) ? intake.field : ''}">` : ''}`;
   } else if (k === 'logistics') {
     html += `
       <h1>A few logistics</h1>
@@ -1210,12 +1238,8 @@ function attachIntakeHandlers() {
   });
   const prevNotes = document.getElementById('prev-notes-input');
   if (prevNotes) prevNotes.addEventListener('input', () => { intake.prevNotes = prevNotes.value; });
-  document.querySelectorAll('#age-band-grid .chip-option[data-age-band]').forEach(el => {
-    el.addEventListener('click', () => {
-      intake.ageBand = intake.ageBand === el.dataset.ageBand ? null : el.dataset.ageBand;
-      renderIntakeStep();
-    });
-  });
+  const ageInput = document.getElementById('age-input');
+  if (ageInput) ageInput.addEventListener('input', () => { intake.age = ageInput.value.replace(/[^\d]/g, ''); });
   document.querySelectorAll('#self-gender-grid .chip-option[data-self-gender]').forEach(el => {
     el.addEventListener('click', () => {
       intake.selfGender = intake.selfGender === el.dataset.selfGender ? null : el.dataset.selfGender;
@@ -1225,9 +1249,16 @@ function attachIntakeHandlers() {
   document.querySelectorAll('#field-grid .chip-option[data-field]').forEach(el => {
     el.addEventListener('click', () => {
       intake.field = intake.field === el.dataset.field ? null : el.dataset.field;
+      intake.fieldOtherOpen = false;
       renderIntakeStep();
     });
   });
+  const fieldOtherBtn = document.getElementById('field-other-btn');
+  if (fieldOtherBtn) fieldOtherBtn.addEventListener('click', () => { intake.fieldOtherOpen = !intake.fieldOtherOpen; renderIntakeStep(); });
+  const fieldOtherSel = document.getElementById('field-other-select');
+  if (fieldOtherSel) fieldOtherSel.addEventListener('change', () => { if (fieldOtherSel.value) { intake.field = fieldOtherSel.value; intake.fieldOtherOpen = false; renderIntakeStep(); } });
+  const fieldTyped = document.getElementById('field-typed');
+  if (fieldTyped) fieldTyped.addEventListener('input', () => { intake.field = fieldTyped.value.trim() || null; });
   const insuranceOtherBtn = document.getElementById('insurance-other-btn');
   if (insuranceOtherBtn) insuranceOtherBtn.addEventListener('click', () => { intake.insuranceOtherOpen = true; renderIntakeStep(); });
   const insuranceOtherSelect = document.getElementById('insurance-other-select');
@@ -1408,8 +1439,9 @@ function idealMatchResult(t) {
       !icAvail.some(a => intake.availability.includes(a))) return { ...blank, stated: true };
 
   // IDEAL FIT IS A BOOST. Must-haves simply weigh double — never a gate.
+  const clientBand = ageToBand(intake.age); // exact age → life-stage band
   const clientValue = {
-    ageBands:  intake.ageBand ? [intake.ageBand] : [],
+    ageBands:  clientBand ? [clientBand] : [],
     genders:   intake.selfGender ? [intake.selfGender] : [],
     fields:    intake.field ? [intake.field] : [],
     needs:     intake.needs || [],
@@ -3583,6 +3615,29 @@ function renderRequests() {
 }
 
 let tSpecOtherOpen = false, tModOtherOpen = false; // transient "+ Other" panels
+let idealFieldOtherOpen = false; // ideal-client field "+ Other" dropdown
+
+// full, deduped catalogs for the ideal-client multi-selects (reflect vocab live)
+function specialtyAll() { return [...new Set([...NEED_OPTIONS, ...OTHER_SPECIALTIES])]; }
+function modalityAll()  { return [...new Set([...MODALITY_OPTIONS, ...MODALITY_QUICK, ...OTHER_MODALITIES])]; }
+
+// A drop-down multi-select for the ideal editor: selected items show as
+// removable chips, and a dropdown adds more from the (large) full list.
+function idealMultiSelectHtml(t, key, options, placeholder) {
+  const sel = t.idealClient[key] || [];
+  return `
+    <div class="ideal-multi">
+      ${sel.length
+        ? `<div class="chip-grid">${sel.map(v => `<div class="chip-option selected" data-ideal-remove="${key}" data-val="${v}">${v} ✕</div>`).join('')}</div>`
+        : `<p class="portal-note" style="margin:2px 0 6px;">None yet — add from the list.</p>`}
+      <div class="other-language-row">
+        <select data-ideal-add="${key}">
+          <option value="">${placeholder}</option>
+          ${options.filter(o => !sel.includes(o)).map(o => `<option value="${o}">${o}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+}
 
 let profileMode = 'edit'; // 'ideal' | 'view' | 'edit' — the profile tab's three-way toggle
 function renderTherapistProfile() {
@@ -3606,20 +3661,29 @@ function renderTherapistProfile() {
       </div>
       <p class="ideal-section-sub">Describe who you're the strongest fit for. When a client lines up, they're flagged <strong>✦ Ideal match</strong> on your requests. This never limits who can find you — everything below this section is your "I also work with" profile, and that's what clients see.</p>
 
-      <div class="t-form-label">Ages</div>
-      <div class="chip-grid">${CLIENT_AGE_BANDS.map(a => `<div class="chip-option ${t.idealClient.ageBands.includes(a) ? 'selected' : ''}" data-ideal="ageBands" data-val="${a}">${a}</div>`).join('')}</div>
+      <div class="t-form-label">Ages <span class="ideal-hint">life stages — clients enter their exact age, we match it here</span></div>
+      <div class="chip-grid">${IDEAL_AGE_BANDS.map(a => `<div class="chip-option ${t.idealClient.ageBands.includes(a.label) ? 'selected' : ''}" data-ideal="ageBands" data-val="${a.label}">${a.label} <span class="chip-sub">${a.sub}</span></div>`).join('')}</div>
 
       <div class="t-form-label">Gender</div>
-      <div class="chip-grid">${CLIENT_GENDER_OPTIONS.map(g => `<div class="chip-option ${t.idealClient.genders.includes(g) ? 'selected' : ''}" data-ideal="genders" data-val="${g}">${g}</div>`).join('')}</div>
+      <div class="chip-grid">${IDEAL_GENDER_OPTIONS.map(g => `<div class="chip-option ${t.idealClient.genders.includes(g) ? 'selected' : ''}" data-ideal="genders" data-val="${g}">${g}</div>`).join('')}</div>
 
       <div class="t-form-label">Field of work</div>
-      <div class="chip-grid">${CLIENT_FIELD_OPTIONS.map(f => `<div class="chip-option ${t.idealClient.fields.includes(f) ? 'selected' : ''}" data-ideal="fields" data-val="${f}">${f}</div>`).join('')}</div>
+      <div class="chip-grid">
+        ${FIELD_PRIMARY.map(f => `<div class="chip-option ${t.idealClient.fields.includes(f) ? 'selected' : ''}" data-ideal="fields" data-val="${f}">${f}</div>`).join('')}
+        ${t.idealClient.fields.filter(f => !FIELD_PRIMARY.includes(f)).map(f => `<div class="chip-option selected" data-ideal="fields" data-val="${f}">${f}</div>`).join('')}
+        <div class="chip-option ${idealFieldOtherOpen ? 'selected' : ''}" id="ideal-field-other-btn">${idealFieldOtherOpen ? 'Done' : '+ Other'}</div>
+      </div>
+      ${idealFieldOtherOpen ? `
+      <div class="other-language-row">
+        <select id="ideal-field-select"><option value="">Choose…</option>${FIELD_MORE.filter(f => !t.idealClient.fields.includes(f)).map(f => `<option value="${f}">${f}</option>`).join('')}</select>
+      </div>
+      <input type="text" class="t-rate-input" id="ideal-field-typed" placeholder="…or type your own, press Enter">` : ''}
 
       <div class="t-form-label">What they want to work on</div>
-      <div class="chip-grid">${NEED_OPTIONS.map(n => `<div class="chip-option ${t.idealClient.needs.includes(n) ? 'selected' : ''}" data-ideal="needs" data-val="${n}">${n}</div>`).join('')}</div>
+      ${idealMultiSelectHtml(t, "needs", specialtyAll(), 'Add a focus…')}
 
-      <div class="t-form-label">Modality</div>
-      <div class="chip-grid">${MODALITY_OPTIONS.map(m => `<div class="chip-option ${t.idealClient.modalities.includes(m) ? 'selected' : ''}" data-ideal="modalities" data-val="${m}">${m}</div>`).join('')}</div>
+      <div class="t-form-label">Type of Therapy</div>
+      ${idealMultiSelectHtml(t, "modalities", modalityAll(), 'Add a therapy type…')}
 
       <div class="t-form-label">Payment <span class="ideal-hard">practical — must line up</span></div>
       <div class="chip-grid">${PAYMENT_TYPE_OPTIONS.map(p => `<div class="chip-option ${t.idealClient.payment === p ? 'selected' : ''}" data-ideal-pay="${p}">${p}</div>`).join('')}</div>
@@ -3860,6 +3924,28 @@ function attachTherapistProfileHandlers(t) {
     if (i === -1) list.push(v); else list.splice(i, 1);
     renderTherapistProfile();
   }));
+  // ideal multi-select dropdowns (needs / type of therapy)
+  document.querySelectorAll('[data-ideal-add]').forEach(el => el.addEventListener('change', () => {
+    if (!el.value) return;
+    const list = t.idealClient[el.dataset.idealAdd];
+    if (!list.includes(el.value)) list.push(el.value);
+    renderTherapistProfile();
+  }));
+  document.querySelectorAll('[data-ideal-remove]').forEach(el => el.addEventListener('click', () => {
+    const list = t.idealClient[el.dataset.idealRemove];
+    const i = list.indexOf(el.dataset.val);
+    if (i !== -1) list.splice(i, 1);
+    renderTherapistProfile();
+  }));
+  // ideal field "+ Other"
+  const ifOtherBtn = document.getElementById('ideal-field-other-btn');
+  if (ifOtherBtn) ifOtherBtn.addEventListener('click', () => { idealFieldOtherOpen = !idealFieldOtherOpen; renderTherapistProfile(); });
+  const ifSel = document.getElementById('ideal-field-select');
+  if (ifSel) ifSel.addEventListener('change', () => { if (ifSel.value && !t.idealClient.fields.includes(ifSel.value)) { t.idealClient.fields.push(ifSel.value); idealFieldOtherOpen = false; renderTherapistProfile(); } });
+  const ifTyped = document.getElementById('ideal-field-typed');
+  if (ifTyped) ifTyped.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { const v = ifTyped.value.trim(); if (v && !t.idealClient.fields.includes(v)) { t.idealClient.fields.push(v); idealFieldOtherOpen = false; renderTherapistProfile(); } }
+  });
   document.querySelectorAll('[data-ideal-pay]').forEach(el => el.addEventListener('click', () => {
     t.idealClient.payment = el.dataset.idealPay;
     renderTherapistProfile();

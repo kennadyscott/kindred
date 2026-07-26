@@ -2018,3 +2018,8 @@ select.t-rate-input,
   margin-top: 8px; font-size: 13px; font-weight: 600; color: #3f6b46;
   background: #eaf3ea; border-radius: 10px; padding: 8px 10px; text-align: center;
 }
+
+/* age-band chip sublabel + ideal multi-select dropdown */
+.chip-sub { font-size: 11px; opacity: .65; font-weight: 500; }
+.ideal-multi { margin-bottom: 4px; }
+.ideal-multi .other-language-row select { width: 100%; }
