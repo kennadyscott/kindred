@@ -3688,6 +3688,28 @@ function idealMultiSelectHtml(t, key, options, placeholder) {
 }
 
 let profileMode = 'edit'; // 'ideal' | 'view' | 'edit' — the profile tab's three-way toggle
+
+// Collapsible Edit-Profile sections + checkbox dropdowns keep their open/closed
+// state across the full re-renders that chip toggles trigger.
+let editSectionsOpen  = { first: true, getToKnow: false, additional: false, everyone: false };
+let editDropdownOpen  = { spec: false, modality: false };
+
+// A drop-down whose options are checkboxes. Selected values also show as
+// removable chips above it. Re-renders on change, but the <details> open state
+// is persisted in editDropdownOpen so the panel stays put.
+function checkboxDropdownHtml(selected, options, key, summaryLabel) {
+  return `
+    <div class="cbx-field">
+      ${selected.length ? `<div class="chip-grid cbx-chips">${selected.map(v => `<div class="chip-option selected" data-cbx-chip="${key}" data-val="${v}">${v} ✕</div>`).join('')}</div>` : ''}
+      <details class="cbx-dd" data-dd="${key}" ${editDropdownOpen[key] ? 'open' : ''}>
+        <summary><span>${selected.length ? `${selected.length} selected` : summaryLabel}</span><span class="cbx-caret">▾</span></summary>
+        <div class="cbx-dd-list">
+          ${options.map(o => `<label class="cbx-row"><input type="checkbox" data-cbx="${key}" value="${o}" ${selected.includes(o) ? 'checked' : ''}><span>${o}</span></label>`).join('')}
+        </div>
+      </details>
+    </div>`;
+}
+
 function renderTherapistProfile() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
   const container = document.getElementById('t-profile-content');
@@ -3748,180 +3770,186 @@ function renderTherapistProfile() {
     </div></div>
 
     <div class="pm-edit">
-    <div class="t-form-label">Pronouns (optional)</div>
-    <input type="text" class="t-rate-input" id="t-pronouns-input" placeholder="e.g. she/her" value="${t.pronouns || ''}">
-    <div class="must-have-toggle">
-      <div class="toggle-label"><strong>Show pronouns on my swipe card</strong><span>Always visible on your full profile either way</span></div>
-      <div class="switch ${t.showPronouns ? 'on' : ''}" id="t-show-pronouns-switch"></div>
-    </div>
-    <div class="must-have-toggle">
-      <div class="toggle-label"><strong>List under a practice or company name</strong><span>Shows instead of your personal name to clients</span></div>
-      <div class="switch ${t.useCompanyName ? 'on' : ''}" id="t-use-company-switch"></div>
-    </div>
-    <div id="t-company-name-field" style="${t.useCompanyName ? '' : 'display:none;'}">
-      <div class="t-form-label">Company / practice name</div>
-      <input type="text" class="t-rate-input" id="t-company-name-input" placeholder="e.g. Bluebird Counseling" value="${t.companyName || ''}">
-    </div>
-    <div class="t-form-label">Credentials (up to 3)</div>
-    <input type="text" class="t-rate-input" id="t-cred-0-input" placeholder="e.g. LPC" value="${t.credentials[0] || ''}">
-    <input type="text" class="t-rate-input" id="t-cred-1-input" placeholder="e.g. PhD" value="${t.credentials[1] || ''}">
-    <input type="text" class="t-rate-input" id="t-cred-2-input" placeholder="e.g. Certified Gottman Therapist" value="${t.credentials[2] || ''}">
+    <div class="edit-public-bar">🌐 Public — this is what clients see</div>
 
-    <div class="t-form-label">Practice type</div>
-    <div class="chip-grid">
-      <div class="chip-option ${t.practiceType === 'specialist' ? 'selected' : ''}" data-set-practice="specialist">A few core specialties</div>
-      <div class="chip-option ${t.practiceType === 'generalist' ? 'selected' : ''}" data-set-practice="generalist">Broad range of concerns</div>
-    </div>
+    <!-- ===== SECTION 1 · FIRST GLANCE ===== -->
+    <details class="edit-section" data-edit-section="first" ${editSectionsOpen.first ? 'open' : ''}>
+      <summary><span class="edit-section-title">First Glance</span><span class="edit-section-hint">the card clients meet you on</span><span class="edit-caret">▾</span></summary>
+      <div class="edit-section-body">
 
-    <div class="everyone-section-head">
-      <h3>Everyone I work with</h3>
-      <span class="everyone-public">Public — this is what clients see</span>
-    </div>
-    <p class="everyone-sub">The full range you're able to take on. Being broad here doesn't dilute your ideal matches — it just means more of the right people can find you.</p>
-
-    <div class="t-form-label">Specialties / needs you work with <span class="ideal-hint">${t.tags.length} selected</span></div>
-    <div class="chip-grid">${NEED_OPTIONS.map(n => `<div class="chip-option ${t.tags.includes(n) ? 'selected' : ''}" data-toggle-tag="${n}">${n}</div>`).join('')}
-      ${t.tags.filter(x => !NEED_OPTIONS.includes(x)).map(x => `<div class="chip-option selected" data-toggle-tag="${x}">${x}</div>`).join('')}
-      <div class="chip-option" id="t-spec-other-btn">+ Other</div>
-    </div>
-    ${tSpecOtherOpen ? `<div class="other-language-row">
-      <select id="t-spec-other-select">
-        <option value="">Choose a specialty…</option>
-        ${OTHER_SPECIALTIES.filter(x => !t.tags.includes(x)).map(x => `<option value="${x}">${x}</option>`).join('')}
-      </select>
-    </div>` : ''}
-
-    <div class="t-form-label">Your top 3 specialties <span class="ideal-hint">these lead your profile — clients see two of these plus one that matches their need (${(t.topSpecialties || []).length}/3)</span></div>
-    <div class="chip-grid">${(t.tags.length ? t.tags : ['Add specialties above first']).map(x => {
-      const on = (t.topSpecialties || []).includes(x);
-      const full = (t.topSpecialties || []).length >= 3 && !on;
-      const real = t.tags.includes(x);
-      return `<div class="chip-option ${on ? 'selected' : ''}${full || !real ? ' chip-disabled' : ''}" ${real ? `data-top-spec="${x}"` : ''}>${x}</div>`;
-    }).join('')}</div>
-
-    <div class="t-form-label">Modalities you offer</div>
-    <div class="chip-grid">${MODALITY_OPTIONS.map(m => `<div class="chip-option ${t.modalities.includes(m) ? 'selected' : ''}" data-toggle-modality="${m}">${m}</div>`).join('')}
-      ${t.modalities.filter(x => !MODALITY_OPTIONS.includes(x)).map(x => `<div class="chip-option selected" data-toggle-modality="${x}">${x}</div>`).join('')}
-      <div class="chip-option" id="t-mod-other-btn">+ Other</div>
-    </div>
-    ${tModOtherOpen ? `<div class="other-language-row">
-      <select id="t-mod-other-select">
-        <option value="">Choose a modality…</option>
-        ${OTHER_MODALITIES.filter(x => !t.modalities.includes(x)).map(x => `<option value="${x}">${x}</option>`).join('')}
-      </select>
-    </div>` : ''}
-
-    <div class="t-form-label">In one line, who do you work best with?</div>
-    <input type="text" class="t-rate-input" id="t-bestfor-input" placeholder="e.g. I work best with new parents navigating postpartum anxiety" value="${t.bestFor || ''}">
-
-    <div class="t-form-label" style="margin-top:20px;">Photos & video</div>
-    <div class="intake-sub">These build the "get to know you" feed clients scroll through — the more of you they see, the stronger the match.</div>
-
-    <div class="media-row">
-      <div class="media-thumb">${t.photo ? `<img src="${t.photo}">` : '<span>—</span>'}</div>
-      <div class="media-row-text"><strong>Lead photo</strong><span>Personal or professional — whichever feels most like you</span></div>
-      <input type="file" accept="image/*" data-media-upload="photo">
-    </div>
-    <div class="media-row">
-      <div class="media-thumb">${t.media.video ? '🎬' : '<span>—</span>'}</div>
-      <div class="media-row-text"><strong>Quick video</strong><span>A 15–30s hello — clients hear your voice before they reach out</span></div>
-      <input type="file" accept="video/*" data-media-upload="video">
-    </div>
-    ${(() => {
-      const photos = therapistPhotos(t);
-      const rows = photos.map((src, i) => `
-        <div class="media-row">
-          <div class="media-thumb"><img src="${src}"></div>
-          <div class="media-row-text"><strong>Photo ${i + 1}</strong><span>Shown in your get-to-know feed</span></div>
-          <button class="text-btn" data-remove-photo="${i}">Remove</button>
-        </div>`).join('');
-      const addRow = photos.length < MAX_PHOTOS ? `
-        <div class="media-row">
-          <div class="media-thumb"><span>＋</span></div>
-          <div class="media-row-text"><strong>Add a photo</strong><span>Up to ${MAX_PHOTOS} — office, life outside work, anything you.</span></div>
-          <input type="file" accept="image/*" data-add-photo>
-        </div>` : `<p class="portal-note">Photo limit reached (${MAX_PHOTOS}). Remove one to add another.</p>`;
-      return rows + addRow;
-    })()}
-
-    <div class="t-form-label">Who I am in the office...</div>
-    <textarea class="intake-textarea" id="t-persona-in" rows="2" placeholder="What sessions with you actually feel like">${t.persona.inOffice || ''}</textarea>
-    <div class="t-form-label">Who I am out of the office...</div>
-    <textarea class="intake-textarea" id="t-persona-out" rows="2" placeholder="The human behind the license">${t.persona.outOfOffice || ''}</textarea>
-
-    <div class="t-form-label">Gender</div>
-    <div class="chip-grid">
-      <div class="chip-option ${t.identity.gender === 'female' ? 'selected' : ''}" data-set-gender="female">Female</div>
-      <div class="chip-option ${t.identity.gender === 'male' ? 'selected' : ''}" data-set-gender="male">Male</div>
-      <div class="chip-option ${t.identity.gender === 'nonbinary' ? 'selected' : ''}" data-set-gender="nonbinary">Nonbinary</div>
-    </div>
-
-    <div class="must-have-toggle">
-      <div class="toggle-label"><strong>LGBTQ+ affirming</strong><span>Shown to clients who require this</span></div>
-      <div class="switch ${t.identity.lgbtqAffirming ? 'on' : ''}" id="t-lgbtq-switch"></div>
-    </div>
-
-    <div class="t-form-label">Languages you speak</div>
-    ${languageChipsHtml(t.languages, profileShowOtherLanguage, 'tp')}
-
-    <div class="t-form-label">Session format</div>
-    <div class="chip-grid">
-      <div class="chip-option ${t.formats.includes('video') ? 'selected' : ''}" data-toggle-format="video">Video</div>
-      <div class="chip-option ${t.formats.includes('in-person') ? 'selected' : ''}" data-toggle-format="in-person">In-person</div>
-    </div>
-
-    <div class="t-form-label">City</div>
-    <input type="text" class="t-rate-input" id="t-city-input" placeholder="e.g. Austin" value="${t.location.city}">
-    <div class="t-form-label">State</div>
-    <select id="t-state-input">
-      <option value="">Select a state</option>
-      ${US_STATES.map(s => `<option value="${s}" ${t.location.state === s ? 'selected' : ''}>${s}</option>`).join('')}
-    </select>
-    <div class="intake-sub" style="margin-top:6px;">Clients looking for in-person sessions only see therapists located in their city/state.</div>
-
-    <div class="t-form-label">Insurance accepted</div>
-    <div class="chip-grid">${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${t.insuranceList.includes(i) ? 'selected' : ''}" data-toggle-insurance="${i}">${i}</div>`).join('')}</div>
-
-    <div class="t-form-label">If you don't take insurance, what should clients know? (optional)</div>
-    <input type="text" class="t-rate-input" id="t-selfpaynote-input" placeholder="e.g. Sliding scale available" value="${t.selfPayNote || ''}">
-
-    <div class="t-form-label">Rate (per session, $)</div>
-    <input type="number" class="t-rate-input" id="t-rate-input" value="${t.rateMin}">
-
-    <div class="t-form-label" style="margin-top:20px;">In your words</div>
-    ${MANDATORY_PROMPTS.map((q, i) => `
-      <div class="t-form-label">${q}</div>
-      <textarea class="intake-textarea" data-edit-mandatory-prompt-index="${i}" rows="2">${t.mandatoryPromptAnswers[i] || ''}</textarea>
-    `).join('')}
-    <div class="t-form-label" style="margin-top:12px;">Pick up to ${MAX_OPTIONAL_PROMPTS} more (${t.optionalPrompts.length}/${MAX_OPTIONAL_PROMPTS} selected)</div>
-    <div class="chip-grid">
-      ${OPTIONAL_PROMPTS.map(q => {
-        const selected = t.optionalPrompts.some(p => p.question === q);
-        const disabled = !selected && t.optionalPrompts.length >= MAX_OPTIONAL_PROMPTS;
-        return `<div class="chip-option ${selected ? 'selected' : ''} ${disabled ? 'chip-disabled' : ''}" data-toggle-optional-prompt="${q}">${q}</div>`;
-      }).join('')}
-    </div>
-    ${t.optionalPrompts.length > 1 ? `<p class="reorder-hint">Use ↑ ↓ to set the order clients see these in.</p>` : ''}
-    ${t.optionalPrompts.map((p, i) => `
-      <div class="prompt-edit-head">
-        <div class="t-form-label" style="margin:0;">${i + 1}. ${p.question}</div>
-        <div class="reorder-btns">
-          <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
-          <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="1" ${i === t.optionalPrompts.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+        <div class="t-form-label">Name</div>
+        <input type="text" class="t-rate-input" id="t-name-input" placeholder="Your name as clients see it" value="${t.name || ''}">
+        <div class="must-have-toggle">
+          <div class="toggle-label"><strong>List under a practice or company name</strong><span>Shows instead of your personal name to clients</span></div>
+          <div class="switch ${t.useCompanyName ? 'on' : ''}" id="t-use-company-switch"></div>
         </div>
-      </div>
-      <textarea class="intake-textarea" data-edit-optional-prompt-answer="${i}" rows="2">${p.answer || ''}</textarea>
-      <div class="prompt-photo-row">
-        ${p.photo ? `<img class="prompt-photo-thumb" src="${p.photo}">` : ''}
-        <input type="file" accept="image/*" data-edit-optional-prompt-photo="${i}">
-      </div>
-      <button type="button" class="text-btn" data-remove-edit-optional-prompt="${i}">Remove this prompt</button>
-    `).join('')}
+        <div id="t-company-name-field" style="${t.useCompanyName ? '' : 'display:none;'}">
+          <div class="t-form-label">Company / practice name</div>
+          <input type="text" class="t-rate-input" id="t-company-name-input" placeholder="e.g. Bluebird Counseling" value="${t.companyName || ''}">
+        </div>
 
-    <div class="must-have-toggle" style="margin-top:20px;">
-      <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>Shown in Discover for new long-term matches</span></div>
-      <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
-    </div>
+        <div class="t-form-label">Credentials (up to 3)</div>
+        <input type="text" class="t-rate-input" id="t-cred-0-input" placeholder="e.g. LPC" value="${t.credentials[0] || ''}">
+        <input type="text" class="t-rate-input" id="t-cred-1-input" placeholder="e.g. PhD" value="${t.credentials[1] || ''}">
+        <input type="text" class="t-rate-input" id="t-cred-2-input" placeholder="e.g. Certified Gottman Therapist" value="${t.credentials[2] || ''}">
+
+        <div class="t-form-label">Location</div>
+        <input type="text" class="t-rate-input" id="t-city-input" placeholder="City — e.g. Austin" value="${t.location.city}">
+        <select id="t-state-input">
+          <option value="">Select a state</option>
+          ${US_STATES.map(s => `<option value="${s}" ${t.location.state === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+        <div class="intake-sub" style="margin-top:6px;">Clients looking for in-person sessions only see therapists located in their city/state.</div>
+
+        <div class="t-form-label">Session format</div>
+        <div class="chip-grid">
+          <div class="chip-option ${t.formats.includes('video') ? 'selected' : ''}" data-toggle-format="video">Online (video)</div>
+          <div class="chip-option ${t.formats.includes('in-person') ? 'selected' : ''}" data-toggle-format="in-person">In-person</div>
+        </div>
+
+        <div class="t-form-label">Session cost (per session, $)</div>
+        <input type="number" class="t-rate-input" id="t-rate-input" value="${t.rateMin}">
+        <div class="t-form-label">Insurance accepted</div>
+        <div class="chip-grid">${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${t.insuranceList.includes(i) ? 'selected' : ''}" data-toggle-insurance="${i}">${i}</div>`).join('')}</div>
+        <div class="t-form-label">If you don't take insurance, what should clients know? (optional)</div>
+        <input type="text" class="t-rate-input" id="t-selfpaynote-input" placeholder="e.g. Sliding scale available" value="${t.selfPayNote || ''}">
+
+        <div class="t-form-label">Website</div>
+        <input type="text" class="t-rate-input" id="t-website-input" placeholder="e.g. yourpractice.com" value="${t.website || ''}">
+
+        <div class="t-form-label">Pronouns (optional)</div>
+        <input type="text" class="t-rate-input" id="t-pronouns-input" placeholder="e.g. she/her" value="${t.pronouns || ''}">
+        <div class="must-have-toggle">
+          <div class="toggle-label"><strong>Show pronouns on my swipe card</strong><span>Always visible on your full profile either way</span></div>
+          <div class="switch ${t.showPronouns ? 'on' : ''}" id="t-show-pronouns-switch"></div>
+        </div>
+
+        <div class="t-form-label">In one line, who do you work best with?</div>
+        <input type="text" class="t-rate-input" id="t-bestfor-input" placeholder="e.g. I work best with new parents navigating postpartum anxiety" value="${t.bestFor || ''}">
+
+        <div class="t-form-label">Specialties / needs you work with</div>
+        ${checkboxDropdownHtml(t.tags, specialtyAll(), 'spec', 'Choose the specialties you work with…')}
+        <div class="t-form-label" style="margin-top:14px;">Your top 3 specialties <span class="ideal-hint">these lead your profile — clients see two of these plus one that matches their need (${(t.topSpecialties || []).length}/3)</span></div>
+        <div class="chip-grid">${(t.tags.length ? t.tags : ['Add specialties above first']).map(x => {
+          const on = (t.topSpecialties || []).includes(x);
+          const full = (t.topSpecialties || []).length >= 3 && !on;
+          const real = t.tags.includes(x);
+          return `<div class="chip-option ${on ? 'selected' : ''}${full || !real ? ' chip-disabled' : ''}" ${real ? `data-top-spec="${x}"` : ''}>${x}</div>`;
+        }).join('')}</div>
+      </div>
+    </details>
+
+    <!-- ===== GET TO KNOW YOU ===== -->
+    <details class="edit-section" data-edit-section="getToKnow" ${editSectionsOpen.getToKnow ? 'open' : ''}>
+      <summary><span class="edit-section-title">Get to know you</span><span class="edit-section-hint">your story, in your words</span><span class="edit-caret">▾</span></summary>
+      <div class="edit-section-body">
+        <div class="t-form-label">Who I am in the office...</div>
+        <textarea class="intake-textarea" id="t-persona-in" rows="2" placeholder="What sessions with you actually feel like">${t.persona.inOffice || ''}</textarea>
+        <div class="t-form-label">Who I am out of the office...</div>
+        <textarea class="intake-textarea" id="t-persona-out" rows="2" placeholder="The human behind the license">${t.persona.outOfOffice || ''}</textarea>
+
+        <div class="t-form-label" style="margin-top:16px;">In your words</div>
+        ${MANDATORY_PROMPTS.map((q, i) => `
+          <div class="t-form-label">${q}</div>
+          <textarea class="intake-textarea" data-edit-mandatory-prompt-index="${i}" rows="2">${t.mandatoryPromptAnswers[i] || ''}</textarea>
+        `).join('')}
+        <div class="t-form-label" style="margin-top:12px;">Pick up to ${MAX_OPTIONAL_PROMPTS} more (${t.optionalPrompts.length}/${MAX_OPTIONAL_PROMPTS} selected)</div>
+        <div class="chip-grid">
+          ${OPTIONAL_PROMPTS.map(q => {
+            const selected = t.optionalPrompts.some(p => p.question === q);
+            const disabled = !selected && t.optionalPrompts.length >= MAX_OPTIONAL_PROMPTS;
+            return `<div class="chip-option ${selected ? 'selected' : ''} ${disabled ? 'chip-disabled' : ''}" data-toggle-optional-prompt="${q}">${q}</div>`;
+          }).join('')}
+        </div>
+        ${t.optionalPrompts.length > 1 ? `<p class="reorder-hint">Use ↑ ↓ to set the order clients see these in.</p>` : ''}
+        ${t.optionalPrompts.map((p, i) => `
+          <div class="prompt-edit-head">
+            <div class="t-form-label" style="margin:0;">${i + 1}. ${p.question}</div>
+            <div class="reorder-btns">
+              <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+              <button type="button" class="reorder-btn" data-move-prompt="${i}" data-dir="1" ${i === t.optionalPrompts.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+            </div>
+          </div>
+          <textarea class="intake-textarea" data-edit-optional-prompt-answer="${i}" rows="2">${p.answer || ''}</textarea>
+          <div class="prompt-photo-row">
+            ${p.photo ? `<img class="prompt-photo-thumb" src="${p.photo}">` : ''}
+            <input type="file" accept="image/*" data-edit-optional-prompt-photo="${i}">
+          </div>
+          <button type="button" class="text-btn" data-remove-edit-optional-prompt="${i}">Remove this prompt</button>
+        `).join('')}
+      </div>
+    </details>
+
+    <!-- ===== SECTION 2 · ADDITIONAL DETAILS ===== -->
+    <details class="edit-section" data-edit-section="additional" ${editSectionsOpen.additional ? 'open' : ''}>
+      <summary><span class="edit-section-title">Additional Details</span><span class="edit-section-hint">availability, identity, languages</span><span class="edit-caret">▾</span></summary>
+      <div class="edit-section-body">
+        <div class="must-have-toggle" style="margin-top:2px;">
+          <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>Shown in Discover for new long-term matches</span></div>
+          <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
+        </div>
+
+        <div class="t-form-label">Gender</div>
+        <div class="chip-grid">
+          <div class="chip-option ${t.identity.gender === 'female' ? 'selected' : ''}" data-set-gender="female">Female</div>
+          <div class="chip-option ${t.identity.gender === 'male' ? 'selected' : ''}" data-set-gender="male">Male</div>
+          <div class="chip-option ${t.identity.gender === 'nonbinary' ? 'selected' : ''}" data-set-gender="nonbinary">Nonbinary</div>
+        </div>
+
+        <div class="must-have-toggle">
+          <div class="toggle-label"><strong>LGBTQ+ affirming</strong><span>Shown to clients who require this</span></div>
+          <div class="switch ${t.identity.lgbtqAffirming ? 'on' : ''}" id="t-lgbtq-switch"></div>
+        </div>
+
+        <div class="t-form-label">Languages you speak</div>
+        ${languageChipsHtml(t.languages, profileShowOtherLanguage, 'tp')}
+      </div>
+    </details>
+
+    <!-- ===== SECTION 3 · BROADER THAN IDEAL CLIENT ===== -->
+    <details class="edit-section" data-edit-section="everyone" ${editSectionsOpen.everyone ? 'open' : ''}>
+      <summary><span class="edit-section-title">Everyone I work with</span><span class="everyone-public">Broader than Ideal Client</span><span class="edit-caret">▾</span></summary>
+      <div class="edit-section-body">
+        <p class="everyone-sub">The full range you're able to take on. Being broad here doesn't dilute your ideal matches — it just means more of the right people can find you.</p>
+
+        <div class="t-form-label">Types of Therapy</div>
+        ${checkboxDropdownHtml(t.modalities, modalityAll(), 'modality', 'Choose the therapy types you offer…')}
+
+        <div class="t-form-label" style="margin-top:18px;">Photos & video</div>
+        <div class="intake-sub">These build the "get to know you" feed clients scroll through. Reorder photos with ↑ ↓ — that's the order clients see them in.</div>
+
+        <div class="media-row">
+          <div class="media-thumb">${t.photo ? `<img src="${t.photo}">` : '<span>—</span>'}</div>
+          <div class="media-row-text"><strong>Lead photo</strong><span>The first thing clients see — most like you</span></div>
+          <label class="media-upload-btn">${t.photo ? 'Change' : 'Add'}<input type="file" accept="image/*" data-media-upload="photo" hidden></label>
+        </div>
+        <div class="media-row">
+          <div class="media-thumb">${t.media.video ? '🎬' : '<span>—</span>'}</div>
+          <div class="media-row-text"><strong>Quick video</strong><span>A 15–30s hello — clients hear your voice first</span></div>
+          <label class="media-upload-btn">${t.media.video ? 'Replace' : 'Add'}<input type="file" accept="video/*" data-media-upload="video" hidden></label>
+        </div>
+        ${(() => {
+          const photos = therapistPhotos(t);
+          const rows = photos.map((src, i) => `
+            <div class="media-row gallery-row">
+              <div class="media-thumb"><img src="${src}"></div>
+              <div class="media-row-text"><strong>Photo ${i + 1}</strong><span>Shown in your get-to-know feed</span></div>
+              <div class="reorder-btns">
+                <button type="button" class="reorder-btn" data-move-photo="${i}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
+                <button type="button" class="reorder-btn" data-move-photo="${i}" data-dir="1" ${i === photos.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
+                <button type="button" class="text-btn" data-remove-photo="${i}">Remove</button>
+              </div>
+            </div>`).join('');
+          const addRow = photos.length < MAX_PHOTOS ? `
+            <label class="media-add-row">
+              <span class="media-thumb"><span>＋</span></span>
+              <span class="media-row-text"><strong>Add a photo</strong><span>Up to ${MAX_PHOTOS} — office, life outside work, anything you.</span></span>
+              <input type="file" accept="image/*" data-add-photo hidden>
+            </label>` : `<p class="portal-note">Photo limit reached (${MAX_PHOTOS}). Remove one to add another.</p>`;
+          return rows + addRow;
+        })()}
+      </div>
+    </details>
     </div>
   `;
   container.dataset.mode = profileMode;
@@ -3948,20 +3976,28 @@ function attachTherapistProfileHandlers(t) {
       t.credentials[i] = credInput.value;
     });
   });
-  document.querySelectorAll('[data-set-practice]').forEach(el => el.addEventListener('click', () => {
-    t.practiceType = el.dataset.setPractice;
+  const tNameInput = document.getElementById('t-name-input');
+  if (tNameInput) tNameInput.addEventListener('input', () => { t.name = tNameInput.value; });
+  const tWebsiteInput = document.getElementById('t-website-input');
+  if (tWebsiteInput) tWebsiteInput.addEventListener('input', () => { t.website = tWebsiteInput.value.trim().replace(/^https?:\/\//, ''); });
+  // remember which collapsible sections / dropdowns are open across re-renders
+  document.querySelectorAll('details[data-edit-section]').forEach(el => el.addEventListener('toggle', () => { editSectionsOpen[el.dataset.editSection] = el.open; }));
+  document.querySelectorAll('details[data-dd]').forEach(el => el.addEventListener('toggle', () => { editDropdownOpen[el.dataset.dd] = el.open; }));
+  // checkbox dropdowns (specialties / types of therapy)
+  const cbxArr = k => (k === 'spec' ? t.tags : t.modalities);
+  document.querySelectorAll('input[data-cbx]').forEach(el => el.addEventListener('change', () => {
+    const arr = cbxArr(el.dataset.cbx), v = el.value, i = arr.indexOf(v);
+    if (i === -1) arr.push(v);
+    else {
+      arr.splice(i, 1);
+      if (el.dataset.cbx === 'spec') { const j = (t.topSpecialties || []).indexOf(v); if (j !== -1) t.topSpecialties.splice(j, 1); }
+    }
     renderTherapistProfile();
   }));
-  document.querySelectorAll('[data-toggle-tag]').forEach(el => el.addEventListener('click', () => {
-    const tag = el.dataset.toggleTag;
-    const i = t.tags.indexOf(tag);
-    if (i === -1) t.tags.push(tag);
-    else {
-      t.tags.splice(i, 1);
-      // a removed specialty can't stay a "top 3"
-      const j = (t.topSpecialties || []).indexOf(tag);
-      if (j !== -1) t.topSpecialties.splice(j, 1);
-    }
+  document.querySelectorAll('[data-cbx-chip]').forEach(el => el.addEventListener('click', () => {
+    const arr = cbxArr(el.dataset.cbxChip), v = el.dataset.val, i = arr.indexOf(v);
+    if (i !== -1) arr.splice(i, 1);
+    if (el.dataset.cbxChip === 'spec') { const j = (t.topSpecialties || []).indexOf(v); if (j !== -1) t.topSpecialties.splice(j, 1); }
     renderTherapistProfile();
   }));
   document.querySelectorAll('[data-top-spec]').forEach(el => el.addEventListener('click', () => {
@@ -4063,6 +4099,13 @@ function attachTherapistProfileHandlers(t) {
   document.querySelectorAll('[data-remove-photo]').forEach(el => el.addEventListener('click', () => {
     if (!Array.isArray(t.media.photos)) t.media.photos = therapistPhotos(t);
     t.media.photos.splice(Number(el.dataset.removePhoto), 1);
+    renderTherapistProfile();
+  }));
+  document.querySelectorAll('[data-move-photo]').forEach(el => el.addEventListener('click', () => {
+    if (!Array.isArray(t.media.photos)) t.media.photos = therapistPhotos(t);
+    const i = Number(el.dataset.movePhoto), j = i + Number(el.dataset.dir);
+    if (j < 0 || j >= t.media.photos.length) return;
+    [t.media.photos[i], t.media.photos[j]] = [t.media.photos[j], t.media.photos[i]];
     renderTherapistProfile();
   }));
   const personaIn = document.getElementById('t-persona-in');
@@ -4347,13 +4390,6 @@ function renderTherapistSettings() {
     ${row('hideFromCurrentClients', 'Hide my profile from current clients', "They keep their conversation with you, but won't see your public card")}
     <p class="portal-note">Your ideal-client settings are always private and never shown to clients.</p>
 
-    <div class="settings-group-title">Your website</div>
-    <p class="portal-note" style="margin-top:0;">${t.website ? `Shown on your profile as <strong>🌐 ${t.website}</strong>` : 'Add your practice website — it appears on your full profile for clients.'}</p>
-    <div class="add-slot-row">
-      <input type="text" id="t-website-input" placeholder="e.g. yourpractice.com" value="${t.website || ''}">
-      <button id="t-website-save-btn">Save</button>
-    </div>
-
     <div class="settings-group-title">Account</div>
     <button class="edit-prefs-btn" id="t-settings-profile-btn">Edit my profile</button>
     <button class="edit-prefs-btn" id="t-settings-logout-btn" style="color:var(--ink-soft);">Log Out</button>
@@ -4366,11 +4402,6 @@ function renderTherapistSettings() {
       therapistSettings[k] = !therapistSettings[k];
       renderTherapistSettings();
     });
-  });
-  document.getElementById('t-website-save-btn').addEventListener('click', () => {
-    t.website = document.getElementById('t-website-input').value.trim().replace(/^https?:\/\//, '');
-    showToast(t.website ? 'Website saved — now on your profile.' : 'Website removed.');
-    renderTherapistSettings();
   });
   document.getElementById('t-settings-profile-btn').addEventListener('click', () => showTScreen('t-profile'));
   document.getElementById('t-settings-logout-btn').addEventListener('click', logout);
