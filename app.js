@@ -1590,6 +1590,9 @@ function isInTop5(t) {
 // wrapping, instead of stacked meta lines.
 function detailFactsHtml(t, opts = {}) {
   const fmtIcon = t.formats.length === 2 ? '🎥' : t.formats.includes('video') ? '🎥' : '🏠';
+  // Derive format + rate from the LIVE fields so edits show up for clients
+  // immediately (the seeded t.meta could be stale after a profile change).
+  const meta = buildTherapistMeta(t);
   // Insurance is a match requirement, so if this therapist is showing to a
   // client with insurance, they accept it — show it as a verified checkmark.
   const insFact = (opts.preview || (intake.hasInsurance === 'yes' && intake.insurance !== 'any'))
@@ -1597,10 +1600,11 @@ function detailFactsHtml(t, opts = {}) {
     : ['🛡️', insuranceDisplayLabel(t, opts)];
   const facts = [
     ['📍', `${t.location.city}, ${t.location.state}`],
-    [fmtIcon, t.meta[0]],
-    ['💵', (t.meta[1] || '').replace('/session', '')],
+    [fmtIcon, meta[0]],
+    ['💵', (meta[1] || '').replace('/session', '')],
     insFact
   ];
+  if (hasSlidingScale(t)) facts.push(['🤝', 'Sliding scale available']);
   if (t.website) facts.push(['🌐', `<a class="website-link" href="https://${t.website}" target="_blank" rel="noopener">${t.website}</a>`]);
   return `<div class="detail-facts">${facts.filter(f => f[1]).map(([ic, txt]) => `<span class="fact"><span class="fact-ic">${ic}</span>${txt}</span>`).join('')}</div>`;
 }
@@ -1697,7 +1701,7 @@ function capabilityRowHtml(t) {
   const acceptingLabel = t.acceptingOngoing ? 'Accepting new clients' : 'Not accepting new clients';
   return `
     <div class="capability-row">
-      <div class="capability-item"><span class="cap-icon">🎥</span>${t.meta[0]}</div>
+      <div class="capability-item"><span class="cap-icon">🎥</span>${buildTherapistMeta(t)[0]}</div>
       <div class="capability-item"><span class="cap-icon">🌿</span>${acceptingLabel}</div>
       <div class="capability-item"><span class="cap-icon">🕐</span>${t.nextAvailableLabel}</div>
     </div>
