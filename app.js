@@ -279,7 +279,22 @@ THERAPISTS.forEach(t => {
   // states the therapist is licensed AND Stripe-verified in — only these count
   // for matching. Seeded from their base state (+ a demo multi-state therapist).
   if (!Array.isArray(t.licensedStates)) t.licensedStates = LICENSE_SEED[t.id] || (t.location && t.location.state ? [t.location.state] : []);
+  // on-demand session price (separate from the ongoing rate); defaults to it
+  if (t.onDemandRate == null) t.onDemandRate = t.rateMin;
 });
+
+let onDemandInfoShown = false;      // show the "what is On-Demand" popup once per session
+let odNewSlotDay = null;            // day currently selected in the slot picker
+const KINDRED_OD_FEE_PCT = 0.05;    // Kindred keeps 5% of each on-demand session
+// Simulated Stripe processing fee (their standard 2.9% + $0.30), passed to the client.
+function ondemandPricing(t) {
+  const price = Number(t.onDemandRate) || Number(t.rateMin) || 0;
+  const stripeFee = Math.round((price * 0.029 + 0.30) * 100) / 100;
+  const kindredCut = Math.round(price * KINDRED_OD_FEE_PCT * 100) / 100;
+  const clientTotal = Math.round((price + stripeFee) * 100) / 100;
+  const therapistNet = Math.round((price - kindredCut) * 100) / 100;
+  return { price, stripeFee, kindredCut, clientTotal, therapistNet };
+}
 
 let NEED_OPTIONS = ['Anxiety', 'Trauma', 'Couples', 'Grief', 'Life Transitions', 'Burnout', 'ADHD', 'Substance Use', 'Postpartum', 'Family Conflict'];
 // The full specialty catalog behind "+ Other" — same no-free-text rule as
@@ -2566,6 +2581,7 @@ function renderOndemand() {
         <div><div class="od-name">${displayName(t)}</div><div class="od-creds">${credentialsLabel(t)}</div></div>
       </div>
       ${matchTagsHtml(t)}
+      <div class="od-price">$${ondemandPricing(t).clientTotal.toFixed(2)} · one-time, cash-pay session</div>
       <div class="slot-row">
         ${t.onDemandSlots.map(s => `<button class="slot-btn" data-tid="${t.id}" data-slot="${s.label}">${s.label}</button>`).join('')}
       </div>
@@ -2627,13 +2643,19 @@ function bookOndemand(tid, slotLabel, btnEl) {
 }
 
 function openPaymentConfirm(t, slotLabel, btnEl) {
-  const amount = t.rateMin;
+  const p = ondemandPricing(t);
+  const amount = p.clientTotal;
   document.getElementById('confirm-sheet').innerHTML = `
     <div class="sheet-close"></div>
     <h2>Request this session</h2>
     <div class="intake-sub">One-time session with ${displayName(t)} — ${slotLabel}</div>
-    <div class="payment-amount">$${amount}</div>
-    <p class="modality-info-text">Your card is <strong>authorized now but only charged when ${displayName(t)} accepts</strong> the session. If they decline or don't respond, the hold is released and you pay nothing.</p>
+    <div class="payment-amount">$${amount.toFixed(2)}</div>
+    <ul class="policy-list">
+      <li>Session fee: $${p.price.toFixed(2)}</li>
+      <li>Stripe processing fee: $${p.stripeFee.toFixed(2)}</li>
+      <li><strong>Total charged to you: $${amount.toFixed(2)}</strong></li>
+    </ul>
+    <p class="modality-info-text">On-Demand is <strong>cash-pay only</strong> (no insurance) and <strong>not for crises</strong>. Your card is <strong>authorized now but only charged when ${displayName(t)} accepts</strong>. If they decline or don't respond, the hold is released and you pay nothing.</p>
     <div class="t-form-label">Cancellation policy (after acceptance)</div>
     <ul class="policy-list">
       <li>48+ hours before your session: full refund</li>
@@ -2641,7 +2663,7 @@ function openPaymentConfirm(t, slotLabel, btnEl) {
       <li>Less than 24 hours before: no refund</li>
       <li>Therapist no-show: full refund, always</li>
     </ul>
-    <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="confirm-pay-btn">Authorize $${amount} &amp; Request</button>
+    <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="confirm-pay-btn">Authorize $${amount.toFixed(2)} &amp; Request</button>
     <button class="text-btn" id="confirm-pay-cancel" style="color:var(--ink-soft);">Cancel</button>
   `;
   document.getElementById('confirm-modal').classList.remove('hidden');
@@ -2761,8 +2783,13 @@ function openTherapistOnDemandAgreement(onAgree) {
       <li>24–48 hours before: they get a 50% refund — you keep the other 50%</li>
       <li>Less than 24 hours before: no refund — you keep the full amount</li>
     </ul>
+    <div class="t-form-label">Fees</div>
+    <ul class="policy-list">
+      <li><strong>Kindred keeps a 5% processing fee</strong> on each on-demand session cost.</li>
+      <li>The client also covers the Stripe processing fee (2.9% + $0.30) on top of your price.</li>
+    </ul>
     <p class="modality-info-text"><strong>Showing up is the deal:</strong> if you miss a confirmed session, the client is refunded in full and your On-Demand access is permanently suspended.</p>
-    <p class="modality-info-text">By continuing, you agree to these terms and to honor confirmed sessions.</p>
+    <p class="modality-info-text">By continuing, you agree to these terms — including Kindred's 5% fee — and to honor confirmed sessions.</p>
     <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="agree-td-ondemand-btn">I Agree</button>
     <button class="text-btn" id="decline-td-ondemand-btn" style="color:var(--ink-soft);">Not Now</button>
   `;
@@ -3513,16 +3540,6 @@ function renderTherapistInsights() {
     { label: 'On-Demand sessions booked', value: (t.stats.onDemandBooked || 0) + odBookedCount, delta: 'all time' }
   ];
   container.innerHTML = `
-    <div class="home-accepting-card">
-      <div class="must-have-toggle card-toggle">
-        <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>${t.acceptingOngoing ? 'New clients can find and book you' : "You're shown in Discover marked not accepting — clients can save you for later"}</span></div>
-        <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-insights-ongoing-switch"></div>
-      </div>
-      <div class="must-have-toggle card-toggle">
-        <div class="toggle-label"><strong>Offer a waitlist</strong><span>${t.offerWaitlist ? "Clients who find you while you're full can join your waitlist" : 'Off — clients can only save you for later'}</span></div>
-        <div class="switch ${t.offerWaitlist ? 'on' : ''}" id="t-insights-waitlist-switch"></div>
-      </div>
-    </div>
     <div class="intake-sub" style="margin-bottom:14px;">How clients are finding and responding to your profile.</div>
     <div class="stat-grid">
       ${tiles.map(s => `
@@ -3534,6 +3551,16 @@ function renderTherapistInsights() {
       `).join('')}
     </div>
     <div class="portal-note" style="margin-top:12px;">Counts reflect this demo session plus seeded history — real analytics arrive with the production backend.</div>
+    <div class="home-accepting-card" style="margin-top:18px;margin-bottom:0;">
+      <div class="must-have-toggle card-toggle">
+        <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>${t.acceptingOngoing ? 'New clients can find and book you' : "You're shown in Discover marked not accepting — clients can save you for later"}</span></div>
+        <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-insights-ongoing-switch"></div>
+      </div>
+      <div class="must-have-toggle card-toggle">
+        <div class="toggle-label"><strong>Offer a waitlist</strong><span>${t.offerWaitlist ? "Clients who find you while you're full can join your waitlist" : 'Off — clients can only save you for later'}</span></div>
+        <div class="switch ${t.offerWaitlist ? 'on' : ''}" id="t-insights-waitlist-switch"></div>
+      </div>
+    </div>
   `;
   const insOngoingSwitch = document.getElementById('t-insights-ongoing-switch');
   if (insOngoingSwitch) insOngoingSwitch.addEventListener('click', () => {
@@ -3575,78 +3602,74 @@ function updateTNavBadge() {
 // answers "what spaces do I have open?" for new ongoing clients and for
 // one-time on-demand sessions. Filled slots show as Booked; the therapist
 // manages their openings here.
+function odSlotSort(s) {
+  const day = s.day || (s.label || '').split(' ')[0];
+  const time = s.time || (s.label || '').split(' ').slice(1).join(' ');
+  return DAYS_OF_WEEK.indexOf(day) * 10000 + timeSortKey(time);
+}
+
 function renderTherapistHome() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
-  document.getElementById('t-home-title').textContent = 'On Demand';
+  document.getElementById('t-home-title').innerHTML = `On Demand <button class="od-info-btn" id="od-info-btn" aria-label="What is On-Demand?">ⓘ</button>`;
   const list = document.getElementById('t-home-list');
+  if (!onDemandInfoShown) { onDemandInfoShown = true; openOnDemandInfo(); }
 
-  const ongoingBookings = matches.filter(m => m.therapist.id === t.id && m.status === 'matched' && m.scheduledDay);
   const odBooked = matches.filter(m => m.therapist.id === t.id && m.status === 'ondemand' && m.paymentStatus === 'paid');
-  const sortedAvail = [...t.availabilitySlots]
-    .map((s, i) => ({ ...s, i }))
-    .sort((a, b) => DAYS_OF_WEEK.indexOf(a.day) - DAYS_OF_WEEK.indexOf(b.day) || timeSortKey(a.time) - timeSortKey(b.time));
-  const openOngoing = sortedAvail.filter(s => !ongoingBookings.some(m => m.scheduledDay === s.day && m.scheduledTime === s.time)).length;
+  const p = ondemandPricing(t);
 
   let html = onDemandToggleHtml(t);
-
-  // ===== On-demand availability =====
-  // (Ongoing-client controls live on Home + Edit Profile — this tab is On-Demand only.)
   html += `<div class="avail-section-title">⚡ On-demand this week</div>`;
   if (t.onDemandBanned) {
     html += `<p class="portal-note">On-demand access is suspended after a reported no-show. Ongoing matching is unaffected.</p>`;
   } else if (!t.onDemand) {
-    html += `<p class="portal-note">On-demand is off. Turn it on in your Profile to offer one-time sessions.</p>`;
+    html += `<p class="portal-note">On-demand is off. Turn it on above to offer one-time sessions this week.</p>`;
   } else {
+    // ----- price (talks to what the client is charged) -----
+    html += `<div class="t-form-label">Your On-Demand session price ($)</div>
+      <input type="number" class="t-rate-input" id="od-rate-input" value="${t.onDemandRate}">
+      <p class="portal-note" style="margin-top:4px;">The client pays <strong>$${p.clientTotal.toFixed(2)}</strong> — your $${p.price.toFixed(2)} plus the Stripe fee $${p.stripeFee.toFixed(2)}. Kindred keeps 5% ($${p.kindredCut.toFixed(2)}); you net <strong>$${p.therapistNet.toFixed(2)}</strong>.</p>`;
+
+    // ----- weekly calendar picker (buttons, not free text) -----
+    html += `<div class="t-form-label" style="margin-top:16px;">Add openings for this week</div>`;
+    html += `<div class="od-day-row">${DAYS_OF_WEEK.map(d => `<button type="button" class="od-day-btn ${odNewSlotDay === d ? 'selected' : ''}" data-od-day="${d}">${d}</button>`).join('')}</div>`;
+    html += `<div class="add-slot-row"><input type="time" id="od-time-input" value="10:00"><button id="add-od-btn" ${odNewSlotDay ? '' : 'disabled'}>Add ${odNewSlotDay || 'time'}</button></div>`;
+
+    // ----- this week's openings -----
     if (t.onDemandSlots.length === 0) {
-      html += `<p class="portal-note">No on-demand openings this week — add a one-time slot below.</p>`;
+      html += `<p class="portal-note">No openings yet — pick a day above and add a time.</p>`;
     } else {
-      html += t.onDemandSlots.map((s, i) => {
+      const sorted = t.onDemandSlots.map((s, i) => ({ s, i })).sort((a, b) => odSlotSort(a.s) - odSlotSort(b.s));
+      html += `<div class="od-slots">` + sorted.map(({ s, i }) => {
         const booked = odBooked.find(m => m.slotLabel === s.label);
         return `<div class="avail-slot ${booked ? 'filled' : 'open'}">
           <div class="avail-when"><span class="avail-day">${s.label}</span></div>
           <span class="avail-status ${booked ? 'booked' : ''}">${booked ? 'Booked' : 'Open'}</span>
           ${booked ? '' : `<button class="appt-remove" data-remove-od="${i}">✕</button>`}
         </div>`;
-      }).join('');
+      }).join('') + `</div>`;
     }
-    html += `
-      <div class="add-slot-row">
-        <input type="text" id="new-od-slot" placeholder="e.g. Thu 4:00pm">
-        <button id="add-od-btn">Add</button>
-      </div>`;
   }
 
   list.innerHTML = html;
 
-  list.querySelectorAll('[data-remove-avail]').forEach(btn => {
-    btn.addEventListener('click', () => { t.availabilitySlots.splice(Number(btn.dataset.removeAvail), 1); renderTherapistHome(); });
-  });
   bindOnDemandToggle(t);
-  const homeOngoingSwitch = document.getElementById('t-home-ongoing-switch');
-  if (homeOngoingSwitch) homeOngoingSwitch.addEventListener('click', () => {
-    t.acceptingOngoing = !t.acceptingOngoing;
-    t.nextAvailableRank = t.acceptingOngoing ? 1 : null;
-    t.nextAvailableLabel = t.acceptingOngoing ? 'This week' : 'Not accepting new ongoing clients';
-    renderTherapistHome();
-  });
-  const addAvailBtn = document.getElementById('add-avail-btn');
-  if (addAvailBtn) addAvailBtn.addEventListener('click', () => {
-    const day = document.getElementById('avail-day').value;
-    const time = formatTime12h(document.getElementById('avail-time').value);
-    if (t.availabilitySlots.some(s => s.day === day && s.time === time)) { showToast('That slot is already open.'); return; }
-    t.availabilitySlots.push({ day, time });
+  const odInfoBtn = document.getElementById('od-info-btn');
+  if (odInfoBtn) odInfoBtn.addEventListener('click', openOnDemandInfo);
+  const odRateInput = document.getElementById('od-rate-input');
+  if (odRateInput) odRateInput.addEventListener('change', () => { t.onDemandRate = Number(odRateInput.value) || 0; renderTherapistHome(); });
+  document.querySelectorAll('[data-od-day]').forEach(btn => btn.addEventListener('click', () => { odNewSlotDay = btn.dataset.odDay; renderTherapistHome(); }));
+  const addOdBtn = document.getElementById('add-od-btn');
+  if (addOdBtn) addOdBtn.addEventListener('click', () => {
+    if (!odNewSlotDay) { showToast('Pick a day first.'); return; }
+    const time = formatTime12h(document.getElementById('od-time-input').value);
+    const label = `${odNewSlotDay} ${time}`;
+    if (t.onDemandSlots.some(s => s.label === label)) { showToast('That opening is already added.'); return; }
+    const rank = t.onDemandSlots.length ? Math.max(...t.onDemandSlots.map(s => s.rank || 0)) + 1 : 1;
+    t.onDemandSlots.push({ label, day: odNewSlotDay, time, rank });
     renderTherapistHome();
   });
   list.querySelectorAll('[data-remove-od]').forEach(btn => {
     btn.addEventListener('click', () => { t.onDemandSlots.splice(Number(btn.dataset.removeOd), 1); renderTherapistHome(); });
-  });
-  const addOdBtn = document.getElementById('add-od-btn');
-  if (addOdBtn) addOdBtn.addEventListener('click', () => {
-    const label = document.getElementById('new-od-slot').value.trim();
-    if (!label) return;
-    const rank = t.onDemandSlots.length ? Math.max(...t.onDemandSlots.map(s => s.rank)) + 1 : 1;
-    t.onDemandSlots.push({ label, rank });
-    renderTherapistHome();
   });
 }
 
@@ -4424,13 +4447,37 @@ function bindOnDemandToggle(t) {
   const odSwitch = document.getElementById('t-ondemand-switch');
   if (!odSwitch) return;
   odSwitch.addEventListener('click', () => {
-    if (!t.onDemand && !t.agreedToOnDemandPolicy) {
+    if (!t.onDemand) {
+      // turning ON always requires agreeing to the terms afresh
       openTherapistOnDemandAgreement(() => { t.agreedToOnDemandPolicy = true; t.onDemand = true; renderTherapistHome(); });
     } else {
-      t.onDemand = !t.onDemand;
+      // turning OFF clears the agreement, so re-enabling re-prompts the terms
+      t.onDemand = false;
+      t.agreedToOnDemandPolicy = false;
       renderTherapistHome();
     }
   });
+}
+
+// First-time (and reference) explainer for what On-Demand therapy is.
+function openOnDemandInfo() {
+  document.getElementById('confirm-sheet').innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>⚡ What is On-Demand?</h2>
+    <p class="modality-info-text">On-Demand lets clients book a single, one-time session with you this week — separate from ongoing therapy. A few things to know:</p>
+    <ul class="policy-list">
+      <li><strong>Not for crises.</strong> It's not crisis care — anyone in crisis should call or text 988 or their local emergency line.</li>
+      <li><strong>Cash-pay only.</strong> No insurance is billed for On-Demand sessions.</li>
+      <li><strong>You meet outside the app.</strong> Kindred handles the request and payment; you schedule and hold the actual session on your own platform.</li>
+      <li><strong>5% processing fee.</strong> Kindred keeps 5% of the session cost to run On-Demand; the client also covers the Stripe processing fee.</li>
+    </ul>
+    <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="od-info-ok-btn">Got it</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  const close = () => document.getElementById('confirm-modal').classList.add('hidden');
+  document.getElementById('od-info-ok-btn').addEventListener('click', close);
+  const sc = document.querySelector('#confirm-sheet .sheet-close');
+  if (sc) sc.addEventListener('click', close);
 }
 
 document.getElementById('btn-like').addEventListener('click', () => {

@@ -2026,6 +2026,21 @@ select.t-rate-input,
 /* disabled checkbox rows (e.g. top-3 once full) */
 .cbx-row-disabled { opacity:.4; cursor:default; }
 
+/* On-Demand: info button + weekly calendar picker */
+.od-info-btn {
+  border:none; background:none; cursor:pointer; color:var(--coral);
+  font-size:16px; line-height:1; padding:0 2px; vertical-align:middle;
+}
+.od-day-row { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 10px; }
+.od-day-btn {
+  flex:1; min-width:38px; font:inherit; font-size:13px; font-weight:600;
+  padding:9px 4px; border:1.5px solid var(--line); border-radius:10px;
+  background:#fff; color:var(--ink); cursor:pointer;
+}
+.od-day-btn.selected { background:var(--coral); border-color:var(--coral); color:#fff; }
+.od-slots { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.od-price { font-size:13px; font-weight:600; color:var(--ink); margin:8px 0 4px; }
+
 /* verified licensed-state chips */
 .licensed-state-chip { display:inline-flex; align-items:center; gap:5px; }
 .licensed-state-chip .lic-verified { color:var(--moss, #5a7d5a); font-weight:800; }
