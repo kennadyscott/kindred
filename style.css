@@ -2023,3 +2023,13 @@ select.t-rate-input,
 .chip-sub { font-size: 11px; opacity: .65; font-weight: 500; }
 .ideal-multi { margin-bottom: 4px; }
 .ideal-multi .other-language-row select { width: 100%; }
+
+/* ===== "Get to know them" — visually its own section ===== */
+.get-to-know {
+  margin-top: 34px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 18px 16px 20px;
+}
+.get-to-know .section-title { margin-top: 4px; }
