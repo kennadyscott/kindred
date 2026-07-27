@@ -1222,6 +1222,20 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 .quiz-result-card strong { display: block; font-size: 14px; color: var(--ink); }
 .quiz-result-card span { font-size: 12.5px; line-height: 1.45; color: var(--ink-soft); }
 .quiz-result-foot { font-size: 11.5px; font-style: italic; color: var(--ink-soft); margin: 6px 0 0; }
+
+/* one-section-at-a-time quiz: step counter + running summary */
+.quiz-step-count {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--coral); margin-bottom: 6px;
+}
+.quiz-running {
+  margin-top: 16px; font-size: 12.5px; color: var(--ink-soft);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+}
+.quiz-running-chip {
+  background: #f3edf6; border: 1px solid #e4d8ec; color: var(--ink);
+  font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+}
 .must-have-toggle {
   display: flex;
   align-items: center;

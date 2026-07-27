@@ -593,6 +593,7 @@ let intake = {
   careFor: null,         // 'myself' | 'child' | 'couples' | 'family'
   childAge: '',          // shown only when careFor === 'child'
   needs: [],
+  quizStage: 0,          // "new to me" path walks one theme group at a time, then a read
   notSure: false,        // "I'm not sure" on the needs step — valid answer, adds no tag filter
   needsOtherOpen: false, // transient UI flag for the "+ Other" specialty panel
   modality: 'open', modalityRequired: false, modalityOtherOpen: false,
@@ -960,24 +961,42 @@ function renderIntakeStep() {
   } else if (k === 'needs' && intake.knowsNeeds === 'no') {
     const groups = [...new Set(UNSURE_OPTIONS.map(o => o.group))];
     const readTags = [...new Set(intake.needs)].filter(tag => CONDITION_PLAIN[tag]);
-    html += `
-      <h1>Which of these sound like you?</h1>
-      <div class="intake-sub">No need for the right words — pick anything that's felt true lately. We'll turn it into a plain-language read on what might be going on, and what to look for in a therapist.</div>
-      <div id="unsure-list">
-        ${groups.map(g => `
-          <div class="quiz-group-label">${g}</div>
+    const stage = Math.min(intake.quizStage || 0, groups.length);
+    // friendly per-section prompts
+    const GROUP_PROMPTS = {
+      'Mood & energy': "How have your mood and energy been?",
+      'Worry & stress': 'What about worry and stress?',
+      'Relationships': 'How are your relationships feeling?',
+      'Focus, habits & self': 'What about focus, habits, and how you treat yourself?',
+      'Big life stuff': 'Any big life stuff going on?'
+    };
+    if (stage < groups.length) {
+      const g = groups[stage];
+      const opts = UNSURE_OPTIONS.filter(o => o.group === g);
+      html += `
+        <div class="quiz-step-count">Section ${stage + 1} of ${groups.length}</div>
+        <h1>${GROUP_PROMPTS[g] || g}</h1>
+        <div class="intake-sub">Pick anything that sounds like you — or skip this one if nothing fits. No right words needed.</div>
+        <div id="unsure-list">
           <div class="option-list">
-            ${UNSURE_OPTIONS.filter(o => o.group === g).map(o => `<div class="option-row ${intake.needs.includes(o.tag) ? 'selected' : ''}" data-unsure-tag="${o.tag}">${o.label}</div>`).join('')}
+            ${opts.map(o => `<div class="option-row ${intake.needs.includes(o.tag) ? 'selected' : ''}" data-unsure-tag="${o.tag}">${o.label}</div>`).join('')}
           </div>
-        `).join('')}
-      </div>
-      ${readTags.length ? `
-        <div class="quiz-result">
-          <div class="quiz-result-title">💡 Here's what this might be about</div>
-          <div class="quiz-result-sub">A plain read on what you picked — these become the focus areas we match you on. Tap a statement above to drop one.</div>
-          ${readTags.map(tag => `<div class="quiz-result-card"><strong>${tag}</strong><span>${CONDITION_PLAIN[tag]}</span></div>`).join('')}
-          <p class="quiz-result-foot">Not clinical labels — just a starting point. Your therapist helps you make sense of the rest.</p>
-        </div>` : ''}`;
+        </div>
+        ${readTags.length ? `<div class="quiz-running">So far this sounds like: ${readTags.map(t => `<span class="quiz-running-chip">${t}</span>`).join('')}</div>` : ''}`;
+    } else {
+      // final read screen
+      html += `
+        <h1>Here's what this might be about</h1>
+        <div class="intake-sub">A plain-language read on everything you picked — these become the focus areas we match you on.</div>
+        ${readTags.length ? `
+          <div class="quiz-result">
+            ${readTags.map(tag => `<div class="quiz-result-card"><strong>${tag}</strong><span>${CONDITION_PLAIN[tag]}</span></div>`).join('')}
+            <p class="quiz-result-foot">Not clinical labels — just a starting point. Your therapist helps you make sense of the rest.</p>
+          </div>` : `
+          <div class="quiz-result">
+            <div class="quiz-result-sub" style="margin:0;">Nothing jumped out — that's completely okay. We'll show you a broad set of well-matched therapists, and you can refine anytime. Tap Back if you'd like another look.</div>
+          </div>`}`;
+    }
   } else if (k === 'needs') {
     const extraSelected = intake.needs.filter(n => !NEED_OPTIONS.includes(n));
     html += `
@@ -1196,7 +1215,7 @@ function attachIntakeHandlers() {
   });
 
   document.querySelectorAll('#knows-list [data-knows]').forEach(el => {
-    el.addEventListener('click', () => { intake.knowsNeeds = el.dataset.knows; renderIntakeStep(); });
+    el.addEventListener('click', () => { intake.knowsNeeds = el.dataset.knows; intake.quizStage = 0; renderIntakeStep(); });
   });
 
   document.querySelectorAll('#needs-grid .chip-option[data-need]').forEach(el => {
@@ -1382,11 +1401,24 @@ function attachIntakeHandlers() {
     el.addEventListener('click', () => { intake.budgetRange = el.dataset.budgetRange; renderIntakeStep(); });
   });
 
+  // The "new to me" needs step paginates through theme groups + a final read,
+  // so Next/Back walk those sub-stages before moving between intake steps.
+  const curStepKey = activeSteps()[intakeStep];
+  const inUnsureQuiz = curStepKey === 'needs' && intake.knowsNeeds === 'no';
+  const quizGroupCount = [...new Set(UNSURE_OPTIONS.map(o => o.group))].length;
+
   const backBtn = document.getElementById('intake-back');
-  if (backBtn) backBtn.addEventListener('click', () => { intakeStep--; renderIntakeStep(); });
+  if (backBtn) backBtn.addEventListener('click', () => {
+    if (inUnsureQuiz && (intake.quizStage || 0) > 0) { intake.quizStage--; }
+    else { intakeStep--; }
+    renderIntakeStep();
+  });
 
   document.getElementById('intake-next').addEventListener('click', () => {
-    if (intakeStep < activeSteps().length - 1) {
+    if (inUnsureQuiz && (intake.quizStage || 0) < quizGroupCount) {
+      intake.quizStage = (intake.quizStage || 0) + 1;   // next theme group, then the read
+      renderIntakeStep();
+    } else if (intakeStep < activeSteps().length - 1) {
       intakeStep++;
       renderIntakeStep();
     } else {
