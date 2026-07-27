@@ -4,7 +4,7 @@ const THERAPISTS = [
     pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
     photo: 'https://randomuser.me/api/portraits/women/90.jpg',
     initials: 'MC', gradient: 'linear-gradient(135deg,#8a63a8,#5c3766)',
-    meta: ['Video & In-person', '$140–180/session'],
+    meta: ['Online & In-person', '$140–180/session'],
     bestFor: 'I work best with high-achievers who are quietly running on empty.',
     tags: ['Anxiety', 'Life Transitions', 'CBT', 'LGBTQ+ Affirming'],
     mandatoryPromptAnswers: [
@@ -38,7 +38,7 @@ const THERAPISTS = [
     pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
     photo: 'https://randomuser.me/api/portraits/men/83.jpg',
     initials: 'JO', gradient: 'linear-gradient(135deg,#bf7350,#9c5535)',
-    meta: ['Video only', '$110–130/session'],
+    meta: ['Online only', '$110–130/session'],
     selfPayNote: 'Sliding scale available',
     bestFor: "I work best with couples who still want to fight for the relationship, not just survive it.",
     tags: ['Couples', 'Family Conflict', 'EFT'],
@@ -108,7 +108,7 @@ const THERAPISTS = [
     pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
     photo: 'https://randomuser.me/api/portraits/men/11.jpg',
     initials: 'SA', gradient: 'linear-gradient(135deg,#d4a24e,#b57e2f)',
-    meta: ['Video & In-person', '$160/session'],
+    meta: ['Online & In-person', '$160/session'],
     bestFor: "I work best with men who are burnt out and tired of being told to 'just relax.'",
     tags: ['ADHD', 'Burnout', "Men's Issues", 'ACT'],
     mandatoryPromptAnswers: [
@@ -142,7 +142,7 @@ const THERAPISTS = [
     pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
     photo: 'https://randomuser.me/api/portraits/women/63.jpg',
     initials: 'LF', gradient: 'linear-gradient(135deg,#6ba4c9,#4278a0)',
-    meta: ['Video only', '$135/session'],
+    meta: ['Online only', '$135/session'],
     bestFor: 'I work best with new parents who feel like they should be coping better than they are.',
     tags: ['Postpartum', 'Anxiety', 'New Parents'],
     mandatoryPromptAnswers: [
@@ -176,7 +176,7 @@ const THERAPISTS = [
     pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
     photo: 'https://randomuser.me/api/portraits/men/22.jpg',
     initials: 'MW', gradient: 'linear-gradient(135deg,#8a9b6e,#647a4a)',
-    meta: ['In-person & Video', '$120/session'],
+    meta: ['In-person & Online', '$120/session'],
     selfPayNote: 'Sliding scale',
     bestFor: 'I work best with young adults who are ambivalent about change and sick of being lectured.',
     tags: ['Substance Use', 'Young Adults', 'Motivational Interviewing'],
@@ -713,7 +713,7 @@ function getMatchReasons(t) {
   }
   if (intake.modality !== 'open' && t.modalities.includes(intake.modality)) reasons.push(intake.modality);
   if (intake.formats.length && intake.formats.some(f => t.formats.includes(f))) {
-    if (intake.formats.includes('video') && t.formats.includes('video')) reasons.push('Video sessions');
+    if (intake.formats.includes('video') && t.formats.includes('video')) reasons.push('Online sessions');
     else if (intake.formats.includes('in-person') && t.formats.includes('in-person')) reasons.push('In-person sessions');
   }
   const wantsInPerson = intake.formats.includes('in-person');
@@ -782,8 +782,8 @@ function dbRowToTherapist(row) {
   const nameWords = (row.name || '').replace(/^Dr\.?\s*/i, '').split(' ').filter(Boolean);
   let h = 0; for (const ch of (row.user_id || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   const formats = row.formats || [];
-  const formatLabel = formats.length >= 2 ? 'Video & In-person'
-    : formats.includes('video') ? 'Video only'
+  const formatLabel = formats.length >= 2 ? 'Online & In-person'
+    : formats.includes('video') ? 'Online only'
     : formats.includes('in-person') ? 'In-person only' : 'Format not set';
   const optionalPrompts = Array.isArray(row.optional_prompts) ? row.optional_prompts.slice() : [];
   if (row.prompt_fit) optionalPrompts.unshift({ question: 'You may be a fit if...', answer: row.prompt_fit, photo: null });
@@ -3300,7 +3300,7 @@ function renderSignupStep() {
       <div class="intake-sub">So clients only see you if they can actually work with you.</div>
       <div class="t-form-label">Session format</div>
       <div class="chip-grid" id="ts-format-grid">
-        <div class="chip-option ${d.formats.includes('video') ? 'selected' : ''}" data-format="video">Video</div>
+        <div class="chip-option ${d.formats.includes('video') ? 'selected' : ''}" data-format="video">Online</div>
         <div class="chip-option ${d.formats.includes('in-person') ? 'selected' : ''}" data-format="in-person">In-person</div>
       </div>
       <div class="t-form-label">City</div>
@@ -3579,8 +3579,8 @@ function attachSignupHandlers() {
 }
 
 function buildTherapistMeta(d) {
-  const formatLabel = d.formats.length === 2 ? 'Video & In-person'
-    : d.formats.includes('video') ? 'Video only'
+  const formatLabel = d.formats.length === 2 ? 'Online & In-person'
+    : d.formats.includes('video') ? 'Online only'
     : d.formats.includes('in-person') ? 'In-person only'
     : 'Format not set';
   return [formatLabel, `$${d.rateMin}/session`];
@@ -4148,7 +4148,7 @@ function renderTherapistProfile() {
 
         <div class="t-form-label">Session format</div>
         <div class="chip-grid">
-          <div class="chip-option ${t.formats.includes('video') ? 'selected' : ''}" data-toggle-format="video">Online (video)</div>
+          <div class="chip-option ${t.formats.includes('video') ? 'selected' : ''}" data-toggle-format="video">Online</div>
           <div class="chip-option ${t.formats.includes('in-person') ? 'selected' : ''}" data-toggle-format="in-person">In-person</div>
         </div>
 
