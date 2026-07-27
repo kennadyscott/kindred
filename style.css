@@ -1243,6 +1243,13 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 }
 .quiz-done-emoji { font-size: 30px; margin-bottom: 8px; }
 .quiz-done p { font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); margin: 0; }
+
+/* "Required" marker on intake fields */
+.req-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--coral); background: #fdf1ed; border: 1px solid #f4d9cf;
+  padding: 2px 7px; border-radius: 999px; margin-left: 6px; vertical-align: middle;
+}
 .must-have-toggle {
   display: flex;
   align-items: center;

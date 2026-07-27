@@ -1016,11 +1016,12 @@ function renderIntakeStep() {
     html += `
       <h1>Who do you want to work with?</h1>
       <div class="intake-sub">Preferences are optional — but we do need to know where you are, since therapists are licensed by state.</div>
+      <div class="t-form-label">Gender</div>
       <div class="option-list" id="gender-list">
         <div class="option-row ${intake.genderPref === 'no-preference' ? 'selected' : ''}" data-gender="no-preference">No preference</div>
-        <div class="option-row ${intake.genderPref === 'female' ? 'selected' : ''}" data-gender="female">Female therapist</div>
-        <div class="option-row ${intake.genderPref === 'male' ? 'selected' : ''}" data-gender="male">Male therapist</div>
-        <div class="option-row ${intake.genderPref === 'nonbinary' ? 'selected' : ''}" data-gender="nonbinary">Nonbinary therapist</div>
+        <div class="option-row ${intake.genderPref === 'female' ? 'selected' : ''}" data-gender="female">Female</div>
+        <div class="option-row ${intake.genderPref === 'male' ? 'selected' : ''}" data-gender="male">Male</div>
+        <div class="option-row ${intake.genderPref === 'nonbinary' ? 'selected' : ''}" data-gender="nonbinary">Nonbinary</div>
       </div>
       <div id="gender-must-have" style="${intake.genderPref === 'no-preference' ? 'display:none;' : ''}">
         <div class="must-have-toggle">
@@ -1033,10 +1034,10 @@ function renderIntakeStep() {
         <div class="switch ${intake.lgbtqRequired ? 'on' : ''}" id="lgbtq-switch"></div>
       </div>
       <div class="t-form-label">Ethnicity</div>
-      <div class="chip-grid" id="ethnicity-grid">
-        <div class="chip-option ${intake.ethnicityPref === 'no-preference' ? 'selected' : ''}" data-ethnicity="no-preference">No preference</div>
-        ${ETHNICITY_OPTIONS.map(e => `<div class="chip-option ${intake.ethnicityPref === e ? 'selected' : ''}" data-ethnicity="${e}">${e}</div>`).join('')}
-      </div>
+      <select id="ethnicity-select">
+        <option value="no-preference" ${intake.ethnicityPref === 'no-preference' ? 'selected' : ''}>No preference</option>
+        ${ETHNICITY_OPTIONS.map(e => `<option value="${e}" ${intake.ethnicityPref === e ? 'selected' : ''}>${e}</option>`).join('')}
+      </select>
       <div class="t-form-label">Language</div>
       <div class="chip-grid" id="language-grid">
         ${LANGUAGE_QUICK_OPTIONS.map(l => `<div class="chip-option ${intake.languagePref === l ? 'selected' : ''}" data-language="${l}">${l}</div>`).join('')}
@@ -1054,10 +1055,10 @@ function renderIntakeStep() {
       </div>
       <div class="t-form-label">How do you want to meet?</div>
       <div class="option-list" id="format-list">
-        <div class="option-row ${intake.format === 'no-preference' ? 'selected' : ''}" data-format="no-preference">Either works</div>
-        <div class="option-row ${intake.format === 'video' ? 'selected' : ''}" data-format="video">Online (video)</div>
+        <div class="option-row ${intake.format === 'video' ? 'selected' : ''}" data-format="video">Online</div>
         <div class="option-row ${intake.format === 'in-person' ? 'selected' : ''}" data-format="in-person">In-person</div>
       </div>
+      <div class="intake-sub" style="margin-top:2px;">Optional — leave both unpicked if either works for you.</div>
       <div class="t-form-label">When can you usually meet?</div>
       <div class="chip-grid" id="availability-grid">
         ${AVAILABILITY_OPTIONS.map(a => `<div class="chip-option ${intake.availability.includes(a) ? 'selected' : ''}" data-availability="${a}">${a}</div>`).join('')}
@@ -1066,13 +1067,13 @@ function renderIntakeStep() {
         <div class="toggle-label"><strong>Only accepting new clients</strong><span>Hide anyone you could only save for later</span></div>
         <div class="switch ${intake.mustBeAccepting ? 'on' : ''}" id="accepting-required-switch"></div>
       </div>
-      <div class="t-form-label">Your state</div>
+      <div class="t-form-label">Your state <span class="req-badge">Required</span></div>
       <select id="intake-state">
         <option value="">Select a state</option>
         ${US_STATES.map(s => `<option value="${s}" ${intake.state === s ? 'selected' : ''}>${s}</option>`).join('')}
       </select>
       <div id="location-fields" style="${intake.format === 'in-person' ? '' : 'display:none;'}">
-        <div class="t-form-label">Your city</div>
+        <div class="t-form-label">Your city <span class="req-badge">Required for in-person</span></div>
         <input type="text" class="t-rate-input" id="intake-city" placeholder="e.g. Austin" value="${intake.city}">
       </div>
       <div class="intake-sub" style="margin-top:6px;">${intake.format === 'in-person' ? 'In-person only works with a therapist actually located near you.' : 'Even online, your therapist has to be licensed in your state.'}</div>`;
@@ -1283,9 +1284,8 @@ function attachIntakeHandlers() {
   if (lgbtqSwitch) lgbtqSwitch.addEventListener('click', () => { intake.lgbtqRequired = !intake.lgbtqRequired; renderIntakeStep(); });
   const acceptingReqSwitch = document.getElementById('accepting-required-switch');
   if (acceptingReqSwitch) acceptingReqSwitch.addEventListener('click', () => { intake.mustBeAccepting = !intake.mustBeAccepting; renderIntakeStep(); });
-  document.querySelectorAll('#ethnicity-grid .chip-option').forEach(el => {
-    el.addEventListener('click', () => { intake.ethnicityPref = el.dataset.ethnicity; renderIntakeStep(); });
-  });
+  const ethnicitySelect = document.getElementById('ethnicity-select');
+  if (ethnicitySelect) ethnicitySelect.addEventListener('change', () => { intake.ethnicityPref = ethnicitySelect.value; renderIntakeStep(); });
 
   document.querySelectorAll('#language-grid [data-language]').forEach(el => {
     el.addEventListener('click', () => {
@@ -1303,7 +1303,11 @@ function attachIntakeHandlers() {
   if (languageReqSwitch) languageReqSwitch.addEventListener('click', () => { intake.languageRequired = !intake.languageRequired; renderIntakeStep(); });
 
   document.querySelectorAll('#format-list .option-row').forEach(el => {
-    el.addEventListener('click', () => { intake.format = el.dataset.format; renderIntakeStep(); });
+    el.addEventListener('click', () => {
+      // tap again to clear back to "either works" (no filter)
+      intake.format = (intake.format === el.dataset.format) ? 'no-preference' : el.dataset.format;
+      renderIntakeStep();
+    });
   });
   document.querySelectorAll('#availability-grid .chip-option').forEach(el => {
     el.addEventListener('click', () => {
@@ -2940,9 +2944,9 @@ document.getElementById('login-back').addEventListener('click', () => {
 // and always landed on the existing-profile picker instead.
 document.getElementById('login-submit-btn').addEventListener('click', () => {
   if (accountType === 'client') {
-    // Clients don't land straight in the deck — they pick which side of
-    // Kindred they want first: the matching app or the explore/site side.
-    openExperienceModal();
+    // Dive straight into matching — no "match vs explore" fork up front.
+    // Explore Kindred stays available from the bottom nav once they're in.
+    enterMatchingExperience();
   } else {
     // No real per-account passwords in this prototype, so "Log In" just
     // takes you into whichever therapist account is currently active —
