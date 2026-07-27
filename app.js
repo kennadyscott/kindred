@@ -1191,10 +1191,14 @@ function renderIntakeStep() {
   else if (k === 'logistics') canProceed = intake.hasInsurance === 'yes' ? intake.insurance !== 'any'
     : intake.hasInsurance === 'no' ? intake.noInsurancePref !== null
     : false;
+  // On the optional "Anything else that matters?" step, the button reads Skip
+  // until they pick something, then Continue.
+  let nextLabel = intakeStep === activeSteps().length - 1 ? 'See My Matches' : 'Continue';
+  if (k === 'anythingElse' && intake.affinities.length === 0 && intake.faith.length === 0) nextLabel = 'Skip';
   html += `
     <div class="intake-footer">
       ${intakeStep > 0 ? `<button class="btn-back" id="intake-back">Back</button>` : ''}
-      <button class="btn-next" id="intake-next" ${canProceed ? '' : 'disabled'}>${intakeStep === activeSteps().length - 1 ? 'See My Matches' : 'Continue'}</button>
+      <button class="btn-next" id="intake-next" ${canProceed ? '' : 'disabled'}>${nextLabel}</button>
     </div>`;
 
   intakeContent.innerHTML = html;
