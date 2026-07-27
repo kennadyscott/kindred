@@ -1,6 +1,8 @@
-// Network-first service worker: keeps content fresh when online (so the team
-// always gets the latest deploy) while still enabling install + offline use.
-const CACHE = 'kindred-v1';
+// Network-first service worker that ALWAYS revalidates against the network when
+// online, so a new deploy shows up immediately. The previous version let the
+// browser's HTTP cache serve a stale app.js to the SW's fetch — {cache:'reload'}
+// bypasses that. The cache is only a fallback for when you're actually offline.
+const CACHE = 'kindred-v2';
 
 self.addEventListener('install', (e) => { self.skipWaiting(); });
 
@@ -14,13 +16,17 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
-        return res;
-      })
-      .catch(() => caches.match(e.request))
-  );
+  e.respondWith((async () => {
+    try {
+      // 'reload' = go to the network and skip the HTTP cache, then refresh ours.
+      const res = await fetch(e.request, { cache: 'reload' });
+      const copy = res.clone();
+      caches.open(CACHE).then(c => c.put(e.request, copy));
+      return res;
+    } catch (err) {
+      const cached = await caches.match(e.request);
+      if (cached) return cached;
+      throw err;
+    }
+  })());
 });
