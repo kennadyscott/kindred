@@ -281,7 +281,31 @@ THERAPISTS.forEach(t => {
   if (!Array.isArray(t.licensedStates)) t.licensedStates = LICENSE_SEED[t.id] || (t.location && t.location.state ? [t.location.state] : []);
   // on-demand session price (separate from the ongoing rate); defaults to it
   if (t.onDemandRate == null) t.onDemandRate = t.rateMin;
+  // listing subscription: seeded therapists are already live founding members;
+  // NEW signups build their profile but must subscribe to list it (see below).
+  if (t.listed === undefined) t.listed = true;
+  if (t.subscription === undefined) t.subscription = { plan: 'founding', founding: true, introRate: 19.99, standardRate: 29.99 };
 });
+
+// ===== LISTING SUBSCRIPTION (therapists pay to list) =====
+// Founding offer: the first 200 therapists get $19.99/mo for 3 months, then
+// $29.99/mo. Once the 200 founding spots are gone, everyone is $29.99/mo.
+const FOUNDING_TOTAL = 200;
+const FOUNDING_INTRO_RATE = 19.99;
+const FOUNDING_INTRO_MONTHS = 3;
+const STANDARD_RATE = 29.99;
+let foundingSpotsTaken = 43; // demo seed — founding rate still open
+function foundingSpotsLeft() { return Math.max(0, FOUNDING_TOTAL - foundingSpotsTaken); }
+function listingPricing() {
+  const founding = foundingSpotsLeft() > 0;
+  return {
+    founding,
+    introRate: founding ? FOUNDING_INTRO_RATE : STANDARD_RATE,
+    introMonths: founding ? FOUNDING_INTRO_MONTHS : 0,
+    standardRate: STANDARD_RATE,
+    spotsLeft: foundingSpotsLeft()
+  };
+}
 
 let onDemandInfoShown = false;      // show the "what is On-Demand" popup once per session
 let odNewSlotDay = null;            // day currently selected in the slot picker
@@ -654,8 +678,9 @@ function hasSlidingScale(t) {
   return !!t.acceptsSlidingScale || /sliding/i.test(t.selfPayNote || '');
 }
 function isCompatible(t, mode) {
-  // Unverified licenses never reach clients — verification is the floor,
-  // not a ranking signal.
+  // A profile only reaches clients once it's listed (subscription active) and
+  // license-verified — both are the floor, not ranking signals.
+  if (t.listed === false) return false;
   if (!t.licenseVerified) return false;
   // Not-accepting therapists still show (with a "save for later" banner) unless
   // the client asked to see only those open to new clients right now.
@@ -3624,11 +3649,65 @@ function finishTherapistSignup() {
     acceptingOngoing: d.acceptingOngoing, onDemand: d.onDemand, onDemandSlots: d.onDemandSlots,
     agreedToOnDemandPolicy: d.agreedToOnDemandPolicy,
     nextAvailableRank: d.acceptingOngoing ? 1 : null,
-    nextAvailableLabel: d.acceptingOngoing ? 'This week' : 'Not accepting new ongoing clients'
+    nextAvailableLabel: d.acceptingOngoing ? 'This week' : 'Not accepting new ongoing clients',
+    // profile is built but NOT listed until they subscribe
+    listed: false, subscription: null
   });
 
   currentTherapistId = id;
   showTherapistView();
+  openActivateProfile(); // pay to list before the profile goes live
+}
+
+// The "pay to list" gate. Therapists can build everything, but the profile only
+// enters the match pool once they start a listing subscription.
+function openActivateProfile() {
+  const t = THERAPISTS.find(t => t.id === currentTherapistId);
+  if (!t || t.listed) return;
+  const p = listingPricing();
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>Activate your profile</h2>
+    <div class="intake-sub">Your profile is built. List it on Kindred to start being matched with clients.</div>
+    <div class="activate-plan ${p.founding ? 'founding' : ''}">
+      ${p.founding ? `<div class="activate-badge">🌟 Founding member — ${p.spotsLeft} of ${FOUNDING_TOTAL} spots left</div>` : ''}
+      <div class="activate-price">$${p.introRate.toFixed(2)}<span>/mo</span></div>
+      ${p.founding
+        ? `<div class="activate-terms">for your first ${p.introMonths} months, then $${p.standardRate.toFixed(2)}/mo</div>`
+        : `<div class="activate-terms">billed monthly · cancel anytime</div>`}
+    </div>
+    <ul class="policy-list">
+      <li>Your profile goes live in client matching immediately</li>
+      <li>Cancel anytime — your profile just unlists, nothing is deleted</li>
+      ${p.founding ? `<li>Founding rate is locked to your first ${p.introMonths} months</li>` : ''}
+    </ul>
+    <div id="activate-status"></div>
+    <button class="primary-btn" style="margin-top:14px;background:var(--coral);color:white;" id="activate-pay-btn">Activate — $${p.introRate.toFixed(2)}/mo</button>
+    <button class="text-btn" id="activate-later-btn" style="color:var(--ink-soft);">I'll do this later</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  const close = () => document.getElementById('confirm-modal').classList.add('hidden');
+  const sc = sheet.querySelector('.sheet-close'); if (sc) sc.addEventListener('click', close);
+  document.getElementById('activate-later-btn').addEventListener('click', () => { close(); renderTherapistInsights(); });
+  document.getElementById('activate-pay-btn').addEventListener('click', () => {
+    const btn = document.getElementById('activate-pay-btn');
+    const status = document.getElementById('activate-status');
+    btn.disabled = true; btn.textContent = 'Starting subscription…';
+    status.innerHTML = `<div class="portal-note" style="margin-bottom:8px;">Setting up billing…</div>`;
+    setTimeout(() => {
+      // (Demo) — real Stripe subscription billing is backend work. Business data,
+      // so it's NOT behind the HIPAA gate; wire it when the backend lands.
+      const founding = p.founding;
+      if (founding) foundingSpotsTaken++;
+      t.listed = true;
+      t.subscription = { plan: founding ? 'founding' : 'standard', founding, introRate: p.introRate, standardRate: p.standardRate, introMonths: p.introMonths };
+      t.published = true;
+      close();
+      showToast(founding ? "You're a founding member — your profile is live! 🌟" : 'Your profile is live!');
+      renderTherapistInsights();
+    }, 1200);
+  });
 }
 
 function logout() {
@@ -3715,6 +3794,7 @@ function renderTherapistInsights() {
     { label: 'On-Demand sessions booked', value: (t.stats.onDemandBooked || 0) + odBookedCount, delta: 'all time' }
   ];
   container.innerHTML = `
+    ${!t.listed ? `<div class="activate-banner"><div><strong>Your profile isn't listed yet</strong><span>Activate it to appear in client matching.</span></div><button class="activate-banner-btn" id="t-activate-btn">Activate</button></div>` : ''}
     <div class="intake-sub" style="margin-bottom:14px;">How clients are finding and responding to your profile.</div>
     <div class="stat-grid">
       ${tiles.map(s => `
@@ -3737,6 +3817,8 @@ function renderTherapistInsights() {
       </div>
     </div>
   `;
+  const activateBtn = document.getElementById('t-activate-btn');
+  if (activateBtn) activateBtn.addEventListener('click', openActivateProfile);
   const insOngoingSwitch = document.getElementById('t-insights-ongoing-switch');
   if (insOngoingSwitch) insOngoingSwitch.addEventListener('click', () => {
     t.acceptingOngoing = !t.acceptingOngoing;
@@ -4832,6 +4914,13 @@ function renderTherapistSettings() {
     ${row('showInSearch', 'Appear in matching', 'Turning this off hides you from new matches without deleting anything')}
     <p class="portal-note">Your ideal-client settings are always private and never shown to clients.</p>
 
+    <div class="settings-group-title">Your listing</div>
+    ${t.listed && t.subscription
+      ? `<p class="portal-note" style="margin-top:0;">${t.subscription.founding
+            ? `🌟 <strong>Founding member</strong> — $${t.subscription.introRate.toFixed(2)}/mo for your first ${t.subscription.introMonths} months, then $${t.subscription.standardRate.toFixed(2)}/mo. Your profile is live.`
+            : `<strong>Listed</strong> — $${t.subscription.standardRate.toFixed(2)}/mo. Your profile is live.`}</p>`
+      : `<p class="portal-note" style="margin-top:0;">Your profile isn't listed yet.</p><button class="edit-prefs-btn" id="t-settings-activate-btn" style="color:var(--coral-dark);">Activate my profile</button>`}
+
     <div class="settings-group-title">Account</div>
     <button class="edit-prefs-btn" id="t-settings-profile-btn">Edit my profile</button>
     <button class="edit-prefs-btn" id="t-settings-logout-btn" style="color:var(--ink-soft);">Log Out</button>
@@ -4845,6 +4934,8 @@ function renderTherapistSettings() {
       renderTherapistSettings();
     });
   });
+  const settingsActivateBtn = document.getElementById('t-settings-activate-btn');
+  if (settingsActivateBtn) settingsActivateBtn.addEventListener('click', openActivateProfile);
   document.getElementById('t-settings-profile-btn').addEventListener('click', () => showTScreen('t-profile'));
   document.getElementById('t-settings-logout-btn').addEventListener('click', logout);
   document.getElementById('t-settings-delete-btn').addEventListener('click', openTherapistDeleteSheet);

@@ -1246,6 +1246,31 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 
 /* little star marking a required intake field */
 .req-star { color: var(--coral); font-size: 12px; margin-left: 3px; vertical-align: middle; }
+
+/* pay-to-list: banner + subscribe sheet */
+.activate-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: linear-gradient(135deg, #f6e3b0, #efd7f0); color: #5b4415;
+  border-radius: 14px; padding: 12px 14px; margin-bottom: 16px;
+}
+.activate-banner strong { display: block; font-size: 14px; }
+.activate-banner span { font-size: 12px; opacity: .85; }
+.activate-banner-btn {
+  flex: none; border: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 13px;
+  background: var(--ink); color: #fff; border-radius: 999px; padding: 9px 18px;
+}
+.activate-plan {
+  text-align: center; border: 1.5px solid var(--line); border-radius: 16px;
+  padding: 18px 14px; margin: 14px 0; background: #fff;
+}
+.activate-plan.founding { border-color: #e3c15a; background: #fffdf5; }
+.activate-badge {
+  display: inline-block; font-size: 11.5px; font-weight: 700; color: #7a5b12;
+  background: #fbeec2; border-radius: 999px; padding: 4px 12px; margin-bottom: 10px;
+}
+.activate-price { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 34px; color: var(--ink); }
+.activate-price span { font-size: 16px; font-weight: 600; color: var(--ink-soft); }
+.activate-terms { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
 .must-have-toggle {
   display: flex;
   align-items: center;
