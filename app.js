@@ -533,18 +533,58 @@ let PREV_EXPERIENCE_OPTIONS = [
   'Someone who shares my identity', 'Better at handling trauma', 'Nothing — it worked, I moved'
 ];
 
+// The "new to me" quiz: plain-language statements grouped by theme. Each maps to
+// a matchable specialty tag. Picking a few builds a live "here's what this might
+// be about" read — turning felt experience into potential focus areas.
 const UNSURE_OPTIONS = [
-  { label: "My mind won't stop racing, or I feel on edge a lot", tag: 'Anxiety' },
-  { label: "Something happened and I can't shake it", tag: 'Trauma' },
-  { label: 'Things feel tense or distant with my partner', tag: 'Couples' },
-  { label: "I lost someone or something and it's been hard to move through", tag: 'Grief' },
-  { label: "Everything in my life feels like it's changing at once", tag: 'Life Transitions' },
-  { label: "I'm running on empty, exhausted all the time", tag: 'Burnout' },
-  { label: 'I have trouble focusing or finishing things', tag: 'ADHD' },
-  { label: 'My drinking or drug use has been on my mind', tag: 'Substance Use' },
-  { label: 'Things have felt different since having a baby', tag: 'Postpartum' },
-  { label: 'Things are tense with my family', tag: 'Family Conflict' }
+  // Mood & energy
+  { group: 'Mood & energy', label: "I feel flat or heavy — things I used to enjoy don't land anymore", tag: 'Depression' },
+  { group: 'Mood & energy', label: "I'm running on empty, exhausted no matter how much I rest", tag: 'Burnout' },
+  { group: 'Mood & energy', label: "I'm harder on myself than I'd ever be on anyone else", tag: 'Self Esteem' },
+  { group: 'Mood & energy', label: "My emotions swing fast and feel hard to steer", tag: 'Emotional Regulation' },
+  // Worry & stress
+  { group: 'Worry & stress', label: "My mind won't stop racing, or I feel on edge a lot", tag: 'Anxiety' },
+  { group: 'Worry & stress', label: "Being around people makes me anxious — I overthink every interaction", tag: 'Social Anxiety' },
+  { group: 'Worry & stress', label: "The pressure I'm under feels like more than I can carry", tag: 'Stress' },
+  { group: 'Worry & stress', label: "Something happened and I can't shake it", tag: 'Trauma' },
+  // Relationships
+  { group: 'Relationships', label: 'Things feel tense or distant with my partner', tag: 'Couples' },
+  { group: 'Relationships', label: 'Things are tense or painful with my family', tag: 'Family Conflict' },
+  { group: 'Relationships', label: "I lose myself in relationships, or I can't say no", tag: 'Codependency' },
+  // Focus, habits & self
+  { group: 'Focus, habits & self', label: 'I have trouble focusing or finishing what I start', tag: 'ADHD' },
+  { group: 'Focus, habits & self', label: 'My drinking or drug use has been on my mind', tag: 'Substance Use' },
+  { group: 'Focus, habits & self', label: "I can't sleep, or sleep never leaves me rested", tag: 'Sleep or Insomnia' },
+  { group: 'Focus, habits & self', label: 'My anger gets bigger than the moment calls for', tag: 'Anger Management' },
+  // Big life stuff
+  { group: 'Big life stuff', label: "Everything in my life feels like it's changing at once", tag: 'Life Transitions' },
+  { group: 'Big life stuff', label: "I lost someone or something and it's been hard to move through", tag: 'Grief' },
+  { group: 'Big life stuff', label: "I'm unsure where my career or sense of purpose is headed", tag: 'Career Counseling' },
+  { group: 'Big life stuff', label: 'Things have felt different since having a baby', tag: 'Postpartum' }
 ];
+
+// Plain-language read for each tag — what the quiz reflects back to the client.
+const CONDITION_PLAIN = {
+  'Anxiety': "that racing-mind, on-edge, bracing-for-the-worst feeling",
+  'Social Anxiety': "dread and self-consciousness around other people",
+  'Depression': "low, flat, or heavy — joy and motivation gone quiet",
+  'Burnout': "depleted past the point that rest seems to fix",
+  'Self Esteem': "a harsh inner critic and a shaky sense of worth",
+  'Emotional Regulation': "big feelings that are hard to slow down or steer",
+  'Stress': "carrying more pressure than feels sustainable",
+  'Trauma': "a past event that still intrudes on the present",
+  'Couples': "strain, distance, or conflict with a partner",
+  'Family Conflict': "tension or hurt in family relationships",
+  'Codependency': "losing yourself in other people's needs",
+  'ADHD': "trouble with focus, follow-through, and overwhelm",
+  'Substance Use': "a relationship with alcohol or drugs worth a closer look",
+  'Sleep or Insomnia': "sleep that won't come, or won't leave you rested",
+  'Anger Management': "anger that runs hotter than the moment calls for",
+  'Life Transitions': "a season of change reshaping who you are",
+  'Grief': "moving through a meaningful loss",
+  'Career Counseling': "uncertainty about work, direction, or purpose",
+  'Postpartum': "the identity and mood shifts that can follow a baby"
+};
 
 let intake = {
   knowsNeeds: null, // 'no' = new to therapy (symptom-led) | 'yes' = experienced (knows what they want)
@@ -918,12 +958,26 @@ function renderIntakeStep() {
         </div>
       </div>`;
   } else if (k === 'needs' && intake.knowsNeeds === 'no') {
+    const groups = [...new Set(UNSURE_OPTIONS.map(o => o.group))];
+    const readTags = [...new Set(intake.needs)].filter(tag => CONDITION_PLAIN[tag]);
     html += `
-      <h1>What's been going on?</h1>
-      <div class="intake-sub">Pick anything that sounds like you. You don't need the right words — we'll translate these into what to look for in a therapist.</div>
-      <div class="option-list" id="unsure-list">
-        ${UNSURE_OPTIONS.map(o => `<div class="option-row ${intake.needs.includes(o.tag) ? 'selected' : ''}" data-unsure-tag="${o.tag}">${o.label}</div>`).join('')}
-      </div>`;
+      <h1>Which of these sound like you?</h1>
+      <div class="intake-sub">No need for the right words — pick anything that's felt true lately. We'll turn it into a plain-language read on what might be going on, and what to look for in a therapist.</div>
+      <div id="unsure-list">
+        ${groups.map(g => `
+          <div class="quiz-group-label">${g}</div>
+          <div class="option-list">
+            ${UNSURE_OPTIONS.filter(o => o.group === g).map(o => `<div class="option-row ${intake.needs.includes(o.tag) ? 'selected' : ''}" data-unsure-tag="${o.tag}">${o.label}</div>`).join('')}
+          </div>
+        `).join('')}
+      </div>
+      ${readTags.length ? `
+        <div class="quiz-result">
+          <div class="quiz-result-title">💡 Here's what this might be about</div>
+          <div class="quiz-result-sub">A plain read on what you picked — these become the focus areas we match you on. Tap a statement above to drop one.</div>
+          ${readTags.map(tag => `<div class="quiz-result-card"><strong>${tag}</strong><span>${CONDITION_PLAIN[tag]}</span></div>`).join('')}
+          <p class="quiz-result-foot">Not clinical labels — just a starting point. Your therapist helps you make sense of the rest.</p>
+        </div>` : ''}`;
   } else if (k === 'needs') {
     const extraSelected = intake.needs.filter(n => !NEED_OPTIONS.includes(n));
     html += `
@@ -1170,7 +1224,7 @@ function attachIntakeHandlers() {
     });
   });
 
-  document.querySelectorAll('#unsure-list .option-row').forEach(el => {
+  document.querySelectorAll('#unsure-list [data-unsure-tag]').forEach(el => {
     el.addEventListener('click', () => {
       const tag = el.dataset.unsureTag;
       const i = intake.needs.indexOf(tag);

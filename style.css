@@ -1203,6 +1203,25 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   color: var(--coral-dark);
   font-weight: 600;
 }
+
+/* "new to me" quiz: theme labels + live plain-language read */
+.quiz-group-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ink-soft); margin: 16px 0 8px;
+}
+.quiz-result {
+  margin-top: 18px; padding: 16px; border-radius: 16px;
+  background: #f3edf6; border: 1px solid #e4d8ec;
+}
+.quiz-result-title { font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 15px; color: var(--ink); }
+.quiz-result-sub { font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); margin: 4px 0 12px; }
+.quiz-result-card {
+  background: #fff; border: 1px solid #e4d8ec; border-radius: 12px;
+  padding: 10px 12px; margin-bottom: 8px;
+}
+.quiz-result-card strong { display: block; font-size: 14px; color: var(--ink); }
+.quiz-result-card span { font-size: 12.5px; line-height: 1.45; color: var(--ink-soft); }
+.quiz-result-foot { font-size: 11.5px; font-style: italic; color: var(--ink-soft); margin: 6px 0 0; }
 .must-have-toggle {
   display: flex;
   align-items: center;
