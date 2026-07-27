@@ -1441,6 +1441,86 @@ function finishIntake() {
   showScreen('discover');
 }
 
+// Demo helper: drop straight into a fully-populated client account so every
+// client zone (Discover, Short List, Matches, On-Demand, Explore) has content.
+function seedClientDemo() {
+  accountType = 'client';
+  Object.assign(intake, {
+    knowsNeeds: 'yes', careFor: 'myself',
+    needs: ['Anxiety', 'Burnout', 'Life Transitions'], notSure: false, quizStage: 0,
+    modality: 'open', modalityRequired: false, modalityOtherOpen: false,
+    stylePref: 'gentle',
+    genderPref: 'no-preference', genderRequired: false,
+    ethnicityPref: 'no-preference',
+    lgbtqRequired: false, affinities: ['LGBTQ+'], faith: [],
+    languagePref: 'any', languageRequired: false, languageOtherOpen: false,
+    formats: [], availability: ['Evenings', 'Weekends'], mustBeAccepting: false,
+    state: '', city: '',
+    hasInsurance: 'no', noInsurancePref: 'therapist-first', budgetRange: 'Any budget',
+    age: '32', selfGender: 'Female', field: 'Healthcare',
+    prevExperience: [], prevNotes: '', completed: false
+  });
+
+  // reset client-side collections
+  shortlist = [];
+  matches.length = 0;
+  Object.keys(chatLog).forEach(k => delete chatLog[k]);
+  savedResources = ['r1', 'r2', 'r4'];
+
+  const byId = id => THERAPISTS.find(t => t.id === id);
+  const [t1, t2, t3, t4, t5, t6] = ['t1', 't2', 't3', 't4', 't5', 't6'].map(byId);
+
+  // Short List — liked, not yet requested
+  [t4, t5].filter(Boolean).forEach(t => shortlist.push(t));
+
+  // Matched conversation — accepted, scheduled, a little back-and-forth
+  if (t1) {
+    matches.push({
+      therapist: t1, status: 'matched', needsSnapshot: ['Anxiety', 'Burnout'],
+      introMessage: 'Hi!', desiredFrequency: 'Weekly', profileShared: true,
+      scheduledDay: 'Tuesday', scheduledTime: '5:00pm',
+      portal: { goals: [{ text: 'Name one thing that drained me each day', done: false }], homework: [{ text: '5-4-3-2-1 grounding, once a day', done: true }], resources: [] }
+    });
+    chatLog[t1.id] = [
+      { from: 'me', text: "Hi! I've been dealing with a lot of anxiety at work and could really use some support." },
+      { from: 'them', text: "I'm so glad you reached out — that sounds exhausting. I'd love to help. I've got you down for Tuesdays at 5." },
+      { from: 'me', text: 'Thank you, that means a lot. See you then!' }
+    ];
+  }
+  // Pending request — waiting on the therapist
+  if (t2) {
+    matches.push({
+      therapist: t2, status: 'pending', needsSnapshot: ['Anxiety', 'Burnout'],
+      introMessage: "Your approach really resonated — I've been running on empty and would love to talk.",
+      desiredFrequency: 'Weekly', profileShared: true, portal: { goals: [], homework: [], resources: [] }
+    });
+    chatLog[t2.id] = [{ from: 'me', text: "Your approach really resonated — I've been running on empty and would love to talk." }];
+  }
+  // Declined — not a fit on their end
+  if (t3) {
+    matches.push({
+      therapist: t3, status: 'declined', needsSnapshot: ['Trauma'],
+      introMessage: 'Hi', desiredFrequency: 'Weekly', profileShared: false, portal: { goals: [], homework: [], resources: [] }
+    });
+    chatLog[t3.id] = [
+      { from: 'me', text: 'Hi, I was hoping to work with you.' },
+      { from: 'them', text: "Thank you for reaching out. I don't think I'm the right fit right now, but I hope you find someone who is." }
+    ];
+  }
+  // On-Demand — one confirmed, paid session
+  if (t6 && Array.isArray(t6.onDemandSlots) && t6.onDemandSlots.length) {
+    const slot = t6.onDemandSlots[0].label;
+    const [day, ...rest] = slot.split(' ');
+    matches.push({
+      therapist: t6, status: 'ondemand', slotLabel: slot,
+      amountPaid: ondemandPricing(t6).clientTotal, paymentStatus: 'paid',
+      sessionDateTime: nextOccurrence(day, rest.join(' ')).toISOString()
+    });
+  }
+
+  finishIntake();
+}
+
 function startIntake() {
   intakeStep = 0;
   document.getElementById('bottom-nav').classList.add('hidden');
@@ -4697,6 +4777,12 @@ function renderProfileScreen() {
 }
 
 showScreen('account-type');
+
+// Demo shortcut — a button on the first screen (and ?demo=client) drops you into
+// a filled-in client account so every zone can be previewed with content.
+const previewClientDemoBtn = document.getElementById('preview-client-demo-btn');
+if (previewClientDemoBtn) previewClientDemoBtn.addEventListener('click', seedClientDemo);
+if (/[?&]demo=client\b/.test(location.search)) seedClientDemo();
 
 // ===== SHARED-THERAPIST DEEP LINK =====
 // A link someone was sent (…#therapist=t3) opens straight to that therapist's
