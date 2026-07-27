@@ -1893,15 +1893,7 @@ function buildCard(t) {
       ${!t.acceptingOngoing ? `<div class="not-accepting-banner">Not currently accepting clients — save for later</div>` : ''}
     </div>
     <div class="card-body">
-      <div class="card-name-row"><h2 class="serif-name">${displayName(t)}</h2>${isInTop5(t) ? `<span class="top5-chip" title="In your Top 5">★</span>` : ''}${t.licenseVerified ? `<span class="verified-chip" title="License verified via Stripe Identity">✓ Verified</span>` : ''}</div>
-      ${(t.showPronouns && t.pronouns) ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
-      <div class="card-subtitle">${[credentialsLabel(t), ...t.tags.slice(0, 2)].join(' • ')}</div>
-      ${traitChipsHtml(t)}
-      ${t.bestFor ? `<div class="quote-block">${t.bestFor}</div>` : ''}
-      ${whyYouMatchHtml(t)}
-      ${capabilityRowHtml(t)}
-      <div class="feed-divider">Keep scrolling — get to know ${displayName(t).replace(/^Dr\.?\s*/i, '').split(' ')[0]}</div>
-      ${profileFeedHtml(t)}
+      ${profileCardBodyHtml(t, {})}
     </div>
   `;
   card.querySelectorAll('[data-info]').forEach(el => {
@@ -2160,16 +2152,11 @@ const detailSheet = document.getElementById('detail-sheet');
 // The client-facing profile body. Shared so a therapist's "View Profile" tab
 // renders exactly what a client sees — one source of truth, no drift.
 // opts.inline omits the close/like/share buttons (the tab has its own chrome).
-function profileCardHtml(t, opts = {}) {
+// Everything below the photo. Shared by the detail view, the therapist's
+// "View Profile", AND the Discover swipe card, so all three read identically.
+function profileCardBodyHtml(t, opts = {}) {
   const preview = opts.preview === true;
   return `
-    ${preview && !opts.inline ? `<div class="preview-banner">👀 This is what clients see when they view your profile</div>` : ''}
-    <div class="card-photo detail-photo" style="background:${t.gradient};">
-      ${t.photo ? `<img class="card-photo-img" src="${t.photo}" alt="">` : `<div class="initials">${t.initials}</div>`}
-      ${preview ? '' : matchBadgeHtml(t)}
-      ${preview ? '' : languageBadgeHtml(t)}
-      ${!t.acceptingOngoing ? `<div class="not-accepting-banner">Not currently accepting clients — save for later</div>` : ''}
-    </div>
     <div class="card-name-row" style="margin-top:14px;"><h2>${displayName(t)}</h2><span class="creds">${credentialsLabel(t)}</span></div>
     ${t.pronouns ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
     <div class="detail-badge-row">
@@ -2186,6 +2173,19 @@ function profileCardHtml(t, opts = {}) {
       <div class="get-to-know-title">Get to Know Them</div>
       ${profileFeedHtml(t)}
     </div>`;
+}
+
+function profileCardHtml(t, opts = {}) {
+  const preview = opts.preview === true;
+  return `
+    ${preview && !opts.inline ? `<div class="preview-banner">👀 This is what clients see when they view your profile</div>` : ''}
+    <div class="card-photo detail-photo" style="background:${t.gradient};">
+      ${t.photo ? `<img class="card-photo-img" src="${t.photo}" alt="">` : `<div class="initials">${t.initials}</div>`}
+      ${preview ? '' : matchBadgeHtml(t)}
+      ${preview ? '' : languageBadgeHtml(t)}
+      ${!t.acceptingOngoing ? `<div class="not-accepting-banner">Not currently accepting clients — save for later</div>` : ''}
+    </div>
+    ${profileCardBodyHtml(t, opts)}`;
 }
 
 function openDetail(t, opts = {}) {
