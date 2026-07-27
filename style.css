@@ -1236,6 +1236,13 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   background: #f3edf6; border: 1px solid #e4d8ec; color: var(--ink);
   font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
 }
+/* neutral, non-diagnostic close for the "new to me" quiz */
+.quiz-done {
+  margin-top: 18px; padding: 22px 18px; border-radius: 16px; text-align: center;
+  background: #f3edf6; border: 1px solid #e4d8ec;
+}
+.quiz-done-emoji { font-size: 30px; margin-bottom: 8px; }
+.quiz-done p { font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); margin: 0; }
 .must-have-toggle {
   display: flex;
   align-items: center;

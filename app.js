@@ -960,7 +960,6 @@ function renderIntakeStep() {
       </div>`;
   } else if (k === 'needs' && intake.knowsNeeds === 'no') {
     const groups = [...new Set(UNSURE_OPTIONS.map(o => o.group))];
-    const readTags = [...new Set(intake.needs)].filter(tag => CONDITION_PLAIN[tag]);
     const stage = Math.min(intake.quizStage || 0, groups.length);
     // friendly per-section prompts
     const GROUP_PROMPTS = {
@@ -973,6 +972,8 @@ function renderIntakeStep() {
     if (stage < groups.length) {
       const g = groups[stage];
       const opts = UNSURE_OPTIONS.filter(o => o.group === g);
+      // NOTE: statements quietly map to matchable focus areas behind the scenes,
+      // but we never surface a condition/label to the client — no diagnosing.
       html += `
         <div class="quiz-step-count">Section ${stage + 1} of ${groups.length}</div>
         <h1>${GROUP_PROMPTS[g] || g}</h1>
@@ -981,21 +982,16 @@ function renderIntakeStep() {
           <div class="option-list">
             ${opts.map(o => `<div class="option-row ${intake.needs.includes(o.tag) ? 'selected' : ''}" data-unsure-tag="${o.tag}">${o.label}</div>`).join('')}
           </div>
-        </div>
-        ${readTags.length ? `<div class="quiz-running">So far this sounds like: ${readTags.map(t => `<span class="quiz-running-chip">${t}</span>`).join('')}</div>` : ''}`;
+        </div>`;
     } else {
-      // final read screen
+      // neutral close — reassurance only, deliberately names no conditions
       html += `
-        <h1>Here's what this might be about</h1>
-        <div class="intake-sub">A plain-language read on everything you picked — these become the focus areas we match you on.</div>
-        ${readTags.length ? `
-          <div class="quiz-result">
-            ${readTags.map(tag => `<div class="quiz-result-card"><strong>${tag}</strong><span>${CONDITION_PLAIN[tag]}</span></div>`).join('')}
-            <p class="quiz-result-foot">Not clinical labels — just a starting point. Your therapist helps you make sense of the rest.</p>
-          </div>` : `
-          <div class="quiz-result">
-            <div class="quiz-result-sub" style="margin:0;">Nothing jumped out — that's completely okay. We'll show you a broad set of well-matched therapists, and you can refine anytime. Tap Back if you'd like another look.</div>
-          </div>`}`;
+        <h1>Thanks — that really helps</h1>
+        <div class="intake-sub">That's everything we need. We'll use what you shared to find therapists who work with what you're carrying.</div>
+        <div class="quiz-done">
+          <div class="quiz-done-emoji">🌿</div>
+          <p>No labels, no diagnosis — that's your therapist's work to do with you. Tap Continue whenever you're ready.</p>
+        </div>`;
     }
   } else if (k === 'needs') {
     const extraSelected = intake.needs.filter(n => !NEED_OPTIONS.includes(n));
