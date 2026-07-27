@@ -604,7 +604,7 @@ let intake = {
   affinities: [],        // gender/sexuality affinity tags — soft multi-select ("anything else")
   faith: [],             // faith backgrounds — soft multi-select ("anything else")
   languagePref: 'any', languageRequired: false, languageOtherOpen: false,
-  format: 'no-preference',
+  formats: [],            // desired session formats — multi-select; [] = either works
   availability: [],      // when the client can usually meet — multi-select
   mustBeAccepting: false,// only surface therapists open to new clients right now
   // About the client THEMSELVES (not preferences about a therapist). Used only
@@ -674,14 +674,17 @@ function isCompatible(t, mode) {
 
   if (intake.languagePref !== 'any' && intake.languageRequired && !t.languages.includes(intake.languagePref)) return false;
 
-  if (intake.format !== 'no-preference' && !t.formats.includes(intake.format)) return false;
+  // Format is multi-select: no pick = either works; otherwise the therapist has
+  // to offer at least one of the formats the client is open to.
+  if (intake.formats.length && !intake.formats.some(f => t.formats.includes(f))) return false;
 
   // State always matters — even online, a therapist has to be licensed
   // where the client lives. Multi-state therapists match on any verified state.
-  // City only matters for meeting in person.
+  // City only matters when they want IN-PERSON ONLY (open to online too = flexible).
   const licensed = (t.licensedStates && t.licensedStates.length) ? t.licensedStates : (t.location.state ? [t.location.state] : []);
   if (intake.state && !licensed.includes(intake.state)) return false;
-  if (intake.format === 'in-person' && intake.city.trim() && t.location.city.trim().toLowerCase() !== intake.city.trim().toLowerCase()) return false;
+  const inPersonOnly = intake.formats.length === 1 && intake.formats[0] === 'in-person';
+  if (inPersonOnly && intake.city.trim() && t.location.city.trim().toLowerCase() !== intake.city.trim().toLowerCase()) return false;
 
   if (intake.hasInsurance === 'yes' && intake.insurance !== 'any' && !t.insuranceList.includes(intake.insurance)) return false;
 
@@ -709,10 +712,12 @@ function getMatchReasons(t) {
     reasons.push('Works with a broad range of concerns');
   }
   if (intake.modality !== 'open' && t.modalities.includes(intake.modality)) reasons.push(intake.modality);
-  if (intake.format !== 'no-preference' && t.formats.includes(intake.format)) {
-    reasons.push(intake.format === 'video' ? 'Video sessions' : 'In-person sessions');
+  if (intake.formats.length && intake.formats.some(f => t.formats.includes(f))) {
+    if (intake.formats.includes('video') && t.formats.includes('video')) reasons.push('Video sessions');
+    else if (intake.formats.includes('in-person') && t.formats.includes('in-person')) reasons.push('In-person sessions');
   }
-  if (intake.format === 'in-person' && intake.city.trim() && t.location.city.trim().toLowerCase() === intake.city.trim().toLowerCase()) {
+  const wantsInPerson = intake.formats.includes('in-person');
+  if (wantsInPerson && intake.city.trim() && t.location.city.trim().toLowerCase() === intake.city.trim().toLowerCase()) {
     reasons.push(`Located in ${t.location.city}, ${t.location.state}`);
   } else if (intake.state && t.location.state === intake.state) {
     reasons.push(`Licensed in ${intake.state}`);
@@ -829,7 +834,7 @@ function matchParams() {
     p_affinities: intake.affinities || [],
     p_faith: intake.faith || [],
     p_language: intake.languagePref !== 'any' ? intake.languagePref : null,
-    p_format: intake.format !== 'no-preference' ? intake.format : null,
+    p_format: intake.formats.length === 1 ? intake.formats[0] : null,
     p_insurance: (intake.hasInsurance === 'yes' && intake.insurance !== 'any') ? intake.insurance : null,
     p_state: intake.state || null,
     p_age_band: ageToBand(intake.age), // send the derived life-stage band
@@ -1013,11 +1018,11 @@ function renderIntakeStep() {
       <h1>Who do you want to work with?</h1>
       <div class="intake-sub">Preferences are optional — but we do need to know where you are, since therapists are licensed by state.</div>
       <div class="t-form-label">Gender</div>
-      <div class="option-list" id="gender-list">
-        <div class="option-row ${intake.genderPref === 'no-preference' ? 'selected' : ''}" data-gender="no-preference">No preference</div>
-        <div class="option-row ${intake.genderPref === 'female' ? 'selected' : ''}" data-gender="female">Female</div>
-        <div class="option-row ${intake.genderPref === 'male' ? 'selected' : ''}" data-gender="male">Male</div>
-        <div class="option-row ${intake.genderPref === 'nonbinary' ? 'selected' : ''}" data-gender="nonbinary">Nonbinary</div>
+      <div class="chip-grid" id="gender-list">
+        <div class="chip-option ${intake.genderPref === 'no-preference' ? 'selected' : ''}" data-gender="no-preference">No preference</div>
+        <div class="chip-option ${intake.genderPref === 'female' ? 'selected' : ''}" data-gender="female">Female</div>
+        <div class="chip-option ${intake.genderPref === 'male' ? 'selected' : ''}" data-gender="male">Male</div>
+        <div class="chip-option ${intake.genderPref === 'nonbinary' ? 'selected' : ''}" data-gender="nonbinary">Nonbinary</div>
       </div>
       <div id="gender-must-have" style="${intake.genderPref === 'no-preference' ? 'display:none;' : ''}">
         <div class="must-have-toggle">
@@ -1050,11 +1055,10 @@ function renderIntakeStep() {
         </div>
       </div>
       <div class="t-form-label">How do you want to meet?</div>
-      <div class="option-list" id="format-list">
-        <div class="option-row ${intake.format === 'video' ? 'selected' : ''}" data-format="video">Online</div>
-        <div class="option-row ${intake.format === 'in-person' ? 'selected' : ''}" data-format="in-person">In-person</div>
+      <div class="chip-grid" id="format-list">
+        <div class="chip-option ${intake.formats.includes('video') ? 'selected' : ''}" data-format="video">Online</div>
+        <div class="chip-option ${intake.formats.includes('in-person') ? 'selected' : ''}" data-format="in-person">In-person</div>
       </div>
-      <div class="intake-sub" style="margin-top:2px;">Optional — leave both unpicked if either works for you.</div>
       <div class="t-form-label">When can you usually meet?</div>
       <div class="chip-grid" id="availability-grid">
         ${AVAILABILITY_OPTIONS.map(a => `<div class="chip-option ${intake.availability.includes(a) ? 'selected' : ''}" data-availability="${a}">${a}</div>`).join('')}
@@ -1063,16 +1067,16 @@ function renderIntakeStep() {
         <div class="toggle-label"><strong>Only accepting new clients</strong><span>Hide anyone you could only save for later</span></div>
         <div class="switch ${intake.mustBeAccepting ? 'on' : ''}" id="accepting-required-switch"></div>
       </div>
-      <div class="t-form-label">Your state <span class="req-badge">Required</span></div>
+      <div class="t-form-label">Your state <span class="req-star" title="Required">★</span></div>
       <select id="intake-state">
         <option value="">Select a state</option>
         ${US_STATES.map(s => `<option value="${s}" ${intake.state === s ? 'selected' : ''}>${s}</option>`).join('')}
       </select>
-      <div id="location-fields" style="${intake.format === 'in-person' ? '' : 'display:none;'}">
-        <div class="t-form-label">Your city <span class="req-badge">Required for in-person</span></div>
+      <div id="location-fields" style="${intake.formats.includes('in-person') ? '' : 'display:none;'}">
+        <div class="t-form-label">Your city <span class="req-star" title="Required for in-person">★</span></div>
         <input type="text" class="t-rate-input" id="intake-city" placeholder="e.g. Austin" value="${intake.city}">
       </div>
-      <div class="intake-sub" style="margin-top:6px;">${intake.format === 'in-person' ? 'In-person only works with a therapist actually located near you.' : 'Even online, your therapist has to be licensed in your state.'}</div>`;
+      <div class="intake-sub" style="margin-top:6px;">${intake.formats.includes('in-person') ? 'In-person only works with a therapist actually located near you.' : 'Even online, your therapist has to be licensed in your state.'}</div>`;
   } else if (k === 'approach') {
     const modalityExtra = (intake.modality !== 'open' && !MODALITY_QUICK.includes(intake.modality)) ? intake.modality : null;
     html += `
@@ -1183,7 +1187,7 @@ function renderIntakeStep() {
   // The "not sure" path never blocks on a minimum selection. On the who step:
   // state is always required (therapists are licensed by state), city only for
   // in-person, and a language must now be chosen — there's no "no preference".
-  else if (k === 'who') canProceed = intake.state !== '' && (intake.format !== 'in-person' || intake.city.trim() !== '') && intake.languagePref !== 'any';
+  else if (k === 'who') canProceed = intake.state !== '' && (!intake.formats.includes('in-person') || intake.city.trim() !== '');
   else if (k === 'logistics') canProceed = intake.hasInsurance === 'yes' ? intake.insurance !== 'any'
     : intake.hasInsurance === 'no' ? intake.noInsurancePref !== null
     : false;
@@ -1267,7 +1271,7 @@ function attachIntakeHandlers() {
     el.addEventListener('click', () => { intake.stylePref = el.dataset.style; renderIntakeStep(); });
   });
 
-  document.querySelectorAll('#gender-list .option-row').forEach(el => {
+  document.querySelectorAll('#gender-list .chip-option').forEach(el => {
     el.addEventListener('click', () => {
       intake.genderPref = el.dataset.gender;
       if (intake.genderPref === 'no-preference') intake.genderRequired = false;
@@ -1298,10 +1302,11 @@ function attachIntakeHandlers() {
   const languageReqSwitch = document.getElementById('language-required-switch');
   if (languageReqSwitch) languageReqSwitch.addEventListener('click', () => { intake.languageRequired = !intake.languageRequired; renderIntakeStep(); });
 
-  document.querySelectorAll('#format-list .option-row').forEach(el => {
+  document.querySelectorAll('#format-list .chip-option').forEach(el => {
     el.addEventListener('click', () => {
-      // tap again to clear back to "either works" (no filter)
-      intake.format = (intake.format === el.dataset.format) ? 'no-preference' : el.dataset.format;
+      // multi-select: pick either or both. None picked = either works.
+      const f = el.dataset.format, i = intake.formats.indexOf(f);
+      if (i === -1) intake.formats.push(f); else intake.formats.splice(i, 1);
       renderIntakeStep();
     });
   });
@@ -1322,7 +1327,7 @@ function attachIntakeHandlers() {
   const intakeCityInput = document.getElementById('intake-city');
   if (intakeCityInput) intakeCityInput.addEventListener('input', () => {
     intake.city = intakeCityInput.value;
-    document.getElementById('intake-next').disabled = !(intake.city.trim() && intake.state && intake.languagePref !== 'any');
+    document.getElementById('intake-next').disabled = !(intake.city.trim() && intake.state);
   });
   document.querySelectorAll('#affinities-grid .chip-option').forEach(el => {
     el.addEventListener('click', () => {
@@ -1620,7 +1625,7 @@ function matchPercent(t) {
     [intake.affinities.length > 0, intake.affinities.some(a => (t.affinities || []).includes(a))],
     [intake.faith.length > 0, intake.faith.some(f => (t.faith || []).includes(f))],
     [intake.languagePref !== 'any', t.languages.includes(intake.languagePref)],
-    [intake.format !== 'no-preference', t.formats.includes(intake.format)],
+    [intake.formats.length > 0, intake.formats.some(f => t.formats.includes(f))],
     [intake.hasInsurance === 'yes' && intake.insurance !== 'any', t.insuranceList.includes(intake.insurance)]
   ];
   prefs.forEach(([applies, ok]) => { if (applies) { possible += 10; if (ok) earned += 10; } });
@@ -4591,9 +4596,13 @@ function needsSummary() {
   return cf ? `${cf} · ${base}` : base;
 }
 function formatSummary() {
-  const where = intake.state ? (intake.format === 'in-person' && intake.city.trim() ? ` · ${intake.city.trim()}, ${intake.state}` : ` · ${intake.state}`) : '';
-  if (intake.format === 'no-preference') return `Either works${where}`;
-  return (intake.format === 'video' ? 'Online (video) preferred' : 'In-person preferred') + where;
+  const wantsInPerson = intake.formats.includes('in-person');
+  const where = intake.state ? (wantsInPerson && intake.city.trim() ? ` · ${intake.city.trim()}, ${intake.state}` : ` · ${intake.state}`) : '';
+  let label;
+  if (!intake.formats.length) label = 'Either works';
+  else if (intake.formats.length === 2) label = 'Online or in-person';
+  else label = intake.formats[0] === 'video' ? 'Online preferred' : 'In-person preferred';
+  return label + where;
 }
 function availabilitySummary() {
   return intake.availability.length ? intake.availability.join(', ') : 'Not specified';
