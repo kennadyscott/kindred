@@ -986,12 +986,8 @@ function renderIntakeStep() {
     } else {
       // neutral close — reassurance only, deliberately names no conditions
       html += `
-        <h1>Thanks — that really helps</h1>
-        <div class="intake-sub">That's everything we need. We'll use what you shared to find therapists who work with what you're carrying.</div>
-        <div class="quiz-done">
-          <div class="quiz-done-emoji">🌿</div>
-          <p>No labels, no diagnosis — that's your therapist's work to do with you. Tap Continue whenever you're ready.</p>
-        </div>`;
+        <h1>Thanks! That's everything we need</h1>
+        <div class="intake-sub">We'll use what you shared to find therapists who work with what you're carrying. Tap Continue whenever you're ready.</div>`;
     }
   } else if (k === 'needs') {
     const extraSelected = intake.needs.filter(n => !NEED_OPTIONS.includes(n));
