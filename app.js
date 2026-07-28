@@ -524,41 +524,9 @@ const LICENSE_SEED = { t1: ['TX', 'CA'] };
 // loaded from the DB, and freshly-signed-up therapists all end up complete.
 // (Only touches fields that are undefined — explicit values, e.g. a new signup's
 // listed:false, are preserved.)
-function normalizeTherapist(t) {
-  if (!t.media) t.media = {};
-  if (!Array.isArray(t.media.photos)) t.media.photos = [t.media.office, t.media.outOfOffice].filter(Boolean).slice(0, 4);
-  if (!t.topSpecialties || !t.topSpecialties.length) t.topSpecialties = (t.tags || []).slice(0, 3);
-  if (t.selfPayNote === undefined) t.selfPayNote = '';
-  if (t.acceptsSlidingScale === undefined) t.acceptsSlidingScale = /sliding/i.test(t.selfPayNote || '');
-  if (t.offerWaitlist === undefined) t.offerWaitlist = !t.acceptingOngoing;
-  if (!Array.isArray(t.waitlist)) t.waitlist = [];
-  if (!Array.isArray(t.startedConversations)) t.startedConversations = [];
-  if (!Array.isArray(t.licensedStates)) t.licensedStates = (t.location && t.location.state) ? [t.location.state] : [];
-  if (t.onDemandRate == null) t.onDemandRate = t.rateMin;
-  if (t.listed === undefined) t.listed = true;
-  if (t.subscription === undefined) t.subscription = { plan: 'founding', founding: true, introRate: 19.99, standardRate: 29.99 };
-  if (!t.stats) t.stats = { profileViews: 0, hearts: 0, top5: 0, conversationsStarted: 0, weekViews: 0, weekHearts: 0 };
-  return t;
-}
-// Add or replace a therapist in the in-memory roster by id.
-function upsertTherapistInMemory(t) {
-  const i = THERAPISTS.findIndex(x => x.id === t.id);
-  if (i === -1) THERAPISTS.push(t); else THERAPISTS[i] = t;
-}
-
-THERAPISTS.forEach(t => {
-  const id = THERAPIST_IDENTITY[t.id] || {};
-  t.ethnicity = id.ethnicity || '';
-  t.affinities = id.affinities || [];
-  t.faith = id.faith || [];
-  t.availabilitySlots = THERAPIST_AVAILABILITY[t.id] || [];
-  t.idealClient = Object.assign(emptyIdealClient(), THERAPIST_IDEAL[t.id] || {});
-  // seed-specific overrides, then the shared normalizer fills the rest
-  if (WAITLIST_SEED[t.id]) t.waitlist = WAITLIST_SEED[t.id].map(name => ({ name }));
-  if (LICENSE_SEED[t.id]) t.licensedStates = LICENSE_SEED[t.id];
-  normalizeTherapist(t);
-});
-
+// NOTE: this block must stay ABOVE normalizeTherapist — the seed loop calls
+// listingPricing() while this module is still evaluating, so a `const`
+// declared after that loop would throw on load (temporal dead zone).
 // ===== LISTING SUBSCRIPTION (therapists pay to list) =====
 // Escalating founding ladder: the earlier you join, the lower your rate — and
 // you KEEP that rate for 12 months before it moves to the standard rate. The
@@ -596,6 +564,48 @@ function listingPricing() {
     nextDateLabel: dateLabel(tier.until)          // when this rate goes away
   };
 }
+
+function normalizeTherapist(t) {
+  if (!t.media) t.media = {};
+  if (!Array.isArray(t.media.photos)) t.media.photos = [t.media.office, t.media.outOfOffice].filter(Boolean).slice(0, 4);
+  if (!t.topSpecialties || !t.topSpecialties.length) t.topSpecialties = (t.tags || []).slice(0, 3);
+  if (t.selfPayNote === undefined) t.selfPayNote = '';
+  if (t.acceptsSlidingScale === undefined) t.acceptsSlidingScale = /sliding/i.test(t.selfPayNote || '');
+  if (t.offerWaitlist === undefined) t.offerWaitlist = !t.acceptingOngoing;
+  if (!Array.isArray(t.waitlist)) t.waitlist = [];
+  if (!Array.isArray(t.startedConversations)) t.startedConversations = [];
+  if (!Array.isArray(t.licensedStates)) t.licensedStates = (t.location && t.location.state) ? [t.location.state] : [];
+  if (t.onDemandRate == null) t.onDemandRate = t.rateMin;
+  if (t.listed === undefined) t.listed = true;
+  if (t.subscription === undefined) {
+    // Derive from the live ladder rather than hard-coding. A literal here drifts
+    // the moment the ladder rolls over, and omitting introMonths printed
+    // "for your first undefined months" in Settings.
+    const p = listingPricing();
+    t.subscription = { plan: p.founding ? 'founding' : 'standard', founding: p.founding,
+                       introRate: p.introRate, introMonths: p.introMonths, standardRate: p.standardRate };
+  }
+  if (!t.stats) t.stats = { profileViews: 0, hearts: 0, top5: 0, conversationsStarted: 0, weekViews: 0, weekHearts: 0 };
+  return t;
+}
+// Add or replace a therapist in the in-memory roster by id.
+function upsertTherapistInMemory(t) {
+  const i = THERAPISTS.findIndex(x => x.id === t.id);
+  if (i === -1) THERAPISTS.push(t); else THERAPISTS[i] = t;
+}
+
+THERAPISTS.forEach(t => {
+  const id = THERAPIST_IDENTITY[t.id] || {};
+  t.ethnicity = id.ethnicity || '';
+  t.affinities = id.affinities || [];
+  t.faith = id.faith || [];
+  t.availabilitySlots = THERAPIST_AVAILABILITY[t.id] || [];
+  t.idealClient = Object.assign(emptyIdealClient(), THERAPIST_IDEAL[t.id] || {});
+  // seed-specific overrides, then the shared normalizer fills the rest
+  if (WAITLIST_SEED[t.id]) t.waitlist = WAITLIST_SEED[t.id].map(name => ({ name }));
+  if (LICENSE_SEED[t.id]) t.licensedStates = LICENSE_SEED[t.id];
+  normalizeTherapist(t);
+});
 
 let onDemandInfoShown = false;      // show the "what is On-Demand" popup once per session
 let odNewSlotDay = null;            // day currently selected in the slot picker
@@ -1311,7 +1321,7 @@ function dbRowToTherapist(row) {
     formats, rateMin: row.rate_min || 0, insuranceList: row.insurance || [],
     licensedStates: (row.license_states && row.license_states.length) ? row.license_states : undefined,
     listed: !!row.published,
-    subscription: row.published ? { plan: 'standard', founding: false, standardRate: 29.99, introRate: 29.99, introMonths: 0 } : null,
+    subscription: row.published ? { plan: 'standard', founding: false, standardRate: STANDARD_RATE, introRate: STANDARD_RATE, introMonths: 0 } : null,
     acceptingOngoing: row.accepting !== false, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
     practiceType: row.practice_type || 'specialist', externalAppointments: [],

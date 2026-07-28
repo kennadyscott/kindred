@@ -1027,7 +1027,10 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 }
 #confirm-sheet .pref-item { background: var(--cream); box-shadow: none; }
 .pref-label { font-size: 11px; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; letter-spacing: 0.5px; }
-.profile-content .edit-prefs-btn {
+/* Deliberately NOT scoped to .profile-content: this class is used in therapist
+   Settings and in both delete-account confirmation flows, which live in other
+   containers. Scoped, those rendered as bare browser buttons. */
+.edit-prefs-btn {
   width: 100%;
   background: var(--sand);
   color: var(--coral-dark);
@@ -2305,4 +2308,149 @@ select.t-rate-input,
   text-align: center;
   padding: 7px 12px;
   backdrop-filter: blur(2px);
+}
+
+/* ============================================================================
+   DESKTOP / TRUE WEB LAYOUT
+   ----------------------------------------------------------------------------
+   Below 900px this stays a phone-shaped app. Above it, the same markup becomes
+   a real web layout: full-bleed, tab bar promoted to a top navigation, and
+   content constrained to a readable measure instead of stretching edge to edge.
+   One codebase — the layout adapts rather than the product being rebuilt.
+   ========================================================================== */
+@media (min-width: 900px) {
+  body {
+    display: block;
+    background: var(--cream);
+  }
+
+  .phone {
+    width: 100%;
+    height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  /* The demo strip spans the full width when it's shown at all. */
+  .demo-banner { width: 100%; }
+
+  /* ---- tab bar becomes a top navigation ---- */
+  .bottom-nav {
+    order: -1;                       /* move above the screens */
+    border-top: none;
+    border-bottom: 1px solid var(--line);
+    padding: 0 24px;
+    justify-content: center;
+    gap: 4px;
+  }
+  .bottom-nav .nav-btn {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px;
+    border-bottom: 2px solid transparent;
+  }
+  .bottom-nav .nav-btn span:last-child { font-size: 13px; }
+  .bottom-nav .nav-icon { font-size: 16px; }
+  .bottom-nav .nav-btn.active {
+    border-bottom-color: var(--coral);
+  }
+  .five-tabs .nav-btn { padding: 14px 16px; }
+  .five-tabs .nav-btn span:last-child { font-size: 13px; letter-spacing: 0; }
+  .five-tabs .nav-icon { font-size: 16px; }
+  .nav-badge { position: static; margin-left: 2px; }
+
+  /* ---- screens scroll as a page, content held to a readable measure ---- */
+  /* One measure per screen so the title in .top-bar lines up with the column
+     beneath it. Screens that need more room just override --measure. */
+  .screen { overflow-y: auto; --measure: 720px; }
+  /* Every direct child of a screen is a column in the page. Enumerating them by
+     class went stale the moment a screen grew a subtitle or a notice — those
+     stayed edge-to-edge while the heading above them was centred. */
+  .screen > * {
+    max-width: var(--measure);
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    /* The screen is the single scroller on desktop — a nested scrollbar mid-page
+       is a phone habit that reads as broken with a mouse wheel. */
+    overflow-y: visible;
+  }
+
+  /* Landing / account-type screen reads as a centred hero, not a full-bleed row */
+  .welcome-content {
+    max-width: 560px;
+    margin: 0 auto;
+    padding-top: 6vh;
+  }
+
+  /* ---- intake: a form measure, and a CTA that follows the questions ---- */
+  /* On a phone `margin-top:auto` parks the button at the thumb. On a 900px-tall
+     desktop screen that same rule strands it a full viewport below the last
+     option, so it reads as unrelated to the question. */
+  #screen-intake, #screen-therapist-signup { --measure: 560px; }
+  .intake-content { padding-top: 40px; justify-content: flex-start; }
+  .intake-footer { margin-top: 28px; }
+  .intake-content h1 { font-size: 27px; }
+  .intake-content .intake-sub { font-size: 14.5px; }
+
+  /* ---- sign in / sign up: a card, not a full-width form ---- */
+  /* Two fields stretched across 780px is the clearest "phone layout on a
+     monitor" tell there is. */
+  #screen-login { --measure: 400px; justify-content: center; }
+  #screen-login .top-bar { padding-bottom: 20px; }
+  .login-form { flex: 0 0 auto;      /* mobile stretches it to fill the screen */
+                padding: 26px 24px 30px; background: #fff;
+                border: 1px solid var(--line); border-radius: 20px;
+                box-shadow: 0 14px 40px rgba(46,42,38,0.07);
+                margin-bottom: 12vh; }
+
+  /* ---- bottom sheets become centred dialogs ---- */
+  .modal-overlay { align-items: center; justify-content: center; padding: 40px 20px; }
+  .modal-sheet {
+    width: 100%;
+    max-width: 620px;
+    max-height: 84vh;
+    border-radius: 22px;
+    box-shadow: 0 24px 60px rgba(46,42,38,0.28);
+  }
+  /* The grab handle reads as "drag me up" — meaningless with a mouse. */
+  .modal-sheet .sheet-close { display: none; }
+
+  /* The insights dashboard is data, not prose — let it breathe wider. */
+  #screen-t-home, #screen-t-insights { --measure: 940px; }
+  #t-insights-content .stat-grid { grid-template-columns: repeat(3, 1fr); }
+  .share-profile-btn { width: auto; display: inline-block; padding: 10px 18px; }
+
+  /* ---- Discover: a larger, centred card instead of a phone-width strip ---- */
+  .card-stack {
+    /* Every card inside is position:absolute, so the stack has no intrinsic
+       width. Auto margins cancel the flex `stretch` that was sizing it on
+       mobile — without an explicit width it collapses to 0 and the card
+       vanishes. */
+    width: 100%;
+    max-width: 520px;
+    margin: 18px auto 12px;
+  }
+  /* Empty/loading states shouldn't float in the middle of a tall desktop
+     viewport — pull them up under the header. */
+  .empty-pool { align-self: start; padding-top: 8vh; }
+  .action-row { padding-bottom: 28px; }
+
+  /* Chat should use the height available rather than a phone viewport. */
+  #screen-chat .chat-messages { max-width: 760px; margin: 0 auto; width: 100%; }
+  #screen-chat .chat-input-row { max-width: 760px; margin: 0 auto; width: 100%; }
+}
+
+/* Wider still: give the reading columns a little more room. Bump the variable
+   rather than re-declaring max-width — a hard-coded value here would silently
+   override every per-screen measure set at the 900px breakpoint. */
+@media (min-width: 1280px) {
+  .screen { --measure: 780px; }
+  #screen-t-home, #screen-t-insights { --measure: 1040px; }
+  /* A questionnaire stays narrow at any width — one question, one column. */
+  #screen-intake, #screen-therapist-signup { --measure: 580px; }
+  .card-stack { max-width: 560px; }
 }
