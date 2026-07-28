@@ -552,25 +552,27 @@ THERAPISTS.forEach(t => {
 });
 
 // ===== LISTING SUBSCRIPTION (therapists pay to list) =====
-// Founding offer: the first 200 therapists get $19.99/mo for 3 months, then
-// $29.99/mo. Once the 200 founding spots are gone, everyone is $29.99/mo.
-const FOUNDING_TOTAL = 200;
+// Founding offer is DATE-based: sign up before Dec 1 and your first 3 months are
+// $19.99/mo, then $29.99/mo. Sign up on or after Dec 1 and it's $29.99/mo flat.
 // Subscription is paid on the WEBSITE (Stripe web checkout), never in-app —
 // keeps Apple's cut at 0% and avoids any IAP surface in the App Store build.
-const THERAPIST_BILLING_URL = 'https://kindredtherapymatch.com/activate';
+const THERAPIST_BILLING_URL = 'https://kindredtherapymatch.com/activate.html';
+const FOUNDING_DEADLINE = new Date('2026-12-01T00:00:00');
 const FOUNDING_INTRO_RATE = 19.99;
 const FOUNDING_INTRO_MONTHS = 3;
 const STANDARD_RATE = 29.99;
-let foundingSpotsTaken = 43; // demo seed — founding rate still open
-function foundingSpotsLeft() { return Math.max(0, FOUNDING_TOTAL - foundingSpotsTaken); }
+function foundingOpen() { return new Date() < FOUNDING_DEADLINE; }
+function foundingDeadlineLabel() {
+  return FOUNDING_DEADLINE.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
 function listingPricing() {
-  const founding = foundingSpotsLeft() > 0;
+  const founding = foundingOpen();
   return {
     founding,
     introRate: founding ? FOUNDING_INTRO_RATE : STANDARD_RATE,
     introMonths: founding ? FOUNDING_INTRO_MONTHS : 0,
     standardRate: STANDARD_RATE,
-    spotsLeft: foundingSpotsLeft()
+    deadlineLabel: foundingDeadlineLabel()
   };
 }
 
@@ -4080,7 +4082,7 @@ function openActivateProfile() {
     <h2>Activate your profile</h2>
     <div class="intake-sub">Your profile is built. List it on Kindred to start being matched with clients.</div>
     <div class="activate-plan ${p.founding ? 'founding' : ''}">
-      ${p.founding ? `<div class="activate-badge">🌟 Founding member — ${p.spotsLeft} of ${FOUNDING_TOTAL} spots left</div>` : ''}
+      ${p.founding ? `<div class="activate-badge">🌟 Founding rate — join before ${p.deadlineLabel}</div>` : ''}
       <div class="activate-price">$${p.introRate.toFixed(2)}<span>/mo</span></div>
       ${p.founding
         ? `<div class="activate-terms">for your first ${p.introMonths} months, then $${p.standardRate.toFixed(2)}/mo</div>`
@@ -4109,7 +4111,10 @@ function openActivateProfile() {
     const founding = p.founding;
     const plan = founding ? 'founding' : 'standard';
 
-    if (KINDRED_FLAGS.therapistBillingLive) {
+    // Never simulate activation in a shipped build — that would hand out free
+    // listings. Production ALWAYS goes to the web checkout; the simulated path
+    // exists only for local/demo testing.
+    if (KINDRED_FLAGS.therapistBillingLive || PRODUCTION_BUILD) {
       // Real: hand off to the website's Stripe checkout. Listing flips server-side
       // when the subscription is active; the app reflects it on next refresh.
       const sess = authReady() && loadAuthSession();
@@ -4125,7 +4130,6 @@ function openActivateProfile() {
     btn.disabled = true; btn.textContent = 'Opening secure checkout…';
     status.innerHTML = `<div class="portal-note" style="margin-bottom:8px;">Redirecting to the Kindred website…</div>`;
     setTimeout(() => {
-      if (founding) foundingSpotsTaken++;
       t.listed = true;
       t.subscription = { plan, founding, introRate: p.introRate, standardRate: p.standardRate, introMonths: p.introMonths };
       t.published = true;
