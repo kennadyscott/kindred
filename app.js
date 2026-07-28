@@ -1059,7 +1059,10 @@ function getMatchReasons(t) {
 // ride as unstored query parameters. Client ACCOUNTS/messaging must not be
 // built until the project has a signed BAA (see supabase/README.md).
 // ===================================================================
-const KINDRED_DB = null; // at launch: { url: 'https://xxxx.supabase.co', key: '<anon public key>' }
+const KINDRED_DB = {
+  url: 'https://izukppxgoerqtustfbnk.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6dWtwcHhnb2VycXR1c3RmYm5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NTAzMTYsImV4cCI6MjEwMDQyNjMxNn0.FeJFOu4PmOJAbk2OqfMH1sQX6DlynKmTyhc-dtKfvZk'
+};
 
 function dbConfig() {
   if (KINDRED_DB && KINDRED_DB.url && KINDRED_DB.key) return KINDRED_DB;
@@ -1280,22 +1283,29 @@ let deckLoading = false;
 let deckFetchSeq = 0;
 
 function computeDeck() {
-  if (!dbReady()) {
-    deck = THERAPISTS.filter(t => isCompatible(t, 'ongoing'))
-      .sort((a, b) => a.nextAvailableRank - b.nextAvailableRank);
-    deckIndex = 0;
-    return;
-  }
+  const seededDeck = () => THERAPISTS.filter(t => isCompatible(t, 'ongoing'))
+    .sort((a, b) => a.nextAvailableRank - b.nextAvailableRank);
+
+  if (!dbReady()) { deck = seededDeck(); deckIndex = 0; return; }
+
   // Server mode: Postgres filters and scores, we render one page. The seq
   // guard drops stale responses if the client edits preferences mid-flight.
   const seq = ++deckFetchSeq;
   deckLoading = true; deck = []; deckIndex = 0;
   dbRpc('match_therapists', matchParams())
-    .then(rows => { if (seq === deckFetchSeq) deck = rows.map(dbRowToTherapist); })
+    .then(rows => {
+      if (seq !== deckFetchSeq) return;
+      deck = rows.map(dbRowToTherapist);
+      // The real roster is still filling up, so an empty result would mean a
+      // blank app for demos and previews. Fall back to the seeded therapists —
+      // but NEVER in a production build: real clients must not be shown
+      // fictional people presented as bookable.
+      if (!deck.length && !PRODUCTION_BUILD) deck = seededDeck();
+    })
     .catch(() => {
-      // the seeded roster is a graceful fallback, never a blank screen
-      if (seq === deckFetchSeq) deck = THERAPISTS.filter(t => isCompatible(t, 'ongoing'))
-        .sort((a, b) => a.nextAvailableRank - b.nextAvailableRank);
+      // network/DB failure: a seeded deck beats a blank screen in demo, but in
+      // production showing nothing is the honest outcome.
+      if (seq === deckFetchSeq) deck = PRODUCTION_BUILD ? [] : seededDeck();
     })
     .then(() => { if (seq === deckFetchSeq) { deckLoading = false; renderStack(); } });
 }
