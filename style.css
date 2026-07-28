@@ -1925,6 +1925,11 @@ select.t-rate-input,
   font: inherit; font-size: 12.5px; color: var(--ink-soft); text-decoration: underline;
 }
 .welcome-demo-link:hover { color: var(--coral); }
+
+/* Production build (App Store): hide demo-only affordances. Everything else —
+   the full client + therapist experience — stays exactly as it is. */
+.production .demo-banner,
+.production #preview-client-demo-btn { display: none !important; }
 .welcome-card {
   display: flex;
   align-items: center;

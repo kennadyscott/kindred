@@ -1,3 +1,12 @@
+// ===================================================================
+// BUILD MODE — flip to true for the App Store / production build. It ONLY hides
+// demo-only affordances (the "prototype" banner + the preview-client-demo
+// shortcut). The full client AND therapist experiences stay 100% functional —
+// nothing is gated or blocked. Leave false for web/PWA testing.
+// ===================================================================
+const PRODUCTION_BUILD = false;
+if (document.body) document.body.classList.toggle('production', PRODUCTION_BUILD);
+
 const THERAPISTS = [
   {
     id: 't1', name: 'Dr. Maya Chen', credentials: ['PhD', 'Clinical Psychologist'],
@@ -5008,8 +5017,8 @@ showScreen('account-type');
 // Demo shortcut — a button on the first screen (and ?demo=client) drops you into
 // a filled-in client account so every zone can be previewed with content.
 const previewClientDemoBtn = document.getElementById('preview-client-demo-btn');
-if (previewClientDemoBtn) previewClientDemoBtn.addEventListener('click', seedClientDemo);
-if (/[?&]demo=client\b/.test(location.search)) seedClientDemo();
+if (previewClientDemoBtn && !PRODUCTION_BUILD) previewClientDemoBtn.addEventListener('click', seedClientDemo);
+if (!PRODUCTION_BUILD && /[?&]demo=client\b/.test(location.search)) seedClientDemo();
 
 // ===== SHARED-THERAPIST DEEP LINK =====
 // A link someone was sent (…#therapist=t3) opens straight to that therapist's
