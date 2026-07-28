@@ -1720,7 +1720,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   font-size: 14px;
 }
 select.t-rate-input,
-#intake-state, #ts-state, #t-state-input, #ethnicity-select {
+#intake-state, #ts-state, #t-state-input, #ethnicity-select, #you-state {
   width: 100%;
   padding: 12px 14px;
   border-radius: 14px;

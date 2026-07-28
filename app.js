@@ -5220,39 +5220,105 @@ function renderProfileScreen() {
   }
   const savedList = EXPLORE_RESOURCES.filter(r => savedResources.includes(r.id));
   const matchedMatches = matches.filter(m => m.status === 'matched');
+  const wantsInPerson = intake.formats.includes('in-person');
   screen.innerHTML = `
-    <header class="top-bar"><div class="logo">Your Preferences</div></header>
+    <header class="top-bar"><div class="logo">You</div></header>
     <div class="profile-content">
-      <div class="pref-item"><div class="pref-label">Looking for support with</div><div class="pref-value">${needsSummary()}</div></div>
-      <div class="pref-item"><div class="pref-label">Approach</div><div class="pref-value">${modalitySummary()}</div></div>
-      <div class="pref-item"><div class="pref-label">Session format</div><div class="pref-value">${formatSummary()}</div></div>
-      <div class="pref-item"><div class="pref-label">When you can meet</div><div class="pref-value">${availabilitySummary()}</div></div>
-      <div class="pref-item"><div class="pref-label">Insurance</div><div class="pref-value">${insuranceSummary()}</div></div>
-      <div class="pref-item"><div class="pref-label">Budget</div><div class="pref-value">${budgetSummary()}</div></div>
-      <div class="pref-item"><div class="pref-label">Identity preferences</div><div class="pref-value">${identitySummary()}</div></div>
 
-      <div class="pref-item">
-        <div class="pref-label">Saved resources</div>
-        <div class="pref-value">${savedList.length ? savedList.map(r => `${r.icon} ${r.title}`).join('<br>') : 'Nothing saved yet — browse the Kindred tab to find resources.'}</div>
+      <!-- ===== PREFERENCES (edit + save inline) ===== -->
+      <div class="settings-group-title" style="margin-top:0;">Preferences</div>
+
+      <div class="t-form-label">What you're working on</div>
+      <div class="chip-grid">${NEED_OPTIONS.map(n => `<div class="chip-option ${intake.needs.includes(n) ? 'selected' : ''}" data-you-need="${n}">${n}</div>`).join('')}</div>
+
+      <div class="t-form-label">Session format</div>
+      <div class="chip-grid">
+        <div class="chip-option ${intake.formats.includes('video') ? 'selected' : ''}" data-you-format="video">Online</div>
+        <div class="chip-option ${intake.formats.includes('in-person') ? 'selected' : ''}" data-you-format="in-person">In-person</div>
       </div>
 
-      <div class="pref-item">
-        <div class="pref-label">Share your profile</div>
-        <div class="pref-value" style="margin-bottom:6px;">Give a matched therapist a picture of what you're working with — your questionnaire answers and saved resources. You choose per therapist, and you can turn it off anytime.</div>
-        <button class="edit-prefs-btn" id="preview-shared-btn" style="margin:2px 0 4px;background:white;border:1.5px solid var(--coral);color:var(--coral-dark);">👀 Preview what your therapist sees</button>
-        ${matchedMatches.length ? matchedMatches.map(m => `
-          <div class="must-have-toggle" style="margin-top:8px;">
-            <div class="toggle-label"><strong>${displayName(m.therapist)}</strong><span>${m.profileShared ? 'Can see your profile' : 'Cannot see your profile'}</span></div>
-            <div class="switch ${m.profileShared ? 'on' : ''}" data-share-toggle="${m.therapist.id}"></div>
-          </div>
-        `).join('') : `<div class="pref-value" style="color:var(--ink-soft);">Once you match with a therapist, you can share your profile with them here.</div>`}
+      <div class="t-form-label">Your state <span class="req-star" title="Required">★</span></div>
+      <select id="you-state">
+        <option value="">Select a state</option>
+        ${US_STATES.map(s => `<option value="${s}" ${intake.state === s ? 'selected' : ''}>${s}</option>`).join('')}
+      </select>
+      ${wantsInPerson ? `<div class="t-form-label">Your city <span class="req-star">★</span></div>
+      <input type="text" class="t-rate-input" id="you-city" placeholder="e.g. Austin" value="${intake.city || ''}">` : ''}
+
+      <div class="t-form-label">Therapist gender</div>
+      <div class="chip-grid">
+        <div class="chip-option ${intake.genderPref === 'no-preference' ? 'selected' : ''}" data-you-gender="no-preference">No preference</div>
+        <div class="chip-option ${intake.genderPref === 'female' ? 'selected' : ''}" data-you-gender="female">Female</div>
+        <div class="chip-option ${intake.genderPref === 'male' ? 'selected' : ''}" data-you-gender="male">Male</div>
+        <div class="chip-option ${intake.genderPref === 'nonbinary' ? 'selected' : ''}" data-you-gender="nonbinary">Nonbinary</div>
       </div>
 
-      <button class="edit-prefs-btn" id="edit-prefs-btn">Edit My Preferences</button>
+      <div class="t-form-label">Language</div>
+      <div class="chip-grid">
+        <div class="chip-option ${intake.languagePref === 'any' ? 'selected' : ''}" data-you-language="any">No preference</div>
+        ${LANGUAGE_QUICK_OPTIONS.map(l => `<div class="chip-option ${intake.languagePref === l ? 'selected' : ''}" data-you-language="${l}">${l}</div>`).join('')}
+      </div>
+
+      <div class="t-form-label">Budget</div>
+      <div class="chip-grid">${BUDGET_RANGES.map(b => `<div class="chip-option ${intake.budgetRange === b.label ? 'selected' : ''}" data-you-budget="${b.label}">${b.label}</div>`).join('')}</div>
+
+      <button class="primary-btn" id="save-prefs-btn" style="margin-top:14px;background:var(--coral);color:white;">Save preferences</button>
+      <button class="edit-prefs-btn" id="edit-prefs-btn" style="color:var(--ink-soft);">Retake the full questionnaire</button>
+
+      <!-- ===== SHARE YOUR PROFILE ===== -->
+      <div class="settings-group-title">Share your profile</div>
+      <p class="portal-note" style="margin-top:0;">Give a matched therapist a picture of what you're working with — your answers and saved resources. You choose per therapist, and can turn it off anytime.</p>
+      <button class="edit-prefs-btn" id="preview-shared-btn" style="margin:2px 0 4px;background:white;border:1.5px solid var(--coral);color:var(--coral-dark);">👀 Preview what your therapist sees</button>
+      ${matchedMatches.length ? matchedMatches.map(m => `
+        <div class="must-have-toggle" style="margin-top:8px;">
+          <div class="toggle-label"><strong>${displayName(m.therapist)}</strong><span>${m.profileShared ? 'Can see your profile' : 'Cannot see your profile'}</span></div>
+          <div class="switch ${m.profileShared ? 'on' : ''}" data-share-toggle="${m.therapist.id}"></div>
+        </div>`).join('') : `<p class="portal-note">Once you match with a therapist, you can share your profile with them here.</p>`}
+      <p class="portal-note">Saved resources: ${savedList.length ? savedList.map(r => `${r.icon} ${r.title}`).join(' · ') : 'nothing saved yet — browse the Kindred tab.'}</p>
+
+      <!-- ===== ACCOUNT ===== -->
+      <div class="settings-group-title">Account</div>
       <button class="edit-prefs-btn" id="client-logout-btn" style="color:var(--ink-soft);">Log Out</button>
-      <button class="edit-prefs-btn" id="delete-account-btn" style="color:var(--ink-soft);">Delete My Account</button>
+      <button class="edit-prefs-btn" id="delete-account-btn" style="color:#a8443a;">Delete My Account</button>
     </div>
   `;
+
+  // ----- inline preference editors (mutate intake, re-render) -----
+  screen.querySelectorAll('[data-you-need]').forEach(el => el.addEventListener('click', () => {
+    const n = el.dataset.youNeed, i = intake.needs.indexOf(n);
+    if (i === -1) intake.needs.push(n); else intake.needs.splice(i, 1);
+    intake.notSure = false; renderProfileScreen();
+  }));
+  screen.querySelectorAll('[data-you-format]').forEach(el => el.addEventListener('click', () => {
+    const f = el.dataset.youFormat, i = intake.formats.indexOf(f);
+    if (i === -1) intake.formats.push(f); else intake.formats.splice(i, 1);
+    renderProfileScreen();
+  }));
+  const youState = document.getElementById('you-state');
+  if (youState) youState.addEventListener('change', () => { intake.state = youState.value; });
+  const youCity = document.getElementById('you-city');
+  if (youCity) youCity.addEventListener('input', () => { intake.city = youCity.value; });
+  screen.querySelectorAll('[data-you-gender]').forEach(el => el.addEventListener('click', () => {
+    intake.genderPref = el.dataset.youGender;
+    if (intake.genderPref === 'no-preference') intake.genderRequired = false;
+    renderProfileScreen();
+  }));
+  screen.querySelectorAll('[data-you-language]').forEach(el => el.addEventListener('click', () => {
+    intake.languagePref = el.dataset.youLanguage;
+    if (intake.languagePref === 'any') intake.languageRequired = false;
+    renderProfileScreen();
+  }));
+  screen.querySelectorAll('[data-you-budget]').forEach(el => el.addEventListener('click', () => {
+    intake.budgetRange = el.dataset.youBudget; renderProfileScreen();
+  }));
+  document.getElementById('save-prefs-btn').addEventListener('click', () => {
+    if (!intake.state) { showToast('Pick your state so we can match you with licensed therapists.'); return; }
+    if (intake.formats.includes('in-person') && !(intake.city || '').trim()) { showToast('Add your city for in-person matches.'); return; }
+    clientStore.persistIntake(intake);   // gated by the flag
+    computeDeck(); renderStack(); renderMatches();
+    showToast('Preferences saved — your matches are updated.');
+  });
+
   document.getElementById('edit-prefs-btn').addEventListener('click', startIntake);
   document.getElementById('client-logout-btn').addEventListener('click', logout);
   document.getElementById('delete-account-btn').addEventListener('click', openDeleteAccountSheet);
