@@ -1,0 +1,98 @@
+# ============================================================================
+# Kindred — iOS build & release (Codemagic)
+# ----------------------------------------------------------------------------
+# Builds and signs the iOS app on Codemagic's Mac hardware, so nothing needs
+# Xcode, CocoaPods, or Homebrew installed locally.
+#
+# WHAT YOU NEED CONNECTED (one-time, in the Codemagic UI):
+#   1. This GitHub repo (kennadyscott/kindred)
+#   2. An App Store Connect API key  (Integrations -> App Store Connect)
+#      Generate it at App Store Connect -> Users and Access -> Integrations ->
+#      App Store Connect API -> "+" -> Access: App Manager. Download the .p8
+#      ONCE and upload it to Codemagic with its Key ID and Issuer ID.
+#   3. An app record in App Store Connect with bundle id
+#      com.kindredtherapymatch.app
+#
+# Then: Codemagic picks this file up automatically and "Start new build" does
+# the rest. The output lands in TestFlight.
+# ============================================================================
+
+workflows:
+  ios-release:
+    name: Kindred iOS
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    environment:
+      node: 20
+      xcode: latest
+      cocoapods: default
+      groups:
+        # Create this group in Codemagic (Environment variables) containing
+        # APP_STORE_APPLE_ID — the numeric app id from App Store Connect.
+        - appstore
+      ios_signing:
+        # Codemagic fetches/creates the distribution certificate and profile
+        # using the App Store Connect API key. No certificates on your machine.
+        distribution_type: app_store
+        bundle_identifier: com.kindredtherapymatch.app
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+
+    triggering:
+      # Manual by default — an App Store build should be deliberate, not fired
+      # by every push to main.
+      events: []
+
+    scripts:
+      - name: Install JS dependencies
+        script: npm install
+
+      - name: Build web assets (sets PRODUCTION_BUILD = true)
+        script: npm run build
+
+      - name: Verify this is NOT a demo build
+        script: |
+          # Belt and braces: never let a demo-mode binary reach the App Store.
+          if grep -q "const PRODUCTION_BUILD = false" www/app.js; then
+            echo "ERROR: www/app.js is still in demo mode."
+            exit 1
+          fi
+          echo "OK: production build confirmed."
+
+      - name: Capacitor sync
+        script: npx cap sync ios
+
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios/App
+          pod install
+
+      - name: Set build number from TestFlight
+        script: |
+          cd ios/App
+          # Auto-increment so every upload is accepted by App Store Connect.
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+          agvtool new-version -all $(($LATEST + 1))
+
+      - name: Build signed .ipa
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Uploads to TestFlight so you can install it on your own phone and
+        # try it before anything goes to review.
+        submit_to_testflight: true
+        # Left false on purpose: submitting for App Store review should be a
+        # deliberate click in App Store Connect, not an automatic consequence
+        # of a build.
+        submit_to_app_store: false
