@@ -7,6 +7,50 @@
 const PRODUCTION_BUILD = false;
 if (document.body) document.body.classList.toggle('production', PRODUCTION_BUILD);
 
+// ===================================================================
+// SERVER-CONTROLLED FLAGS — fetched from config.json at launch. This is the
+// switch that lets an already-shipped App Store build change behavior with NO
+// new binary and NO re-review: edit config.json + redeploy the web layer and
+// the native app picks it up next launch. Safe defaults (everything OFF) hold
+// until the fetch resolves.
+//
+// clientDataPersistence gates whether a real client's data (intake, matches,
+// messages) is saved SERVER-SIDE. It stays OFF — client data lives only in the
+// browser, which is HIPAA-clean — and flips ON the moment the BAA is signed.
+// Flipping it is a config change, not an app change.
+// ===================================================================
+let KINDRED_FLAGS = { clientDataPersistence: false, therapistBillingLive: false };
+function clientDataPersistenceEnabled() { return !!KINDRED_FLAGS.clientDataPersistence; }
+(function loadRemoteFlags() {
+  fetch('config.json?cb=' + Date.now(), { cache: 'no-store' })
+    .then(r => (r.ok ? r.json() : null))
+    .then(cfg => { if (cfg && typeof cfg === 'object') KINDRED_FLAGS = Object.assign(KINDRED_FLAGS, cfg); })
+    .catch(() => {});
+})();
+
+// The client data layer, abstracted behind the flag. TODAY every method is a
+// no-op beyond the in-browser state the app already keeps (HIPAA-clean). When
+// clientDataPersistence flips ON (post-BAA), the SAME shipped binary starts
+// persisting to Supabase through these hooks — no new App Store build. The
+// server writes are best-effort and never block the UI.
+const clientStore = {
+  async persistIntake(intake) {
+    if (!clientDataPersistenceEnabled() || !authReady() || !loadAuthSession()) return;
+    try { await authRest('/client_intake', { method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: loadAuthSession().user.id, answers: intake }) }); }
+    catch (e) { console.warn('client intake persist deferred:', e.message); }
+  },
+  async persistMatch(m) {
+    if (!clientDataPersistenceEnabled() || !authReady() || !loadAuthSession()) return;
+    try { await authRest('/client_matches', { method: 'POST', headers: { 'Prefer': 'return=minimal' }, body: JSON.stringify({ client_id: loadAuthSession().user.id, therapist_id: m.therapist.id, status: m.status }) }); }
+    catch (e) { console.warn('client match persist deferred:', e.message); }
+  },
+  async persistMessage(therapistId, msg) {
+    if (!clientDataPersistenceEnabled() || !authReady() || !loadAuthSession()) return;
+    try { await authRest('/messages', { method: 'POST', headers: { 'Prefer': 'return=minimal' }, body: JSON.stringify({ client_id: loadAuthSession().user.id, therapist_id: therapistId, sender: msg.from, text: msg.text }) }); }
+    catch (e) { console.warn('message persist deferred:', e.message); }
+  }
+};
+
 const THERAPISTS = [
   {
     id: 't1', name: 'Dr. Maya Chen', credentials: ['PhD', 'Clinical Psychologist'],
@@ -1573,6 +1617,7 @@ function attachIntakeHandlers() {
 
 function finishIntake() {
   intake.completed = true;
+  clientStore.persistIntake(intake); // no-op until clientDataPersistence flips on (post-BAA)
   computeDeck();
   document.getElementById('bottom-nav').classList.remove('hidden');
   renderStack();
@@ -2206,6 +2251,9 @@ function confirmMatchRequest(therapistId, introMessage, desiredFrequency) {
   });
   t.stats.conversationsStarted++;
   chatLog[therapistId] = [{ from: 'me', text: introMessage }];
+  const m = matches[matches.length - 1];
+  clientStore.persistMatch(m);                                  // gated by the flag
+  clientStore.persistMessage(therapistId, { from: 'me', text: introMessage });
   showToast('Match request sent — waiting for them to respond.');
   updateNavBadge();
   renderShortlist();
@@ -2792,6 +2840,7 @@ function sendChatMessage() {
   chatLog[tid] = chatLog[tid] || [];
   const from = chatRole === 'therapist' ? 'them' : 'me';
   chatLog[tid].push({ from, text });
+  clientStore.persistMessage(tid, { from, text }); // gated by the flag
   input.value = '';
   renderChatMessages(tid);
   renderMatches();
