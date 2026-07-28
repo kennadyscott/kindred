@@ -47,14 +47,13 @@ for (const file of ASSETS) {
 
 // app.js gets the production flag flipped on the way in.
 const appSrc = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
-const before = 'const PRODUCTION_BUILD = false;';
-const after = 'const PRODUCTION_BUILD = true;';
-if (!appSrc.includes(before)) {
+const FLAG = /const PRODUCTION_BUILD = (true|false);/;
+if (!FLAG.test(appSrc)) {
   console.error('\n  ERROR: could not find the PRODUCTION_BUILD flag in app.js.');
-  console.error('  Refusing to build rather than ship a demo-mode binary.\n');
+  console.error('  Refusing to build rather than risk shipping a demo-mode binary.\n');
   process.exit(1);
 }
-fs.writeFileSync(path.join(OUT, 'app.js'), appSrc.replace(before, after));
+fs.writeFileSync(path.join(OUT, 'app.js'), appSrc.replace(FLAG, 'const PRODUCTION_BUILD = true;'));
 
 // The service worker is a web/PWA concern; the native shell serves locally and
 // a stale SW cache inside the app would be a debugging nightmare.

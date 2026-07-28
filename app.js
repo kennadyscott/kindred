@@ -4,7 +4,7 @@
 // shortcut). The full client AND therapist experiences stay 100% functional —
 // nothing is gated or blocked. Leave false for web/PWA testing.
 // ===================================================================
-const PRODUCTION_BUILD = false;
+const PRODUCTION_BUILD = true;
 if (document.body) document.body.classList.toggle('production', PRODUCTION_BUILD);
 
 // ===================================================================
@@ -1380,6 +1380,26 @@ loadVocab();
 let deckLoading = false;
 let deckFetchSeq = 0;
 
+// How many therapists are live on the platform AT ALL, ignoring this client's
+// filters. Lets an empty deck say the true thing: "we're still onboarding"
+// (cold start) vs "your filters are too tight". null = not known yet.
+let rosterCount = null;
+function refreshRosterCount() {
+  if (!dbReady()) { rosterCount = null; return Promise.resolve(null); }
+  const c = dbConfig();
+  return fetch(`${c.url.replace(/\/$/, '')}/rest/v1/therapists_public?select=user_id&limit=1`, {
+    headers: { apikey: c.key, Authorization: `Bearer ${c.key}`, Prefer: 'count=exact' }
+  })
+    .then(res => {
+      // PostgREST reports the true total in Content-Range as "0-0/12"
+      const range = res.headers.get('content-range') || '';
+      const total = parseInt(range.split('/')[1], 10);
+      rosterCount = Number.isFinite(total) ? total : null;
+      return rosterCount;
+    })
+    .catch(() => { rosterCount = null; return null; });
+}
+
 function computeDeck() {
   const seededDeck = () => THERAPISTS.filter(t => isCompatible(t, 'ongoing'))
     .sort((a, b) => a.nextAvailableRank - b.nextAvailableRank);
@@ -1405,6 +1425,7 @@ function computeDeck() {
       // production showing nothing is the honest outcome.
       if (seq === deckFetchSeq) deck = PRODUCTION_BUILD ? [] : seededDeck();
     })
+    .then(() => refreshRosterCount())   // so an empty deck can explain itself honestly
     .then(() => { if (seq === deckFetchSeq) { deckLoading = false; renderStack(); } });
 }
 
@@ -2049,6 +2070,11 @@ function startIntake() {
 // ===================================================================
 function renderStack() {
   cardStack.innerHTML = '';
+  // The swipe controls are meaningless with nothing to swipe — hide them for
+  // loading and every empty state, show them only when a card is present.
+  const actionRow = document.getElementById('action-row');
+  const setControls = on => { if (actionRow) actionRow.style.display = on ? '' : 'none'; };
+  setControls(false);
 
   if (deckLoading) {
     cardStack.innerHTML = `<div class="empty-pool">Finding your matches…</div>`;
@@ -2056,6 +2082,21 @@ function renderStack() {
   }
 
   if (deck.length === 0) {
+    // Two very different situations, and telling someone to "loosen their
+    // requirements" when the roster is simply still filling up is bad advice
+    // and reads as their fault. Distinguish them.
+    if (rosterCount === 0) {
+      cardStack.innerHTML = `<div class="empty-pool">
+        <strong>We're still welcoming therapists in your area.</strong><br><br>
+        Kindred is new, and we're onboarding carefully — every therapist is
+        licensed and verified before they can be matched. Your answers are
+        saved, so we can tell you the moment someone who fits joins.
+        <button class="loosen-btn" id="notify-btn">Notify me when there's a match</button>
+      </div>`;
+      const nb = document.getElementById('notify-btn');
+      if (nb) nb.addEventListener('click', () => showToast("We'll let you know as soon as someone who fits joins."));
+      return;
+    }
     cardStack.innerHTML = `<div class="empty-pool">
       No therapists match everything you asked for right now.<br><br>
       Try loosening a must-have requirement to see more options.
@@ -2075,6 +2116,7 @@ function renderStack() {
   }
   // Append back-to-front so the current therapist (visible[0]) ends up as
   // lastElementChild — that's what drag/button handlers treat as "the top card".
+  setControls(true);
   const appendOrder = visible.slice().reverse();
   appendOrder.forEach((t, idx) => {
     const depthFromFront = appendOrder.length - 1 - idx; // 0 = current/front card
@@ -3350,7 +3392,9 @@ function renderOndemand() {
   }
   const list = computeOnDemandList();
   if (list.length === 0) {
-    ondemandList.innerHTML = `<p class="empty-state">No one-time slots match your needs this week — check back soon.</p>`;
+    ondemandList.innerHTML = rosterCount === 0
+      ? `<p class="empty-state">We're still welcoming therapists in your area. On-Demand opens up as soon as therapists near you start offering one-time sessions.</p>`
+      : `<p class="empty-state">No one-time slots match your needs this week — check back soon.</p>`;
     return;
   }
   ondemandList.innerHTML = list.map(t => `
