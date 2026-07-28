@@ -2515,6 +2515,87 @@ function checkForNewMatches() {
   renderMatches();
 }
 
+// ===== THERAPIST SELF-MARKETING =====
+// A therapist's own audience is the cheapest growth channel Kindred has, so
+// give them a link that lands well for someone with no app and no account:
+// the public profile page on the WEBSITE, which funnels into matching.
+const KINDRED_SITE_URL = 'https://kindredtherapymatch.com';
+function slugifyName(name) {
+  return (name || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')   // strip accents
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+function therapistProfileUrl(t) {
+  const ref = t.slug || slugifyName(displayName(t));
+  return ref
+    ? `${KINDRED_SITE_URL}/profile.html?t=${encodeURIComponent(ref)}`
+    : `${KINDRED_SITE_URL}/profile.html?id=${encodeURIComponent(t.id)}`;
+}
+
+// Ready-to-post captions. Therapists are busy; giving them the words is the
+// difference between "I'll do it later" and it actually going out.
+function shareCaptions(t) {
+  const first = displayName(t).replace(/^Dr\.?\s*/i, '').split(' ')[0];
+  const url = therapistProfileUrl(t);
+  return [
+    { label: 'Short + direct', text: `I'm on Kindred — a therapy platform that matches people by fit, not by who's first in a directory. Here's my profile:\n${url}` },
+    { label: 'Warm / personal', text: `If you've been putting off finding a therapist because the search itself feels exhausting — I get it. I'm on Kindred, where you answer a few questions and get matched on how you actually want to feel in the room.\n\nMy profile: ${url}` },
+    { label: 'For your website', text: `Now accepting new clients through Kindred. See my profile and find out if we're a fit: ${url}` },
+    { label: 'Email signature', text: `— ${displayName(t)}\nBook or see if we're a fit: ${url}` }
+  ];
+}
+
+function openShareMyProfile() {
+  const t = THERAPISTS.find(t => t.id === currentTherapistId);
+  if (!t) return;
+  const url = therapistProfileUrl(t);
+  const caps = shareCaptions(t);
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>Share your profile</h2>
+    <div class="intake-sub">Your profile has a public page anyone can open — no app needed. Post it, email it, put it on your website. Everyone who lands there gets matched with you first.</div>
+
+    ${!t.listed ? `<p class="portal-note" style="background:#fdf1ed;border-radius:12px;padding:10px 12px;">Your profile isn't listed yet, so this link won't be live until you activate it.</p>` : ''}
+
+    <div class="t-form-label">Your profile link</div>
+    <div class="share-link-row">
+      <input type="text" class="t-rate-input" id="share-url-input" readonly value="${url}">
+      <button class="media-upload-btn" id="share-copy-btn">Copy</button>
+    </div>
+
+    <button class="primary-btn" style="margin-top:12px;background:var(--coral);color:white;" id="share-native-btn">↗ Share</button>
+
+    <div class="t-form-label" style="margin-top:20px;">Ready-to-post captions</div>
+    <div class="intake-sub" style="margin-top:-4px;">Tap any one to copy it.</div>
+    ${caps.map((c, i) => `
+      <div class="share-caption" data-share-caption="${i}">
+        <div class="share-caption-label">${c.label}</div>
+        <div class="share-caption-text">${c.text.replace(/\n/g, '<br>')}</div>
+      </div>`).join('')}
+
+    <p class="portal-note">Kindred never shares client information — this page only shows what clients already see on your profile.</p>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  const close = () => document.getElementById('confirm-modal').classList.add('hidden');
+  const sc = sheet.querySelector('.sheet-close'); if (sc) sc.addEventListener('click', close);
+
+  const copy = (text, msg) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => showToast(msg)).catch(() => showToast('Copy failed — select and copy manually.'));
+    } else { showToast('Copy this: ' + text); }
+  };
+  document.getElementById('share-copy-btn').addEventListener('click', () => copy(url, 'Link copied.'));
+  document.getElementById('share-native-btn').addEventListener('click', () => {
+    if (navigator.share) {
+      navigator.share({ title: `${displayName(t)} on Kindred`, text: caps[0].text, url }).catch(() => {});
+    } else { copy(caps[0].text, 'Caption + link copied.'); }
+  });
+  sheet.querySelectorAll('[data-share-caption]').forEach(el => el.addEventListener('click', () => {
+    copy(caps[Number(el.dataset.shareCaption)].text, 'Caption copied — paste it anywhere.');
+  }));
+}
+
 // ===== SHARE A THERAPIST =====
 // Word of mouth is how most people actually find a therapist. This shares the
 // THERAPIST's public profile — never anything about the client doing the
@@ -4250,6 +4331,7 @@ function renderTherapistInsights() {
         </div>
       `).join('')}
     </div>
+    <button class="edit-prefs-btn share-profile-btn" id="t-share-profile-btn">↗ Share my profile</button>
     <div class="portal-note" style="margin-top:12px;">Counts reflect this demo session plus seeded history — real analytics arrive with the production backend.</div>
     <div class="home-accepting-card" style="margin-top:18px;margin-bottom:0;">
       <div class="must-have-toggle card-toggle">
@@ -4264,6 +4346,8 @@ function renderTherapistInsights() {
   `;
   const activateBtn = document.getElementById('t-activate-btn');
   if (activateBtn) activateBtn.addEventListener('click', openActivateProfile);
+  const shareProfileBtn = document.getElementById('t-share-profile-btn');
+  if (shareProfileBtn) shareProfileBtn.addEventListener('click', openShareMyProfile);
   const insOngoingSwitch = document.getElementById('t-insights-ongoing-switch');
   if (insOngoingSwitch) insOngoingSwitch.addEventListener('click', () => {
     t.acceptingOngoing = !t.acceptingOngoing;

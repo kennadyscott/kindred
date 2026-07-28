@@ -1244,6 +1244,22 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 .quiz-done-emoji { font-size: 30px; margin-bottom: 8px; }
 .quiz-done p { font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); margin: 0; }
 
+/* ===== Therapist self-marketing / share sheet ===== */
+.share-profile-btn { color: var(--coral-dark); border-color: var(--coral); }
+.share-link-row { display: flex; gap: 8px; align-items: center; }
+.share-link-row input { flex: 1; margin: 0; font-size: 12.5px; }
+.share-link-row .media-upload-btn { flex: none; }
+.share-caption {
+  border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  margin-bottom: 10px; cursor: pointer; background: #fff;
+}
+.share-caption:active { background: var(--cream); }
+.share-caption-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--coral); margin-bottom: 6px;
+}
+.share-caption-text { font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+
 /* little star marking a required intake field */
 .req-star { color: var(--coral); font-size: 12px; margin-left: 3px; vertical-align: middle; }
 
