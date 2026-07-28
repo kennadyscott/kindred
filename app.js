@@ -55,7 +55,7 @@ const THERAPISTS = [
   {
     id: 't1', name: 'Dr. Maya Chen', credentials: ['PhD', 'Clinical Psychologist'],
     pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
-    photo: 'https://randomuser.me/api/portraits/women/90.jpg',
+    photo: 'https://images.unsplash.com/photo-1573496799652-408c2ac9fe98?w=512&h=512&fit=crop&crop=faces&q=85',
     initials: 'MC', gradient: 'linear-gradient(135deg,#8a63a8,#5c3766)',
     meta: ['Online & In-person', '$140–180/session'],
     bestFor: 'I work best with high-achievers who are quietly running on empty.',
@@ -89,7 +89,7 @@ const THERAPISTS = [
   {
     id: 't2', name: 'James Okafor', credentials: ['LMFT'],
     pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
-    photo: 'https://randomuser.me/api/portraits/men/83.jpg',
+    photo: 'https://images.unsplash.com/photo-1531384441138-2736e62e0919?w=512&h=512&fit=crop&crop=faces&q=85',
     initials: 'JO', gradient: 'linear-gradient(135deg,#bf7350,#9c5535)',
     meta: ['Online only', '$110–130/session'],
     selfPayNote: 'Sliding scale available',
@@ -124,7 +124,7 @@ const THERAPISTS = [
   {
     id: 't3', name: 'Priya Raman', credentials: ['LPC', 'Trauma Specialist'],
     pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
-    photo: 'https://randomuser.me/api/portraits/women/8.jpg',
+    photo: 'https://images.unsplash.com/photo-1592621385612-4d7129426394?w=512&h=512&fit=crop&crop=faces&q=85',
     initials: 'PR', gradient: 'linear-gradient(135deg,#a68fc9,#7a5fa8)',
     meta: ['In-person, Downtown', '$150/session'],
     selfPayNote: 'Out-of-network',
@@ -159,7 +159,7 @@ const THERAPISTS = [
   {
     id: 't4', name: 'Dr. Sam Alvarez', credentials: ['PsyD'],
     pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
-    photo: 'https://randomuser.me/api/portraits/men/11.jpg',
+    photo: 'https://images.unsplash.com/photo-1508341591423-4347099e1f19?w=512&h=512&fit=crop&crop=faces&q=85',
     initials: 'SA', gradient: 'linear-gradient(135deg,#d4a24e,#b57e2f)',
     meta: ['Online & In-person', '$160/session'],
     bestFor: "I work best with men who are burnt out and tired of being told to 'just relax.'",
@@ -193,7 +193,7 @@ const THERAPISTS = [
   {
     id: 't5', name: 'Dr. Leah Fitzgerald', credentials: ['PhD', 'Perinatal Specialist'],
     pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
-    photo: 'https://randomuser.me/api/portraits/women/63.jpg',
+    photo: 'https://images.unsplash.com/photo-1594744803329-e58b31de8bf5?w=512&h=512&fit=crop&crop=faces&q=85',
     initials: 'LF', gradient: 'linear-gradient(135deg,#6ba4c9,#4278a0)',
     meta: ['Online only', '$135/session'],
     bestFor: 'I work best with new parents who feel like they should be coping better than they are.',
@@ -227,7 +227,7 @@ const THERAPISTS = [
   {
     id: 't6', name: 'Marcus Webb', credentials: ['LCSW'],
     pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
-    photo: 'https://randomuser.me/api/portraits/men/22.jpg',
+    photo: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=512&h=512&fit=crop&crop=faces&q=85',
     initials: 'MW', gradient: 'linear-gradient(135deg,#8a9b6e,#647a4a)',
     meta: ['In-person & Online', '$120/session'],
     selfPayNote: 'Sliding scale',
@@ -258,6 +258,205 @@ const THERAPISTS = [
       inOffice: "Hoodie-friendly. No clipboard between us, no trick questions. If you want to sit on the floor, the floor is honestly where the best sessions happen.",
       outOfOffice: "Winter camping, because apparently I only relax when it's slightly too cold to think."
     }
+  },
+  {
+    id: 't7', name: 'Dr. Aaron Blake', credentials: ['LCSW'],
+    pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
+    photo: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=512&h=512&fit=crop&crop=faces&q=85',
+    initials: 'AB', gradient: 'linear-gradient(135deg,#5f7d6b,#3c5246)',
+    meta: ['Online & In-person', '$135/session'],
+    selfPayNote: '',
+    bestFor: 'I work best with men who were raised to handle everything alone and are finally done doing that.',
+    tags: ['Depression', 'Burnout', 'Anxiety'],
+    mandatoryPromptAnswers: [
+      "putting words to things you were taught to just push through.",
+      "No performance required. First sessions are just about getting the weight of it out loud — we go at your pace."
+    ],
+    optionalPrompts: [
+      { question: "You'll probably click with me if...", answer: "you want someone direct who won't tiptoe, but also won't make you feel like a project to be fixed.", photo: null },
+      { question: 'How I can help...', answer: "make sense of the low-grade heaviness that looks like 'fine' from the outside.", photo: null },
+      { question: 'I became a therapist because...', answer: "I watched too many good men white-knuckle their way through things that a single honest conversation could have eased.", photo: null }
+    ],
+    modalities: ['CBT'], style: 'direct',
+    identity: { gender: 'male', lgbtqAffirming: false }, languages: ['English'],
+    formats: ['video', 'in-person'], rateMin: 135, insuranceList: ['Aetna', 'BCBS'],
+    acceptingOngoing: true, onDemand: false, onDemandSlots: [],
+    nextAvailableRank: 1, nextAvailableLabel: 'This week',
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false,
+    location: { city: 'Atlanta', state: 'GA' },
+    licenseVerified: true, licenseNumber: 'GA-31882',
+    website: 'aaronblakelcsw.com',
+    stats: { profileViews: 88, hearts: 19, top5: 3, conversationsStarted: 3, weekViews: 12, weekHearts: 4 },
+    media: { video: null, office: 'https://picsum.photos/id/1062/700/460', outOfOffice: 'https://picsum.photos/id/1074/700/460' },
+    persona: {
+      inOffice: "Even, unhurried, a little dry. I'll say the true thing out loud so you don't have to be the first one to.",
+      outOfOffice: "Rebuilding an old motorcycle that may never run. My kids think that's hilarious."
+    }
+  },
+  {
+    id: 't8', name: 'Sofia Marín', credentials: ['LMFT'],
+    pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
+    photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=512&h=512&fit=crop&crop=faces&q=85',
+    initials: 'SM', gradient: 'linear-gradient(135deg,#a86377,#6b3c4e)',
+    meta: ['Online only', '$145/session'],
+    selfPayNote: 'Sliding scale available',
+    bestFor: 'I work best with people carrying a big life change and the grief nobody warned them came with it.',
+    tags: ['Life Transitions', 'Anxiety', 'Couples'],
+    mandatoryPromptAnswers: [
+      "steadying yourself when the ground you were standing on just moved.",
+      "We'll start with what's loudest right now. You don't need to have it organized before you get here — that's the work."
+    ],
+    optionalPrompts: [
+      { question: 'Together we could...', answer: "make room for the version of you that's still catching up to the change.", photo: null },
+      { question: "Out of session, you'll find me...", answer: "cooking for far too many people — feeding people is how my family says the things we can't.", photo: null }
+    ],
+    modalities: ['EFT'], style: 'gentle',
+    identity: { gender: 'female', lgbtqAffirming: true }, languages: ['English', 'Spanish'],
+    formats: ['video'], rateMin: 145, insuranceList: ['Cigna', 'EAP'],
+    acceptingOngoing: true, onDemand: false, onDemandSlots: [],
+    nextAvailableRank: 2, nextAvailableLabel: 'Next week',
+    practiceType: 'generalist', externalAppointments: [], agreedToOnDemandPolicy: false,
+    location: { city: 'Miami', state: 'FL' },
+    licenseVerified: true, licenseNumber: 'FL-45107',
+    website: 'sofiamarintherapy.com',
+    stats: { profileViews: 104, hearts: 27, top5: 5, conversationsStarted: 4, weekViews: 16, weekHearts: 6 },
+    media: { video: null, office: 'https://picsum.photos/id/1084/700/460', outOfOffice: 'https://picsum.photos/id/292/700/460' },
+    persona: {
+      inOffice: "Warm and a little maternal, but I'll ask the pointed question when it's time. Tissues are always within reach and never a big deal.",
+      outOfOffice: "Salsa dancing badly and proudly, and calling my abuela every Sunday whether I have news or not."
+    }
+  },
+  {
+    id: 't9', name: 'Jordan Lee', credentials: ['LPC'],
+    pronouns: 'they/them', showPronouns: true, useCompanyName: false, companyName: '',
+    photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=512&h=512&fit=crop&crop=faces&q=85',
+    initials: 'JL', gradient: 'linear-gradient(135deg,#8a63a8,#5c3766)',
+    meta: ['Online only', '$140/session'],
+    selfPayNote: '',
+    bestFor: 'I work best with LGBTQ+ folks who are tired of explaining themselves before they can even start.',
+    tags: ['Anxiety', 'Self Esteem', 'Life Transitions'],
+    mandatoryPromptAnswers: [
+      "feeling at home in yourself, without translating for the room first.",
+      "You won't have to catch me up on the basics of your identity — we get to skip straight to what actually brought you in."
+    ],
+    optionalPrompts: [
+      { question: "We're the same type of weird if...", answer: "you process out loud, contradict yourself twice, and land somewhere truer than where you started.", photo: null },
+      { question: 'I geek out on...', answer: "the moment a client stops managing how they come across and just says the real thing.", photo: null }
+    ],
+    modalities: ['ACT'], style: 'balanced',
+    identity: { gender: 'nonbinary', lgbtqAffirming: true }, languages: ['English'],
+    formats: ['video'], rateMin: 140, insuranceList: ['Aetna', 'United'],
+    acceptingOngoing: true, onDemand: false, onDemandSlots: [],
+    nextAvailableRank: 1, nextAvailableLabel: 'This week',
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false,
+    location: { city: 'Brooklyn', state: 'NY' },
+    licenseVerified: true, licenseNumber: 'NY-58820',
+    website: 'jordanleecounseling.com',
+    stats: { profileViews: 131, hearts: 44, top5: 7, conversationsStarted: 6, weekViews: 20, weekHearts: 8 },
+    media: { video: null, office: 'https://picsum.photos/id/1067/700/460', outOfOffice: 'https://picsum.photos/id/335/700/460' },
+    persona: {
+      inOffice: "Curious, warm, a little playful. I reflect a lot back to you — you'll hear your own patterns in my voice and go 'oh, huh.'",
+      outOfOffice: "Thrifting for the exact right lamp for eleven years running, and losing to my cat at everything."
+    }
+  },
+  {
+    id: 't10', name: 'Dr. Evelyn Hart', credentials: ['PhD', 'Clinical Psychologist'],
+    pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
+    photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=512&h=512&fit=crop&crop=faces&q=85',
+    initials: 'EH', gradient: 'linear-gradient(135deg,#5c6b8a,#37436b)',
+    meta: ['Online & In-person', '$175/session'],
+    selfPayNote: '',
+    bestFor: 'I work best with people carrying something from years ago that still runs the show today.',
+    tags: ['Trauma', 'Grief', 'Anxiety'],
+    mandatoryPromptAnswers: [
+      "loosening the grip of something that happened, so it stops shaping what happens next.",
+      "We move carefully and never faster than you're ready for. Safety and pace come before anything else in trauma work."
+    ],
+    optionalPrompts: [
+      { question: 'I became a therapist because...', answer: "I believe the past is far more changeable in its meaning than it feels when you're inside it.", photo: null },
+      { question: 'My greatest strength is...', answer: "staying steady and unflinching with the things people are most afraid will scare someone off.", photo: null }
+    ],
+    modalities: ['EMDR'], style: 'gentle',
+    identity: { gender: 'female', lgbtqAffirming: true }, languages: ['English'],
+    formats: ['video', 'in-person'], rateMin: 175, insuranceList: [],
+    acceptingOngoing: false, onDemand: false, onDemandSlots: [],
+    nextAvailableRank: null, nextAvailableLabel: 'Not accepting new ongoing clients',
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: false,
+    location: { city: 'Seattle', state: 'WA' },
+    licenseVerified: true, licenseNumber: 'WA-20911',
+    website: 'evelynhartphd.com',
+    stats: { profileViews: 173, hearts: 52, top5: 9, conversationsStarted: 8, weekViews: 9, weekHearts: 2 },
+    media: { video: null, office: 'https://picsum.photos/id/1040/700/460', outOfOffice: 'https://picsum.photos/id/29/700/460' },
+    persona: {
+      inOffice: "Calm, grounded, deliberate. I'll slow us down on purpose — the nervous system doesn't heal in a hurry.",
+      outOfOffice: "Tending a garden that is mostly weeds I've decided to like, and reading three books at once."
+    }
+  },
+  {
+    id: 't11', name: 'Nathan Brooks', credentials: ['LPC'],
+    pronouns: 'he/him', showPronouns: true, useCompanyName: false, companyName: '',
+    photo: 'https://images.unsplash.com/photo-1500048993953-d23a436266cf?w=512&h=512&fit=crop&crop=faces&q=85',
+    initials: 'NB', gradient: 'linear-gradient(135deg,#bf7350,#9c5535)',
+    meta: ['Online only', '$120/session'],
+    selfPayNote: '',
+    bestFor: 'I work best with people who start a hundred things and finish two, and are hard on themselves about it.',
+    tags: ['ADHD', 'Life Transitions', 'Burnout'],
+    mandatoryPromptAnswers: [
+      "building systems that fit your actual brain instead of the one you keep apologizing for not having.",
+      "We'll get practical fast. Expect real strategies you can try this week, not just insight for its own sake."
+    ],
+    optionalPrompts: [
+      { question: "I won't shut up about...", answer: "how much of what you call 'lazy' is actually an executive-function traffic jam, not a character flaw.", photo: null },
+      { question: 'How I can help...', answer: "turn the overwhelm into a short list of next steps that don't make you want to nap.", photo: null }
+    ],
+    modalities: ['CBT'], style: 'direct',
+    identity: { gender: 'male', lgbtqAffirming: false }, languages: ['English'],
+    formats: ['video'], rateMin: 120, insuranceList: ['BCBS', 'Cigna'],
+    acceptingOngoing: true, onDemand: true, onDemandSlots: [{ label: 'Mon 12:00pm', rank: 1 }, { label: 'Wed 5:30pm', rank: 2 }],
+    nextAvailableRank: 1, nextAvailableLabel: 'This week',
+    practiceType: 'specialist', externalAppointments: [], agreedToOnDemandPolicy: true,
+    location: { city: 'Columbus', state: 'OH' },
+    licenseVerified: true, licenseNumber: 'OH-40255',
+    website: '',
+    stats: { profileViews: 96, hearts: 25, top5: 4, conversationsStarted: 3, weekViews: 18, weekHearts: 5 },
+    media: { video: null, office: 'https://picsum.photos/id/119/700/460', outOfOffice: 'https://picsum.photos/id/225/700/460' },
+    persona: {
+      inOffice: "Fast, warm, a whiteboard-and-sticky-notes kind of energy. We'll laugh about the chaos while we actually sort it.",
+      outOfOffice: "Half-built projects everywhere and a very patient dog who's seen all of them."
+    }
+  },
+  {
+    id: 't12', name: 'Amara Johnson', credentials: ['LCSW'],
+    pronouns: 'she/her', showPronouns: true, useCompanyName: false, companyName: '',
+    photo: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=512&h=512&fit=crop&crop=faces&q=85',
+    initials: 'AJ', gradient: 'linear-gradient(135deg,#8a63a8,#5c3766)',
+    meta: ['Online only', '$130/session'],
+    selfPayNote: 'Sliding scale available',
+    bestFor: 'I work best with high-achieving Black women who are exhausted from being everyone else’s steady one.',
+    tags: ['Anxiety', 'Burnout', 'Self Esteem'],
+    mandatoryPromptAnswers: [
+      "putting yourself back on your own list, without the guilt tax.",
+      "This is a space where you don't have to be strong or explain the context. We can just start with how you actually are."
+    ],
+    optionalPrompts: [
+      { question: 'Together we could...', answer: "untangle the difference between what you truly want and what you've been carrying because no one else would.", photo: null },
+      { question: "You'll probably click with me if...", answer: "you want warmth and realness both — I'll hold space and also gently call it when you're overfunctioning again.", photo: null }
+    ],
+    modalities: ['CBT'], style: 'gentle',
+    identity: { gender: 'female', lgbtqAffirming: true }, languages: ['English'],
+    formats: ['video'], rateMin: 130, insuranceList: ['Aetna', 'United', 'EAP'],
+    acceptingOngoing: true, onDemand: false, onDemandSlots: [],
+    nextAvailableRank: 1, nextAvailableLabel: 'This week',
+    practiceType: 'generalist', externalAppointments: [], agreedToOnDemandPolicy: false,
+    location: { city: 'Atlanta', state: 'GA' },
+    licenseVerified: true, licenseNumber: 'GA-52740',
+    website: 'amarajohnsonlcsw.com',
+    stats: { profileViews: 148, hearts: 47, top5: 8, conversationsStarted: 6, weekViews: 24, weekHearts: 9 },
+    media: { video: null, office: 'https://picsum.photos/id/1078/700/460', outOfOffice: 'https://picsum.photos/id/431/700/460' },
+    persona: {
+      inOffice: "Warm, direct, and fully in it with you. I laugh, I get real, and I won't let you shrink yourself in here.",
+      outOfOffice: "Sunday reset queen — candles, a good playlist, and absolutely not answering my phone."
+    }
   }
 ];
 
@@ -271,7 +470,13 @@ const THERAPIST_IDENTITY = {
   t3: { ethnicity: 'South Asian', affinities: ['LGBTQ+'], faith: ['Hindu'] },
   t4: { ethnicity: 'Hispanic and Latino', affinities: [], faith: ['Secular and Non-Religious'] },
   t5: { ethnicity: '', affinities: [], faith: ['Christian'] },
-  t6: { ethnicity: '', affinities: ['LGBTQ+', 'Transgender'], faith: ['Secular and Non-Religious'] }
+  t6: { ethnicity: '', affinities: ['LGBTQ+', 'Transgender'], faith: ['Secular and Non-Religious'] },
+  t7: { ethnicity: '', affinities: [], faith: ['Secular and Non-Religious'] },
+  t8: { ethnicity: 'Hispanic and Latino', affinities: [], faith: ['Christian'] },
+  t9: { ethnicity: '', affinities: ['LGBTQ+', 'Non-binary'], faith: ['Secular and Non-Religious'] },
+  t10: { ethnicity: '', affinities: [], faith: [] },
+  t11: { ethnicity: '', affinities: [], faith: [] },
+  t12: { ethnicity: 'Black and African American', affinities: [], faith: ['Christian'] }
 };
 // Recurring weekly openings the therapist has for NEW ongoing clients — the
 // Home tab is an availability calendar, so this is the core of it. Only
