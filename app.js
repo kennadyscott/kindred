@@ -555,6 +555,9 @@ THERAPISTS.forEach(t => {
 // Founding offer: the first 200 therapists get $19.99/mo for 3 months, then
 // $29.99/mo. Once the 200 founding spots are gone, everyone is $29.99/mo.
 const FOUNDING_TOTAL = 200;
+// Subscription is paid on the WEBSITE (Stripe web checkout), never in-app —
+// keeps Apple's cut at 0% and avoids any IAP surface in the App Store build.
+const THERAPIST_BILLING_URL = 'https://kindredtherapymatch.com/activate';
 const FOUNDING_INTRO_RATE = 19.99;
 const FOUNDING_INTRO_MONTHS = 3;
 const STANDARD_RATE = 29.99;
@@ -4084,30 +4087,47 @@ function openActivateProfile() {
         : `<div class="activate-terms">billed monthly · cancel anytime</div>`}
     </div>
     <ul class="policy-list">
-      <li>Your profile goes live in client matching immediately</li>
+      <li>Your profile goes live in client matching once your subscription is active</li>
       <li>Cancel anytime — your profile just unlists, nothing is deleted</li>
       ${p.founding ? `<li>Founding rate is locked to your first ${p.introMonths} months</li>` : ''}
     </ul>
+    <p class="portal-note" style="margin:8px 0 0;">You'll complete your subscription securely on the Kindred website. We'll bring you right back.</p>
     <div id="activate-status"></div>
-    <button class="primary-btn" style="margin-top:14px;background:var(--coral);color:white;" id="activate-pay-btn">Activate — $${p.introRate.toFixed(2)}/mo</button>
+    <button class="primary-btn" style="margin-top:14px;background:var(--coral);color:white;" id="activate-pay-btn">Continue to secure checkout →</button>
     <button class="text-btn" id="activate-later-btn" style="color:var(--ink-soft);">I'll do this later</button>
   `;
   document.getElementById('confirm-modal').classList.remove('hidden');
   const close = () => document.getElementById('confirm-modal').classList.add('hidden');
   const sc = sheet.querySelector('.sheet-close'); if (sc) sc.addEventListener('click', close);
   document.getElementById('activate-later-btn').addEventListener('click', () => { close(); renderTherapistInsights(); });
+
+  // Payment happens on the WEBSITE (Stripe web checkout), never as an in-app
+  // purchase — so Apple takes no cut and there's no IAP surface in the app.
   document.getElementById('activate-pay-btn').addEventListener('click', () => {
     const btn = document.getElementById('activate-pay-btn');
     const status = document.getElementById('activate-status');
-    btn.disabled = true; btn.textContent = 'Starting subscription…';
-    status.innerHTML = `<div class="portal-note" style="margin-bottom:8px;">Setting up billing…</div>`;
+    const founding = p.founding;
+    const plan = founding ? 'founding' : 'standard';
+
+    if (KINDRED_FLAGS.therapistBillingLive) {
+      // Real: hand off to the website's Stripe checkout. Listing flips server-side
+      // when the subscription is active; the app reflects it on next refresh.
+      const sess = authReady() && loadAuthSession();
+      const email = sess && sess.user && sess.user.email ? `&email=${encodeURIComponent(sess.user.email)}` : '';
+      window.open(`${THERAPIST_BILLING_URL}?plan=${plan}${email}`, '_blank');
+      status.innerHTML = `<div class="portal-note" style="margin-top:8px;">Opened secure checkout on the Kindred website. Your profile goes live the moment your subscription is active — refresh here after.</div>`;
+      btn.textContent = 'Re-open checkout →';
+      return;
+    }
+
+    // Demo (therapistBillingLive off): simulate the web handoff + activation so
+    // the flow can be shown end-to-end without the live backend.
+    btn.disabled = true; btn.textContent = 'Opening secure checkout…';
+    status.innerHTML = `<div class="portal-note" style="margin-bottom:8px;">Redirecting to the Kindred website…</div>`;
     setTimeout(() => {
-      // (Demo) — real Stripe subscription billing is backend work. Business data,
-      // so it's NOT behind the HIPAA gate; wire it when the backend lands.
-      const founding = p.founding;
       if (founding) foundingSpotsTaken++;
       t.listed = true;
-      t.subscription = { plan: founding ? 'founding' : 'standard', founding, introRate: p.introRate, standardRate: p.standardRate, introMonths: p.introMonths };
+      t.subscription = { plan, founding, introRate: p.introRate, standardRate: p.standardRate, introMonths: p.introMonths };
       t.published = true;
       if (authReady() && loadAuthSession()) saveTherapistProfile(t).catch(e => console.warn('listing save deferred:', e.message));
       close();
