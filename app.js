@@ -5210,6 +5210,7 @@ function modalitySummary() {
   return `${intake.modality}${intake.modalityRequired ? ' (must-have)' : ' (preferred)'}`;
 }
 
+let youMode = 'preferences'; // 'preferences' | 'share' | 'account' — the You tab's three-way toggle
 function renderProfileScreen() {
   let screen = document.getElementById('screen-profile');
   if (!screen) {
@@ -5221,14 +5222,8 @@ function renderProfileScreen() {
   const savedList = EXPLORE_RESOURCES.filter(r => savedResources.includes(r.id));
   const matchedMatches = matches.filter(m => m.status === 'matched');
   const wantsInPerson = intake.formats.includes('in-person');
-  screen.innerHTML = `
-    <header class="top-bar"><div class="logo">You</div></header>
-    <div class="profile-content">
-
-      <!-- ===== PREFERENCES (edit + save inline) ===== -->
-      <div class="settings-group-title" style="margin-top:0;">Preferences</div>
-
-      <div class="t-form-label">What you're working on</div>
+  const prefsHtml = `
+      <div class="t-form-label" style="margin-top:8px;">What you're working on</div>
       <div class="chip-grid">${NEED_OPTIONS.map(n => `<div class="chip-option ${intake.needs.includes(n) ? 'selected' : ''}" data-you-need="${n}">${n}</div>`).join('')}</div>
 
       <div class="t-form-label">Session format</div>
@@ -5263,25 +5258,39 @@ function renderProfileScreen() {
       <div class="chip-grid">${BUDGET_RANGES.map(b => `<div class="chip-option ${intake.budgetRange === b.label ? 'selected' : ''}" data-you-budget="${b.label}">${b.label}</div>`).join('')}</div>
 
       <button class="primary-btn" id="save-prefs-btn" style="margin-top:14px;background:var(--coral);color:white;">Save preferences</button>
-      <button class="edit-prefs-btn" id="edit-prefs-btn" style="color:var(--ink-soft);">Retake the full questionnaire</button>
+      <button class="edit-prefs-btn" id="edit-prefs-btn" style="color:var(--ink-soft);">Retake the full questionnaire</button>`;
 
-      <!-- ===== SHARE YOUR PROFILE ===== -->
-      <div class="settings-group-title">Share your profile</div>
-      <p class="portal-note" style="margin-top:0;">Give a matched therapist a picture of what you're working with — your answers and saved resources. You choose per therapist, and can turn it off anytime.</p>
+  const shareHtml = `
+      <p class="portal-note" style="margin-top:8px;">Give a matched therapist a picture of what you're working with — your answers and saved resources. You choose per therapist, and can turn it off anytime.</p>
       <button class="edit-prefs-btn" id="preview-shared-btn" style="margin:2px 0 4px;background:white;border:1.5px solid var(--coral);color:var(--coral-dark);">👀 Preview what your therapist sees</button>
       ${matchedMatches.length ? matchedMatches.map(m => `
         <div class="must-have-toggle" style="margin-top:8px;">
           <div class="toggle-label"><strong>${displayName(m.therapist)}</strong><span>${m.profileShared ? 'Can see your profile' : 'Cannot see your profile'}</span></div>
           <div class="switch ${m.profileShared ? 'on' : ''}" data-share-toggle="${m.therapist.id}"></div>
         </div>`).join('') : `<p class="portal-note">Once you match with a therapist, you can share your profile with them here.</p>`}
-      <p class="portal-note">Saved resources: ${savedList.length ? savedList.map(r => `${r.icon} ${r.title}`).join(' · ') : 'nothing saved yet — browse the Kindred tab.'}</p>
+      <p class="portal-note">Saved resources: ${savedList.length ? savedList.map(r => `${r.icon} ${r.title}`).join(' · ') : 'nothing saved yet — browse the Kindred tab.'}</p>`;
 
-      <!-- ===== ACCOUNT ===== -->
-      <div class="settings-group-title">Account</div>
-      <button class="edit-prefs-btn" id="client-logout-btn" style="color:var(--ink-soft);">Log Out</button>
-      <button class="edit-prefs-btn" id="delete-account-btn" style="color:#a8443a;">Delete My Account</button>
+  const accountHtml = `
+      <button class="edit-prefs-btn" id="client-logout-btn" style="margin-top:8px;color:var(--ink-soft);">Log Out</button>
+      <button class="edit-prefs-btn" id="delete-account-btn" style="color:#a8443a;">Delete My Account</button>`;
+
+  screen.innerHTML = `
+    <header class="top-bar"><div class="logo">You</div></header>
+    <div class="profile-content">
+      <div class="profile-modes" role="tablist">
+        <button class="pmode ${youMode === 'preferences' ? 'active' : ''}" data-youmode="preferences" role="tab">⚙ Preferences</button>
+        <button class="pmode ${youMode === 'share' ? 'active' : ''}" data-youmode="share" role="tab">↗ Share</button>
+        <button class="pmode ${youMode === 'account' ? 'active' : ''}" data-youmode="account" role="tab">👤 Account</button>
+      </div>
+      ${youMode === 'preferences' ? prefsHtml : youMode === 'share' ? shareHtml : accountHtml}
     </div>
   `;
+
+  screen.querySelectorAll('[data-youmode]').forEach(b => b.addEventListener('click', () => {
+    youMode = b.dataset.youmode;
+    renderProfileScreen();
+    document.getElementById('screen-profile').scrollTop = 0;
+  }));
 
   // ----- inline preference editors (mutate intake, re-render) -----
   screen.querySelectorAll('[data-you-need]').forEach(el => el.addEventListener('click', () => {
@@ -5311,7 +5320,8 @@ function renderProfileScreen() {
   screen.querySelectorAll('[data-you-budget]').forEach(el => el.addEventListener('click', () => {
     intake.budgetRange = el.dataset.youBudget; renderProfileScreen();
   }));
-  document.getElementById('save-prefs-btn').addEventListener('click', () => {
+  const savePrefsBtn = document.getElementById('save-prefs-btn');
+  if (savePrefsBtn) savePrefsBtn.addEventListener('click', () => {
     if (!intake.state) { showToast('Pick your state so we can match you with licensed therapists.'); return; }
     if (intake.formats.includes('in-person') && !(intake.city || '').trim()) { showToast('Add your city for in-person matches.'); return; }
     clientStore.persistIntake(intake);   // gated by the flag
@@ -5319,10 +5329,14 @@ function renderProfileScreen() {
     showToast('Preferences saved — your matches are updated.');
   });
 
-  document.getElementById('edit-prefs-btn').addEventListener('click', startIntake);
-  document.getElementById('client-logout-btn').addEventListener('click', logout);
-  document.getElementById('delete-account-btn').addEventListener('click', openDeleteAccountSheet);
-  document.getElementById('preview-shared-btn').addEventListener('click', openSharedProfilePreview);
+  const editPrefsBtn = document.getElementById('edit-prefs-btn');
+  if (editPrefsBtn) editPrefsBtn.addEventListener('click', startIntake);
+  const clientLogoutBtn = document.getElementById('client-logout-btn');
+  if (clientLogoutBtn) clientLogoutBtn.addEventListener('click', logout);
+  const deleteAccountBtn = document.getElementById('delete-account-btn');
+  if (deleteAccountBtn) deleteAccountBtn.addEventListener('click', openDeleteAccountSheet);
+  const previewSharedBtn = document.getElementById('preview-shared-btn');
+  if (previewSharedBtn) previewSharedBtn.addEventListener('click', openSharedProfilePreview);
   screen.querySelectorAll('[data-share-toggle]').forEach(el => el.addEventListener('click', () => {
     const m = matches.find(m => m.therapist.id === el.dataset.shareToggle && m.status === 'matched');
     if (!m) return;
