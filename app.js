@@ -21,11 +21,19 @@ if (document.body) document.body.classList.toggle('production', PRODUCTION_BUILD
 // ===================================================================
 let KINDRED_FLAGS = { clientDataPersistence: false, therapistBillingLive: false };
 function clientDataPersistenceEnabled() { return !!KINDRED_FLAGS.clientDataPersistence; }
+// The flags MUST come from the web, not from the app bundle. Inside a native
+// (Capacitor) build a relative fetch resolves to the packaged copy, which would
+// freeze the flags at whatever shipped — defeating the whole point of being able
+// to flip clientDataPersistence after the BAA without an App Store resubmission.
+// So: absolute URL everywhere except local development.
+const FLAGS_URL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  ? 'config.json'
+  : 'https://app.kindredtherapymatch.com/config.json';
 (function loadRemoteFlags() {
-  fetch('config.json?cb=' + Date.now(), { cache: 'no-store' })
+  fetch(FLAGS_URL + '?cb=' + Date.now(), { cache: 'no-store' })
     .then(r => (r.ok ? r.json() : null))
     .then(cfg => { if (cfg && typeof cfg === 'object') KINDRED_FLAGS = Object.assign(KINDRED_FLAGS, cfg); })
-    .catch(() => {});
+    .catch(() => {});   // safe defaults (everything off) stand if it can't load
 })();
 
 // The client data layer, abstracted behind the flag. TODAY every method is a

@@ -1,0 +1,11 @@
+{
+  "appId": "com.kindredtherapymatch.app",
+  "appName": "Kindred",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "always"
+  },
+  "server": {
+    "iosScheme": "https"
+  }
+}
