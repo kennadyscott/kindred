@@ -991,7 +991,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 }
 .nav-btn.active { color: var(--coral-dark); }
 .nav-icon { font-size: 17px; }
-.nav-btn span:last-child { font-size: 10px; }
+.nav-btn span:last-child { font-size: 10px; white-space: nowrap; }
 .five-tabs .nav-btn { padding: 0 2px; }
 .five-tabs .nav-icon { font-size: 15px; }
 .five-tabs .nav-btn span:last-child { font-size: 9px; letter-spacing: -0.2px; }
