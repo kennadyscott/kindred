@@ -552,27 +552,40 @@ THERAPISTS.forEach(t => {
 });
 
 // ===== LISTING SUBSCRIPTION (therapists pay to list) =====
-// Founding offer is DATE-based: sign up before Dec 1 and your first 3 months are
-// $19.99/mo, then $29.99/mo. Sign up on or after Dec 1 and it's $29.99/mo flat.
-// Subscription is paid on the WEBSITE (Stripe web checkout), never in-app —
-// keeps Apple's cut at 0% and avoids any IAP surface in the App Store build.
+// Escalating founding ladder: the earlier you join, the lower your rate — and
+// you KEEP that rate for 12 months before it moves to the standard rate. The
+// long lock is what makes the urgency real (joining in Sept vs Dec saves $120
+// over the year), and it fairly rewards the therapists who fill a cold-start
+// marketplace. Billing starts immediately on signup.
+// Paid on the WEBSITE (Stripe web checkout), never in-app — keeps Apple's cut
+// at 0% and avoids any IAP surface in the App Store build.
 const THERAPIST_BILLING_URL = 'https://kindredtherapymatch.com/activate.html';
-const FOUNDING_DEADLINE = new Date('2026-12-01T00:00:00');
-const FOUNDING_INTRO_RATE = 19.99;
-const FOUNDING_INTRO_MONTHS = 3;
+const PRICING_TIERS = [
+  { until: new Date('2026-09-01T00:00:00'), rate: 9.99 },
+  { until: new Date('2026-10-01T00:00:00'), rate: 14.99 },
+  { until: new Date('2026-11-01T00:00:00'), rate: 16.99 },
+  { until: new Date('2026-12-01T00:00:00'), rate: 19.99 }
+];
 const STANDARD_RATE = 29.99;
-function foundingOpen() { return new Date() < FOUNDING_DEADLINE; }
-function foundingDeadlineLabel() {
-  return FOUNDING_DEADLINE.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-}
+const FOUNDING_LOCK_MONTHS = 12;
+const dateLabel = d => d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+
 function listingPricing() {
-  const founding = foundingOpen();
+  const now = new Date();
+  const i = PRICING_TIERS.findIndex(t => now < t.until);
+  if (i === -1) {
+    // ladder has closed — standard rate for everyone
+    return { founding: false, introRate: STANDARD_RATE, introMonths: 0, standardRate: STANDARD_RATE, nextRate: null, nextDateLabel: null };
+  }
+  const tier = PRICING_TIERS[i];
+  const next = PRICING_TIERS[i + 1];
   return {
-    founding,
-    introRate: founding ? FOUNDING_INTRO_RATE : STANDARD_RATE,
-    introMonths: founding ? FOUNDING_INTRO_MONTHS : 0,
+    founding: true,
+    introRate: tier.rate,
+    introMonths: FOUNDING_LOCK_MONTHS,
     standardRate: STANDARD_RATE,
-    deadlineLabel: foundingDeadlineLabel()
+    nextRate: next ? next.rate : STANDARD_RATE,   // what it becomes after this deadline
+    nextDateLabel: dateLabel(tier.until)          // when this rate goes away
   };
 }
 
@@ -4082,16 +4095,16 @@ function openActivateProfile() {
     <h2>Activate your profile</h2>
     <div class="intake-sub">Your profile is built. List it on Kindred to start being matched with clients.</div>
     <div class="activate-plan ${p.founding ? 'founding' : ''}">
-      ${p.founding ? `<div class="activate-badge">🌟 Founding rate — join before ${p.deadlineLabel}</div>` : ''}
+      ${p.founding ? `<div class="activate-badge">🌟 Rate rises to $${p.nextRate.toFixed(2)} on ${p.nextDateLabel}</div>` : ''}
       <div class="activate-price">$${p.introRate.toFixed(2)}<span>/mo</span></div>
       ${p.founding
-        ? `<div class="activate-terms">for your first ${p.introMonths} months, then $${p.standardRate.toFixed(2)}/mo</div>`
+        ? `<div class="activate-terms">locked for ${p.introMonths} months, then $${p.standardRate.toFixed(2)}/mo</div>`
         : `<div class="activate-terms">billed monthly · cancel anytime</div>`}
     </div>
     <ul class="policy-list">
       <li>Your profile goes live in client matching once your subscription is active</li>
       <li>Cancel anytime — your profile just unlists, nothing is deleted</li>
-      ${p.founding ? `<li>Founding rate is locked to your first ${p.introMonths} months</li>` : ''}
+      ${p.founding ? `<li>Your $${p.introRate.toFixed(2)} rate is locked for a full ${p.introMonths} months — join later and you'll pay more</li>` : ''}
     </ul>
     <p class="portal-note" style="margin:8px 0 0;">You'll complete your subscription securely on the Kindred website. We'll bring you right back.</p>
     <div id="activate-status"></div>
