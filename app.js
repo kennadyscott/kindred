@@ -948,6 +948,96 @@ const chatLog = {};       // therapistId -> [{from: 'me'|'them', text}] — 'me'
 let chatRole = 'client';  // which side of the chat screen we're currently rendering as
 let chatReturnScreen = 'matches';
 
+// ===================================================================
+// CLIENT STATE — saved to THIS DEVICE only.
+// A client spends real effort on intake, shortlisting, and reaching out; losing
+// all of it on a refresh is unacceptable. This keeps it on their own device.
+//
+// HIPAA: writing to the client's own localStorage is NOT server-side PHI — it's
+// the same category as any app remembering your preferences locally. Nothing
+// here leaves the device. Server-side persistence stays behind
+// clientDataPersistence (see clientStore) until the BAA is signed.
+//
+// Therapists are stored as SNAPSHOTS keyed by id, so a shortlist survives even
+// when the live roster changes; on load we prefer the fresh copy if we have one.
+// ===================================================================
+const CLIENT_STATE_KEY = 'kindred-client';
+const CLIENT_STATE_VERSION = 1;
+
+function saveClientState() {
+  try {
+    if (!intake.completed) return;                 // nothing worth keeping yet
+    const referenced = {};
+    const remember = t => { if (t && t.id) referenced[t.id] = t; };
+    shortlist.forEach(remember);
+    matches.forEach(m => remember(m.therapist));
+
+    localStorage.setItem(CLIENT_STATE_KEY, JSON.stringify({
+      v: CLIENT_STATE_VERSION,
+      intake,
+      savedResources,
+      crisisAcknowledged,
+      clientAgreedToOnDemandPolicy,
+      shortlistIds: shortlist.map(t => t.id),
+      matches: matches.map(m => {
+        const { therapist, ...rest } = m;
+        return { ...rest, therapistId: therapist ? therapist.id : null };
+      }),
+      therapists: referenced,
+      chatLog
+    }));
+  } catch (e) {
+    // Private browsing or a full quota — never let saving break the app.
+    console.warn('client state not saved:', e.message);
+  }
+}
+
+function loadClientState() {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(CLIENT_STATE_KEY) || 'null'); } catch (e) { return false; }
+  if (!saved || saved.v !== CLIENT_STATE_VERSION || !saved.intake) return false;
+
+  Object.assign(intake, saved.intake);
+  savedResources = Array.isArray(saved.savedResources) ? saved.savedResources : [];
+  crisisAcknowledged = !!saved.crisisAcknowledged;
+  clientAgreedToOnDemandPolicy = !!saved.clientAgreedToOnDemandPolicy;
+
+  // Prefer a live therapist object when we have one (fresher rates, availability);
+  // otherwise fall back to the snapshot we stored.
+  const snaps = saved.therapists || {};
+  const resolve = id => THERAPISTS.find(t => t.id === id) || (snaps[id] ? normalizeTherapist(snaps[id]) : null);
+
+  shortlist = (saved.shortlistIds || []).map(resolve).filter(Boolean);
+  matches.length = 0;
+  (saved.matches || []).forEach(m => {
+    const t = resolve(m.therapistId);
+    if (t) matches.push({ ...m, therapist: t });
+  });
+  Object.keys(chatLog).forEach(k => delete chatLog[k]);
+  Object.assign(chatLog, saved.chatLog || {});
+  return true;
+}
+
+// Belt and braces: a match without a therapist would crash every list that
+// renders one. Corrupted or partially-written storage should degrade quietly,
+// never white-screen the app.
+function pruneOrphanMatches() {
+  for (let i = matches.length - 1; i >= 0; i--) {
+    if (!matches[i] || !matches[i].therapist || !matches[i].therapist.id) matches.splice(i, 1);
+  }
+  shortlist = shortlist.filter(t => t && t.id);
+}
+
+function clearClientState() {
+  try { localStorage.removeItem(CLIENT_STATE_KEY); } catch (e) {}
+}
+
+// Catch-all saves. beforeunload is unreliable on mobile/PWA, so pagehide and
+// visibilitychange do the real work there.
+window.addEventListener('pagehide', saveClientState);
+window.addEventListener('beforeunload', saveClientState);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveClientState(); });
+
 const cardStack = document.getElementById('card-stack');
 const navBadge = document.getElementById('nav-badge');
 
@@ -1850,6 +1940,7 @@ function attachIntakeHandlers() {
 
 function finishIntake() {
   intake.completed = true;
+  saveClientState();                 // keep it on this device so a refresh doesn't wipe it
   clientStore.persistIntake(intake); // no-op until clientDataPersistence flips on (post-BAA)
   computeDeck();
   document.getElementById('bottom-nav').classList.remove('hidden');
@@ -2396,6 +2487,7 @@ function handleLike(t) {
   // intent instead of every impulsive right-swipe.
   if (!shortlist.find(s => s.id === t.id) && !matches.find(m => m.therapist.id === t.id)) {
     shortlist.push(t);
+    saveClientState();
   }
   showToast('Added to your shortlist');
   renderShortlist();
@@ -2487,6 +2579,7 @@ function confirmMatchRequest(therapistId, introMessage, desiredFrequency) {
   const m = matches[matches.length - 1];
   clientStore.persistMatch(m);                                  // gated by the flag
   clientStore.persistMessage(therapistId, { from: 'me', text: introMessage });
+  saveClientState();
   showToast('Match request sent — waiting for them to respond.');
   updateNavBadge();
   renderShortlist();
@@ -3154,6 +3247,7 @@ function sendChatMessage() {
   chatLog[tid] = chatLog[tid] || [];
   const from = chatRole === 'therapist' ? 'them' : 'me';
   chatLog[tid].push({ from, text });
+  saveClientState();
   clientStore.persistMessage(tid, { from, text }); // gated by the flag
   input.value = '';
   renderChatMessages(tid);
@@ -3629,6 +3723,7 @@ function renderExploreResources() {
       const id = btn.dataset.resource;
       const i = savedResources.indexOf(id);
       if (i === -1) savedResources.push(id); else savedResources.splice(i, 1);
+      saveClientState();
       renderExploreResources();
     });
   });
@@ -4247,6 +4342,9 @@ function openActivateProfile() {
 
 function logout() {
   if (authReady()) authSignOut();  // clear the Supabase session (fire-and-forget)
+  // A therapy app on a shared device must not leave someone's intake and
+  // conversations behind after they log out.
+  clearClientState();
   accountType = null;
   therapistWelcomeShown = false;
   document.getElementById('bottom-nav').classList.add('hidden');
@@ -5476,6 +5574,13 @@ function renderProfileScreen() {
     renderProfileScreen();
   }));
 }
+
+// Restore this device's client state (intake, shortlist, matches, chats) before
+// anything renders. enterMatchingExperience() then sees intake.completed and
+// takes a returning client straight to their matches instead of re-running the
+// whole questionnaire.
+loadClientState();
+pruneOrphanMatches();
 
 showScreen('account-type');
 
