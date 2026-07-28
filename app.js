@@ -254,6 +254,32 @@ const WAITLIST_SEED = {
 // Demo: a therapist licensed (and Stripe-verified) in more than one state.
 const LICENSE_SEED = { t1: ['TX', 'CA'] };
 
+// Backfill every generic default a therapist object needs, so seeded rows, rows
+// loaded from the DB, and freshly-signed-up therapists all end up complete.
+// (Only touches fields that are undefined — explicit values, e.g. a new signup's
+// listed:false, are preserved.)
+function normalizeTherapist(t) {
+  if (!t.media) t.media = {};
+  if (!Array.isArray(t.media.photos)) t.media.photos = [t.media.office, t.media.outOfOffice].filter(Boolean).slice(0, 4);
+  if (!t.topSpecialties || !t.topSpecialties.length) t.topSpecialties = (t.tags || []).slice(0, 3);
+  if (t.selfPayNote === undefined) t.selfPayNote = '';
+  if (t.acceptsSlidingScale === undefined) t.acceptsSlidingScale = /sliding/i.test(t.selfPayNote || '');
+  if (t.offerWaitlist === undefined) t.offerWaitlist = !t.acceptingOngoing;
+  if (!Array.isArray(t.waitlist)) t.waitlist = [];
+  if (!Array.isArray(t.startedConversations)) t.startedConversations = [];
+  if (!Array.isArray(t.licensedStates)) t.licensedStates = (t.location && t.location.state) ? [t.location.state] : [];
+  if (t.onDemandRate == null) t.onDemandRate = t.rateMin;
+  if (t.listed === undefined) t.listed = true;
+  if (t.subscription === undefined) t.subscription = { plan: 'founding', founding: true, introRate: 19.99, standardRate: 29.99 };
+  if (!t.stats) t.stats = { profileViews: 0, hearts: 0, top5: 0, conversationsStarted: 0, weekViews: 0, weekHearts: 0 };
+  return t;
+}
+// Add or replace a therapist in the in-memory roster by id.
+function upsertTherapistInMemory(t) {
+  const i = THERAPISTS.findIndex(x => x.id === t.id);
+  if (i === -1) THERAPISTS.push(t); else THERAPISTS[i] = t;
+}
+
 THERAPISTS.forEach(t => {
   const id = THERAPIST_IDENTITY[t.id] || {};
   t.ethnicity = id.ethnicity || '';
@@ -261,30 +287,10 @@ THERAPISTS.forEach(t => {
   t.faith = id.faith || [];
   t.availabilitySlots = THERAPIST_AVAILABILITY[t.id] || [];
   t.idealClient = Object.assign(emptyIdealClient(), THERAPIST_IDEAL[t.id] || {});
-  // unify photos into an array (migrate old named office/outOfOffice slots)
-  if (!Array.isArray(t.media.photos)) {
-    t.media.photos = [t.media.office, t.media.outOfOffice].filter(Boolean).slice(0, 4);
-  }
-  // top-three specialties (client-facing view shows 2 of these + 1 overlap)
-  if (!t.topSpecialties || !t.topSpecialties.length) t.topSpecialties = (t.tags || []).slice(0, 3);
-  // sliding scale is its own flag now; seed it from any legacy self-pay note
-  if (t.acceptsSlidingScale === undefined) t.acceptsSlidingScale = /sliding/i.test(t.selfPayNote || '');
-  // waitlist (demo): therapists who are full default to offering one, and a
-  // couple carry seeded names so the Inquiries → Waitlist section has content
-  if (t.offerWaitlist === undefined) t.offerWaitlist = !t.acceptingOngoing;
-  if (!Array.isArray(t.waitlist)) t.waitlist = (WAITLIST_SEED[t.id] || []).map(name => ({ name }));
-  // conversations the therapist started from the waitlist (kept off the shared
-  // `matches` array so they never leak into the demo client's own match list)
-  if (!Array.isArray(t.startedConversations)) t.startedConversations = [];
-  // states the therapist is licensed AND Stripe-verified in — only these count
-  // for matching. Seeded from their base state (+ a demo multi-state therapist).
-  if (!Array.isArray(t.licensedStates)) t.licensedStates = LICENSE_SEED[t.id] || (t.location && t.location.state ? [t.location.state] : []);
-  // on-demand session price (separate from the ongoing rate); defaults to it
-  if (t.onDemandRate == null) t.onDemandRate = t.rateMin;
-  // listing subscription: seeded therapists are already live founding members;
-  // NEW signups build their profile but must subscribe to list it (see below).
-  if (t.listed === undefined) t.listed = true;
-  if (t.subscription === undefined) t.subscription = { plan: 'founding', founding: true, introRate: 19.99, standardRate: 29.99 };
+  // seed-specific overrides, then the shared normalizer fills the rest
+  if (WAITLIST_SEED[t.id]) t.waitlist = WAITLIST_SEED[t.id].map(name => ({ name }));
+  if (LICENSE_SEED[t.id]) t.licensedStates = LICENSE_SEED[t.id];
+  normalizeTherapist(t);
 });
 
 // ===== LISTING SUBSCRIPTION (therapists pay to list) =====
@@ -796,6 +802,102 @@ async function dbRpc(name, params) {
   return res.json();
 }
 
+// ===================================================================
+// SUPABASE AUTH — real THERAPIST accounts (business data, HIPAA-safe).
+// Clients stay demo-side (no server-persisted PHI) until the BAA. Uses the
+// GoTrue + PostgREST endpoints directly, same raw-fetch style as dbRpc — no
+// SDK/CDN dependency. One account works on the app AND the website (both point
+// at this same project). RLS makes a therapist's JWT the only thing that can
+// read/write their own row.
+// ===================================================================
+const KINDRED_AUTH = {
+  url: 'https://izukppxgoerqtustfbnk.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6dWtwcHhnb2VycXR1c3RmYm5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NTAzMTYsImV4cCI6MjEwMDQyNjMxNn0.FeJFOu4PmOJAbk2OqfMH1sQX6DlynKmTyhc-dtKfvZk'
+};
+function authReady() { return !!(KINDRED_AUTH && KINDRED_AUTH.url && KINDRED_AUTH.key); }
+const AUTH_SESSION_KEY = 'kindred-session';
+function loadAuthSession() { try { return JSON.parse(localStorage.getItem(AUTH_SESSION_KEY) || 'null'); } catch (e) { return null; } }
+function saveAuthSession(d) {
+  if (!d || !d.access_token) return null;
+  const s = { access_token: d.access_token, refresh_token: d.refresh_token, expires_at: Date.now() + ((d.expires_in || 3600) * 1000), user: d.user };
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(s));
+  return s;
+}
+function clearAuthSession() { localStorage.removeItem(AUTH_SESSION_KEY); }
+
+async function authRequest(path, body) {
+  const res = await fetch(`${KINDRED_AUTH.url}/auth/v1${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': KINDRED_AUTH.key },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error_description || data.msg || data.message || `auth error ${res.status}`);
+  return data;
+}
+async function authSignUp(email, password) {
+  const data = await authRequest('/signup', { email, password });
+  const session = saveAuthSession(data);        // null when email confirmation is required
+  const user = data.user || (data.id ? data : (session && session.user)) || null;
+  return { user, session, needsConfirmation: !session };
+}
+async function authSignIn(email, password) {
+  const data = await authRequest('/token?grant_type=password', { email, password });
+  return { user: data.user, session: saveAuthSession(data) };
+}
+async function authSignOut() {
+  const s = loadAuthSession();
+  if (s && s.access_token) {
+    try { await fetch(`${KINDRED_AUTH.url}/auth/v1/logout`, { method: 'POST', headers: { 'apikey': KINDRED_AUTH.key, 'Authorization': `Bearer ${s.access_token}` } }); } catch (e) {}
+  }
+  clearAuthSession();
+}
+// Authenticated PostgREST call — the therapist's own JWT, so RLS lets them
+// touch only their own row.
+async function authRest(path, opts = {}) {
+  const s = loadAuthSession();
+  if (!s) throw new Error('Not signed in.');
+  return fetch(`${KINDRED_AUTH.url}/rest/v1${path}`, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', 'apikey': KINDRED_AUTH.key, 'Authorization': `Bearer ${s.access_token}`, ...(opts.headers || {}) }
+  });
+}
+
+// in-memory therapist -> DB columns (mirror of dbRowToTherapist)
+function therapistToDbRow(t, userId) {
+  return {
+    user_id: userId,
+    name: t.name, credentials: t.credentials || [], pronouns: t.pronouns || '', show_pronouns: !!t.showPronouns,
+    license_states: t.licensedStates || [], license_number: t.licenseNumber || '', website: t.website || '', photo: t.photo || null,
+    specialties: t.tags || [], modalities: t.modalities || [], style: t.style || null, practice_type: t.practiceType || 'specialist',
+    best_for: t.bestFor || '', persona: t.persona || {}, media: t.media || {}, optional_prompts: t.optionalPrompts || [],
+    formats: t.formats || [], insurance: t.insuranceList || [], languages: t.languages || [], rate_min: t.rateMin || 0,
+    location: t.location || {}, gender: t.identity ? t.identity.gender : null, lgbtq_affirming: t.identity ? !!t.identity.lgbtqAffirming : false,
+    ethnicity: t.ethnicity || '', affinities: t.affinities || [], faith: t.faith || [], ideal_client: t.idealClient || {},
+    accepting: !!t.acceptingOngoing, published: !!t.listed
+  };
+}
+// Upsert the signed-in therapist's profile (insert on first save, update after).
+async function saveTherapistProfile(t) {
+  const s = loadAuthSession();
+  if (!authReady() || !s) return false;
+  const res = await authRest('/therapists', {
+    method: 'POST',
+    headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(therapistToDbRow(t, s.user.id))
+  });
+  if (!res.ok) throw new Error('save profile: ' + (await res.text()));
+  return true;
+}
+async function loadTherapistRow() {
+  const s = loadAuthSession();
+  if (!authReady() || !s) return null;
+  const res = await authRest(`/therapists?user_id=eq.${s.user.id}&select=*`);
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return rows[0] || null;
+}
+
 // A database row -> the therapist shape the whole UI already renders. Keeping
 // the adapter in ONE place means the day the roster goes live, nothing else
 // in the app has to know the difference.
@@ -830,7 +932,10 @@ function dbRowToTherapist(row) {
     identity: { gender: row.gender || '', lgbtqAffirming: !!row.lgbtq_affirming },
     languages: row.languages && row.languages.length ? row.languages : ['English'],
     formats, rateMin: row.rate_min || 0, insuranceList: row.insurance || [],
-    acceptingOngoing: true, onDemand: false, onDemandSlots: [],
+    licensedStates: (row.license_states && row.license_states.length) ? row.license_states : undefined,
+    listed: !!row.published,
+    subscription: row.published ? { plan: 'standard', founding: false, standardRate: 29.99, introRate: 29.99, introMonths: 0 } : null,
+    acceptingOngoing: row.accepting !== false, onDemand: false, onDemandSlots: [],
     nextAvailableRank: 1, nextAvailableLabel: 'This week',
     practiceType: row.practice_type || 'specialist', externalAppointments: [],
     agreedToOnDemandPolicy: false,
@@ -3052,26 +3157,57 @@ document.getElementById('login-back').addEventListener('click', () => {
 // than one button behind a toggle — burying account creation behind a small
 // mode-switch link meant people testing the therapist flow never found it
 // and always landed on the existing-profile picker instead.
-document.getElementById('login-submit-btn').addEventListener('click', () => {
+document.getElementById('login-submit-btn').addEventListener('click', async () => {
   if (accountType === 'client') {
-    // Dive straight into matching — no "match vs explore" fork up front.
-    // Explore Kindred stays available from the bottom nav once they're in.
+    // Clients stay demo-side (no server-persisted PHI until the BAA) — dive
+    // straight into matching. Explore Kindred stays in the bottom nav.
     enterMatchingExperience();
-  } else {
-    // No real per-account passwords in this prototype, so "Log In" just
-    // takes you into whichever therapist account is currently active —
-    // the same account you were in before you logged out, defaulting to
-    // the first seeded profile the very first time. Real accounts wouldn't
-    // make you pick from a roster of other people's profiles.
-    showTherapistView();
+    return;
+  }
+  const email = (document.getElementById('login-email').value || '').trim();
+  const password = document.getElementById('login-password').value || '';
+  // Empty fields (or no auth configured) = demo therapist portal, as before.
+  if (!authReady() || (!email && !password)) { showTherapistView(); return; }
+  if (!email || !password) { showToast('Enter your email and password.'); return; }
+  const btn = document.getElementById('login-submit-btn'); const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Logging in…';
+  try {
+    await authSignIn(email, password);
+    const row = await loadTherapistRow();
+    if (row) {
+      const t = normalizeTherapist(dbRowToTherapist(row));
+      upsertTherapistInMemory(t);
+      currentTherapistId = t.id;
+      showTherapistView();
+    } else {
+      startTherapistSignup(); // account exists but no profile yet — build it
+    }
+  } catch (e) {
+    showToast(/confirm/i.test(e.message) ? 'Please confirm your email first — check your inbox.'
+      : /invalid|credential|grant/i.test(e.message) ? 'Wrong email or password.' : e.message);
+    btn.disabled = false; btn.textContent = label;
   }
 });
 
-document.getElementById('login-create-btn').addEventListener('click', () => {
-  if (accountType === 'client') {
-    startIntake();
-  } else {
-    startTherapistSignup();
+document.getElementById('login-create-btn').addEventListener('click', async () => {
+  if (accountType === 'client') { startIntake(); return; }
+  const email = (document.getElementById('login-email').value || '').trim();
+  const password = document.getElementById('login-password').value || '';
+  if (!authReady() || (!email && !password)) { startTherapistSignup(); return; } // demo fallback
+  if (!email || password.length < 6) { showToast('Enter an email and a password of at least 6 characters.'); return; }
+  const btn = document.getElementById('login-create-btn'); const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Creating account…';
+  try {
+    const { needsConfirmation } = await authSignUp(email, password);
+    if (needsConfirmation) {
+      showToast('Account created — check your email to confirm, then log in.');
+      btn.disabled = false; btn.textContent = label;
+      return;
+    }
+    startTherapistSignup(); // confirmed session → build their profile now
+  } catch (e) {
+    showToast(/registered|already/i.test(e.message) ? 'That email already has an account — try logging in.' : e.message);
+    btn.disabled = false; btn.textContent = label;
   }
 });
 
@@ -3613,7 +3749,10 @@ function buildTherapistMeta(d) {
 
 function finishTherapistSignup() {
   const d = newTherapistDraft;
-  const id = 't' + Date.now();
+  // When signed in, the therapist's id IS their auth uid so the DB row keys to
+  // them (RLS requires user_id = auth.uid()). Demo signups keep a local id.
+  const authSession = authReady() ? loadAuthSession() : null;
+  const id = authSession ? authSession.user.id : 't' + Date.now();
   const nameWords = d.name.replace(/^Dr\.?\s*/i, '').split(' ').filter(Boolean);
   const initials = nameWords.map(w => w[0]).join('').slice(0, 2).toUpperCase() || '??';
   const gradient = NEW_THERAPIST_GRADIENTS[THERAPISTS.length % NEW_THERAPIST_GRADIENTS.length];
@@ -3655,6 +3794,10 @@ function finishTherapistSignup() {
   });
 
   currentTherapistId = id;
+  const newT = THERAPISTS.find(t => t.id === id);
+  normalizeTherapist(newT);
+  // persist the built (still-unlisted) profile for signed-in therapists
+  if (authSession) saveTherapistProfile(newT).catch(e => console.warn('profile save deferred:', e.message));
   showTherapistView();
   openActivateProfile(); // pay to list before the profile goes live
 }
@@ -3703,6 +3846,7 @@ function openActivateProfile() {
       t.listed = true;
       t.subscription = { plan: founding ? 'founding' : 'standard', founding, introRate: p.introRate, standardRate: p.standardRate, introMonths: p.introMonths };
       t.published = true;
+      if (authReady() && loadAuthSession()) saveTherapistProfile(t).catch(e => console.warn('listing save deferred:', e.message));
       close();
       showToast(founding ? "You're a founding member — your profile is live! 🌟" : 'Your profile is live!');
       renderTherapistInsights();
@@ -3711,6 +3855,7 @@ function openActivateProfile() {
 }
 
 function logout() {
+  if (authReady()) authSignOut();  // clear the Supabase session (fire-and-forget)
   accountType = null;
   therapistWelcomeShown = false;
   document.getElementById('bottom-nav').classList.add('hidden');
