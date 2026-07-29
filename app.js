@@ -577,6 +577,7 @@ function normalizeTherapist(t) {
   if (!Array.isArray(t.licensedStates)) t.licensedStates = (t.location && t.location.state) ? [t.location.state] : [];
   if (t.onDemandRate == null) t.onDemandRate = t.rateMin;
   if (t.listed === undefined) t.listed = true;
+  if (t.licenseVerified === undefined) t.licenseVerified = false;   // never assume verified
   if (t.subscription === undefined) {
     // Derive from the live ladder rather than hard-coding. A literal here drifts
     // the moment the ladder rolls over, and omitting introMonths printed
@@ -1255,6 +1256,8 @@ function therapistToDbRow(t, userId) {
   return {
     user_id: userId,
     name: t.name, credentials: t.credentials || [], pronouns: t.pronouns || '', show_pronouns: !!t.showPronouns,
+    // license_verified is deliberately NOT sent: it is admin-only, and the DB
+    // trigger reverts it on any non-service-role write.
     license_states: t.licensedStates || [], license_number: t.licenseNumber || '', website: t.website || '', photo: t.photo || null,
     specialties: t.tags || [], modalities: t.modalities || [], style: t.style || null, practice_type: t.practiceType || 'specialist',
     best_for: t.bestFor || '', persona: t.persona || {}, media: t.media || {}, optional_prompts: t.optionalPrompts || [],
@@ -1327,7 +1330,10 @@ function dbRowToTherapist(row) {
     practiceType: row.practice_type || 'specialist', externalAppointments: [],
     agreedToOnDemandPolicy: false,
     location: row.location || {},
-    licenseVerified: !!row.license_number, licenseNumber: row.license_number || '',
+    // The badge is a credential claim shown to clients: it tracks the admin-set
+    // column ONLY. It used to be !!row.license_number, so any typed string
+    // produced a verified badge.
+    licenseVerified: row.license_verified === true, licenseNumber: row.license_number || '',
     website: row.website || '',
     ethnicity: row.ethnicity || '', affinities: row.affinities || [], faith: row.faith || [],
     availabilitySlots: [], idealClient: emptyIdealClient(),
@@ -2815,7 +2821,7 @@ function profileCardBodyHtml(t, opts = {}) {
     ${t.pronouns ? `<div class="pronouns-label">${t.pronouns}</div>` : ''}
     <div class="detail-badge-row">
       ${(!preview && isInTop5(t)) ? `<span class="top5-chip">★ In your Top 5</span>` : ''}
-      ${t.licenseVerified ? `<span class="verified-chip">✓ License verified via Stripe Identity</span>` : ''}
+      ${t.licenseVerified ? `<span class="verified-chip">✓ License verified</span>` : ''}
     </div>
     ${detailFactsHtml(t, { preview })}
     ${t.bestFor ? `<div class="best-for">${t.bestFor}</div>` : ''}
@@ -3043,72 +3049,33 @@ function openChat(t, role) {
   showScreen('chat');
 }
 
-// ===== LICENSE VERIFICATION (simulated Stripe Identity) =====
-// Prototype stand-in for a real Stripe Identity verification session —
-// the real flow would redirect to Stripe, run the document/registry check,
-// and return a verified webhook. Here: a themed sheet with a short delay.
-function openStripeVerification(licenseNumber, onVerified) {
-  const sheet = document.getElementById('confirm-sheet');
-  sheet.innerHTML = `
-    <div class="sheet-close"></div>
-    <div class="stripe-sheet-brand">stripe <span>| Identity</span></div>
-    <h2>Verify your professional license</h2>
-    <div class="intake-sub">Kindred uses Stripe Identity to confirm your license against state registries. This takes about a minute in the real flow.</div>
-    <div class="pref-item" style="margin-top:14px;">
-      <div class="pref-label">License number</div>
-      <div class="pref-value">${licenseNumber}</div>
-    </div>
-    <div id="stripe-verify-status"></div>
-    <button class="primary-btn stripe-primary-btn" id="stripe-start-btn">Start verification</button>
-  `;
-  document.getElementById('confirm-modal').classList.remove('hidden');
-  document.getElementById('stripe-start-btn').addEventListener('click', () => {
-    const status = document.getElementById('stripe-verify-status');
-    const btn = document.getElementById('stripe-start-btn');
-    btn.disabled = true;
-    btn.textContent = 'Verifying…';
-    status.innerHTML = `<div class="portal-note" style="margin-bottom:10px;">Checking ${licenseNumber} against the state licensing registry…</div>`;
-    setTimeout(() => {
-      status.innerHTML = `<div class="license-verified-box" style="margin-bottom:10px;">✓ License ${licenseNumber} verified</div>`;
-      btn.textContent = 'Done';
-      btn.disabled = false;
-      btn.onclick = () => {
-        document.getElementById('confirm-modal').classList.add('hidden');
-        onVerified();
-      };
-    }, 1400);
-  });
-}
+// ===== LICENSE VERIFICATION =====
+// openStripeVerification() lived here: a setTimeout that always reported
+// success, behind Stripe Identity branding. Removed rather than fixed --
+// Stripe Identity verifies government ID documents, not professional licenses
+// against state boards, so there was no API to swap in. Verification is a
+// manual state-board lookup; the admin sets license_verified via the
+// service-role function verify_therapist_license() (migration 0009).
 
-// Verify a state license through Stripe Identity. A state can only be added to
-// a therapist's licensed set AFTER this succeeds — that's the gate.
-function openStripeStateVerification(t, state, onVerified) {
+// Adding a licensed state. This used to open a Stripe-branded sheet that
+// "checked the state registry" via setTimeout and always passed -- a therapist
+// could self-grant all 50 states. It now states plainly that the state is
+// pending review. The real gate is therapists.license_verified (migration
+// 0009), which an admin sets only after checking the state board's registry,
+// and which isCompatible() requires before a therapist is shown to anyone.
+function openStateLicenseNotice(t, state, onAdded) {
   const sheet = document.getElementById('confirm-sheet');
   sheet.innerHTML = `
     <div class="sheet-close"></div>
-    <div class="stripe-sheet-brand">stripe <span>| Identity</span></div>
-    <h2>Verify your ${state} license</h2>
-    <div class="intake-sub">Kindred uses Stripe Identity to confirm your professional license against the ${state} state registry. You can only match with clients in ${state} once this is verified. In the real flow this takes about a minute.</div>
-    <div id="stripe-verify-status"></div>
-    <button class="primary-btn stripe-primary-btn" id="stripe-start-btn">Start verification</button>
+    <h2>Add your ${state} license</h2>
+    <div class="intake-sub">We check every license against the ${state} board's registry by hand before you're matched with anyone there. Add it now and we'll confirm it as part of reviewing your profile.</div>
+    <button class="primary-btn" id="state-add-btn">Add ${state}</button>
   `;
   document.getElementById('confirm-modal').classList.remove('hidden');
   const close = () => document.getElementById('confirm-modal').classList.add('hidden');
   const sc = sheet.querySelector('.sheet-close');
   if (sc) sc.addEventListener('click', close);
-  document.getElementById('stripe-start-btn').addEventListener('click', () => {
-    const status = document.getElementById('stripe-verify-status');
-    const btn = document.getElementById('stripe-start-btn');
-    btn.disabled = true;
-    btn.textContent = 'Verifying…';
-    status.innerHTML = `<div class="portal-note" style="margin-bottom:10px;">Checking your ${state} license against the state registry…</div>`;
-    setTimeout(() => {
-      status.innerHTML = `<div class="license-verified-box" style="margin-bottom:10px;">✓ ${state} license verified</div>`;
-      btn.textContent = 'Done';
-      btn.disabled = false;
-      btn.onclick = () => { close(); onVerified(); };
-    }, 1400);
-  });
+  document.getElementById('state-add-btn').addEventListener('click', () => { close(); onAdded(); });
 }
 
 // ===== BETWEEN-SESSIONS PORTAL =====
@@ -3939,12 +3906,9 @@ function renderSignupStep() {
       <input type="text" class="t-rate-input" id="ts-cred-0" placeholder="e.g. LPC" value="${d.credentials[0]}">
       <input type="text" class="t-rate-input" id="ts-cred-1" placeholder="e.g. PhD" value="${d.credentials[1]}">
       <input type="text" class="t-rate-input" id="ts-cred-2" placeholder="e.g. Certified Gottman Therapist" value="${d.credentials[2]}">
-      <div class="t-form-label">License verification</div>
-      ${d.licenseVerified
-        ? `<div class="license-verified-box">✓ License ${d.licenseNumber} verified via Stripe Identity</div>`
-        : `<input type="text" class="t-rate-input" id="ts-license-number" placeholder="License number, e.g. TX-38291" value="${d.licenseNumber}">
-           <button type="button" class="stripe-verify-btn" id="ts-verify-license-btn">Verify with <strong>Stripe</strong> Identity</button>
-           <div class="intake-sub" style="margin-top:6px;">Your profile can't go live until your license is verified. Clients only ever see verified therapists.</div>`}`;
+      <div class="t-form-label">License number</div>
+      <input type="text" class="t-rate-input" id="ts-license-number" placeholder="e.g. TX-38291" value="${d.licenseNumber}">
+      <div class="intake-sub" style="margin-top:6px;">We check every license against your state board's registry by hand before your profile goes live. Clients only ever see verified therapists.</div>`;
   } else if (signupStep === 1) {
     html += `
       <h1>What do you specialize in?</h1>
@@ -4058,7 +4022,7 @@ function renderSignupStep() {
   }
 
   let canProceed = true;
-  if (signupStep === 0) canProceed = d.name.trim().length > 0 && d.licenseVerified;
+  if (signupStep === 0) canProceed = d.name.trim().length > 0 && d.licenseNumber.trim().length > 0;
   else if (signupStep === 3) canProceed = d.city.trim() !== '' && d.state !== '';
   else if (signupStep === 4) canProceed = d.mandatoryPromptAnswers.every(a => a.trim().length > 0);
   html += `
@@ -4077,18 +4041,10 @@ function attachSignupHandlers() {
   const nameInput = document.getElementById('ts-name');
   if (nameInput) nameInput.addEventListener('input', () => {
     d.name = nameInput.value;
-    document.getElementById('ts-next').disabled = !(d.name.trim().length > 0 && d.licenseVerified);
+    document.getElementById('ts-next').disabled = !(d.name.trim().length > 0 && d.licenseNumber.trim().length > 0);
   });
   const licenseInput = document.getElementById('ts-license-number');
   if (licenseInput) licenseInput.addEventListener('input', () => { d.licenseNumber = licenseInput.value; });
-  const verifyBtn = document.getElementById('ts-verify-license-btn');
-  if (verifyBtn) verifyBtn.addEventListener('click', () => {
-    if (!d.licenseNumber.trim()) { showToast('Enter your license number first.'); return; }
-    openStripeVerification(d.licenseNumber.trim(), () => {
-      d.licenseVerified = true;
-      renderSignupStep();
-    });
-  });
   const pronounsInput = document.getElementById('ts-pronouns');
   if (pronounsInput) pronounsInput.addEventListener('input', () => { d.pronouns = pronounsInput.value; });
   const showPronounsSwitch = document.getElementById('ts-show-pronouns-switch');
@@ -5326,10 +5282,10 @@ function attachTherapistProfileHandlers(t) {
   if (verifyLicBtn) verifyLicBtn.addEventListener('click', () => {
     const s = (document.getElementById('t-license-state-select') || {}).value;
     if (!s) { showToast('Pick a state to verify.'); return; }
-    openStripeStateVerification(t, s, () => {
+    openStateLicenseNotice(t, s, () => {
       if (!Array.isArray(t.licensedStates)) t.licensedStates = [];
       if (!t.licensedStates.includes(s)) t.licensedStates.push(s);
-      showToast(`${s} license verified via Stripe ✓`);
+      showToast(`${s} added — pending verification`);
       renderTherapistProfile();
     });
   });
