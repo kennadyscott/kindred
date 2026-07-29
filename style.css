@@ -2454,3 +2454,23 @@ select.t-rate-input,
   #screen-intake, #screen-therapist-signup { --measure: 580px; }
   .card-stack { max-width: 560px; }
 }
+
+/* Paid-but-unverified: the therapist is being billed and is still invisible.
+   Styled to be impossible to scroll past. */
+.verify-banner {
+  border: 1.5px solid var(--coral);
+  background: #FFF6F1;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.verify-banner ul { list-style: disc; }
+.verify-banner .edit-prefs-btn {
+  background: var(--coral);
+  color: #fff;
+  width: auto;
+  padding: 10px 18px;
+}

@@ -20,6 +20,15 @@ if (document.body) document.body.classList.toggle('production', PRODUCTION_BUILD
 // Flipping it is a config change, not an app change.
 // ===================================================================
 let KINDRED_FLAGS = { clientDataPersistence: false, therapistBillingLive: false };
+// Coming back from Stripe's hosted flow. Finishing the flow is NOT passing it:
+// the result arrives by webhook, which can take a moment. Say exactly that
+// rather than showing a success the DB hasn't confirmed.
+function handleIdentityReturn() {
+  if (!/[?&]identity=done/.test(location.search)) return;
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => showToast("Thanks -- we're confirming your ID. This usually takes under a minute."), 400);
+}
+
 function clientDataPersistenceEnabled() { return !!KINDRED_FLAGS.clientDataPersistence; }
 // The flags MUST come from the web, not from the app bundle. Inside a native
 // (Capacitor) build a relative fetch resolves to the packaged copy, which would
@@ -578,6 +587,7 @@ function normalizeTherapist(t) {
   if (t.onDemandRate == null) t.onDemandRate = t.rateMin;
   if (t.listed === undefined) t.listed = true;
   if (t.licenseVerified === undefined) t.licenseVerified = false;   // never assume verified
+  if (t.identityVerified === undefined) t.identityVerified = false;
   if (t.subscription === undefined) {
     // Derive from the live ladder rather than hard-coding. A literal here drifts
     // the moment the ladder rolls over, and omitting introMonths printed
@@ -1334,6 +1344,7 @@ function dbRowToTherapist(row) {
     // column ONLY. It used to be !!row.license_number, so any typed string
     // produced a verified badge.
     licenseVerified: row.license_verified === true, licenseNumber: row.license_number || '',
+    identityVerified: row.identity_verified === true,
     website: row.website || '',
     ethnicity: row.ethnicity || '', affinities: row.affinities || [], faith: row.faith || [],
     availabilitySlots: [], idealClient: emptyIdealClient(),
@@ -3049,6 +3060,80 @@ function openChat(t, role) {
   showScreen('chat');
 }
 
+// A therapist pays first and verifies afterwards, so there is a window where
+// they are being billed and still invisible. Never let that be silent -- say
+// what is missing and what to do about it, everywhere they might look.
+function verificationBannerHtml(t) {
+  if (!t) return '';
+  const needsId = !t.identityVerified;
+  const needsLicense = !t.licenseVerified;
+  if (!needsId && !needsLicense) return '';
+
+  const paying = !!(t.listed && t.subscription);
+  const lead = paying
+    ? "<strong>You're being billed but clients can't see you yet.</strong>"
+    : '<strong>Two checks before you can be matched.</strong>';
+
+  const items = [
+    needsLicense
+      ? `<li>License &mdash; we're checking it against your state board. Nothing for you to do.</li>`
+      : `<li>License &mdash; verified &#10003;</li>`,
+    needsId
+      ? `<li>ID &mdash; <strong>we need you to verify this.</strong> Takes about a minute.</li>`
+      : `<li>ID &mdash; verified &#10003;</li>`
+  ].join('');
+
+  return `
+    <div class="verify-banner">
+      <p style="margin:0 0 8px;">${lead}</p>
+      <ul style="margin:0 0 10px; padding-left:18px; line-height:1.6;">${items}</ul>
+      ${needsId ? `<button class="edit-prefs-btn" id="t-verify-id-btn" style="margin:0;">Verify my ID</button>` : ''}
+    </div>`;
+}
+
+// ===== STRIPE IDENTITY =====
+// Proves the person is who they claim. Separate from the license check, which
+// proves the credential exists -- a state board registry is public, so a real
+// license number in the wrong hands would otherwise sail through.
+//
+// The session is created SERVER-SIDE (the Edge Function holds the Stripe secret
+// key) and the flag is set by the webhook, never here. Returning from Stripe
+// only tells us they finished the flow, not that they passed it.
+function identityStatus(t) {
+  if (!t) return 'unknown';
+  if (t.identityVerified) return 'verified';
+  return t.stripeIdentityStarted ? 'pending' : 'not-started';
+}
+
+async function startIdentityVerification(btn) {
+  const session = loadAuthSession();
+  if (!session || !session.access_token) { showToast('Please log in again.'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Opening Stripe...'; }
+  try {
+    const res = await fetch(`${KINDRED_DB.url}/functions/v1/identity-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: KINDRED_DB.key,
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) {
+      showToast(data.error === 'no_therapist_profile'
+        ? 'Finish your profile first.'
+        : "Couldn't start verification. Try again in a moment.");
+      if (btn) { btn.disabled = false; btn.textContent = 'Verify my ID'; }
+      return;
+    }
+    // Stripe hosts the document capture: no ID images ever touch Kindred.
+    window.location.href = data.url;
+  } catch (err) {
+    showToast("Couldn't reach verification. Check your connection.");
+    if (btn) { btn.disabled = false; btn.textContent = 'Verify my ID'; }
+  }
+}
+
 // ===== LICENSE VERIFICATION =====
 // openStripeVerification() lived here: a setTimeout that always reported
 // success, behind Stripe Identity branding. Removed rather than fixed --
@@ -4447,6 +4532,7 @@ function renderTherapistInsights() {
   ];
   container.innerHTML = `
     ${!t.listed ? `<div class="activate-banner"><div><strong>Your profile isn't listed yet</strong><span>Activate it to appear in client matching.</span></div><button class="activate-banner-btn" id="t-activate-btn">Activate</button></div>` : ''}
+    ${verificationBannerHtml(t)}
     <div class="intake-sub" style="margin-bottom:14px;">How clients are finding and responding to your profile.</div>
     <div class="stat-grid">
       ${tiles.map(s => `
@@ -4472,6 +4558,8 @@ function renderTherapistInsights() {
   `;
   const activateBtn = document.getElementById('t-activate-btn');
   if (activateBtn) activateBtn.addEventListener('click', openActivateProfile);
+  const homeVerifyBtn = document.getElementById('t-verify-id-btn');
+  if (homeVerifyBtn) homeVerifyBtn.addEventListener('click', () => startIdentityVerification(homeVerifyBtn));
   const shareProfileBtn = document.getElementById('t-share-profile-btn');
   if (shareProfileBtn) shareProfileBtn.addEventListener('click', openShareMyProfile);
   const insOngoingSwitch = document.getElementById('t-insights-ongoing-switch');
@@ -5657,6 +5745,7 @@ function renderTherapistSettings() {
     <p class="portal-note">Your ideal-client settings are always private and never shown to clients.</p>
 
     <div class="settings-group-title">Your listing</div>
+    ${verificationBannerHtml(t)}
     ${t.listed && t.subscription
       ? `<p class="portal-note" style="margin-top:0;">${t.subscription.founding
             ? `🌟 <strong>Founding member</strong> — $${t.subscription.introRate.toFixed(2)}/mo for your first ${t.subscription.introMonths} months, then $${t.subscription.standardRate.toFixed(2)}/mo. Your profile is live.`
@@ -5681,6 +5770,8 @@ function renderTherapistSettings() {
   document.getElementById('t-settings-profile-btn').addEventListener('click', () => showTScreen('t-profile'));
   document.getElementById('t-settings-logout-btn').addEventListener('click', logout);
   document.getElementById('t-settings-delete-btn').addEventListener('click', openTherapistDeleteSheet);
+  const verifyIdBtn = document.getElementById('t-verify-id-btn');
+  if (verifyIdBtn) verifyIdBtn.addEventListener('click', () => startIdentityVerification(verifyIdBtn));
 }
 
 // Same principle as the client's delete flow: lead with what they'd lose, keep
