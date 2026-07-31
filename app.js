@@ -5696,6 +5696,37 @@ const previewClientDemoBtn = document.getElementById('preview-client-demo-btn');
 if (previewClientDemoBtn && !PRODUCTION_BUILD) previewClientDemoBtn.addEventListener('click', seedClientDemo);
 if (!PRODUCTION_BUILD && /[?&]demo=client\b/.test(location.search)) seedClientDemo();
 
+// ===== POST-PAYMENT DEEP LINK =====
+// welcome.html sends a therapist straight here after they pay, as
+//     app.kindredtherapymatch.com/?email=...#therapist-signup
+//
+// The site and the app are different origins (kindredtherapymatch.com vs
+// app.kindredtherapymatch.com), so the session they just created cannot travel
+// -- they have to sign in once more. This makes that the smallest possible
+// step: skip "what brings you to Kindred?", prefill the email they paid with,
+// and put the cursor in the password field.
+//
+// Nothing else is needed: the login handler already routes an account that has
+// no profile row into startTherapistSignup(). Someone who has just paid has
+// exactly that shape.
+function applyLandingParams() {
+  const email = new URLSearchParams(location.search).get('email');
+  const wantsSignup = /therapist-signup/.test(location.hash);
+  if (!wantsSignup && !email) return;
+
+  if (wantsSignup) {
+    accountType = 'therapist';
+    openLogin();
+  }
+  if (email) {
+    const f = document.getElementById('login-email');
+    if (f) f.value = email;
+    const pw = document.getElementById('login-password');
+    if (pw) setTimeout(() => pw.focus(), 60);
+  }
+}
+window.addEventListener('load', applyLandingParams);
+
 // ===== SHARED-THERAPIST DEEP LINK =====
 // A link someone was sent (…#therapist=t3) opens straight to that therapist's
 // profile. If they land on the login screen first the hash stays in the URL, so
