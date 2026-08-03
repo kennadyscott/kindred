@@ -4439,10 +4439,38 @@ function finishTherapistSignup() {
   currentTherapistId = id;
   const newT = THERAPISTS.find(t => t.id === id);
   normalizeTherapist(newT);
-  // persist the built (still-unlisted) profile for signed-in therapists
-  if (authSession) saveTherapistProfile(newT).catch(e => console.warn('profile save deferred:', e.message));
-  showTherapistView();
-  openActivateProfile(); // pay to list before the profile goes live
+
+  /* The wizard's draft has listed / licenseVerified / identityVerified all
+     false, because a therapist building a profile cannot know any of them.
+     But those are server-owned -- billing sets published, and the admin and
+     Stripe Identity set the verification flags -- and the flow is
+     landing -> payment -> welcome -> build profile, so by now they HAVE paid
+     and may already have verified their ID.
+     Rendering the draft told a paid, ID-verified therapist they were unlisted
+     and unverified, and re-opened the pay modal. Save, then take the server's
+     word for those three fields. */
+  const finish = () => {
+    showTherapistView();
+    if (!newT.listed) openActivateProfile();   // only when genuinely unpaid
+  };
+  if (authSession) {
+    saveTherapistProfile(newT)
+      .then(loadTherapistRow)
+      .then(row => {
+        if (!row) return;
+        newT.listed           = !!row.published;
+        newT.licenseVerified  = row.license_verified  === true;
+        newT.identityVerified = row.identity_verified === true;
+        newT.subscription     = row.published
+          ? { plan: 'standard', founding: false, standardRate: STANDARD_RATE,
+              introRate: STANDARD_RATE, introMonths: 0 }
+          : null;
+      })
+      .catch(e => console.warn('profile save deferred:', e.message))
+      .then(finish);
+  } else {
+    finish();
+  }
 }
 
 // The "pay to list" gate. Therapists can build everything, but the profile only
