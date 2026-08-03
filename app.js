@@ -1274,7 +1274,16 @@ function therapistToDbRow(t, userId) {
     formats: t.formats || [], insurance: t.insuranceList || [], languages: t.languages || [], rate_min: t.rateMin || 0,
     location: t.location || {}, gender: t.identity ? t.identity.gender : null, lgbtq_affirming: t.identity ? !!t.identity.lgbtqAffirming : false,
     ethnicity: t.ethnicity || '', affinities: t.affinities || [], faith: t.faith || [], ideal_client: t.idealClient || {},
-    accepting: !!t.acceptingOngoing, published: !!t.listed
+    accepting: !!t.acceptingOngoing
+    /* `published` is deliberately NOT sent. Billing owns it: the Stripe webhook
+       sets it on payment and clears it on cancellation or a failed charge.
+       The flow is landing -> payment -> profile, so the profile is always saved
+       AFTER the webhook has published the row -- and this payload used to
+       include published:false from a fresh signup draft, silently un-paying a
+       therapist the moment they finished building their profile, then asking
+       them to pay again.
+       PostgREST's merge-duplicates upsert only updates the columns present
+       here, so omitting it preserves whatever billing last set. */
   };
 }
 /* Every edit in the profile editor mutated the in-memory therapist and
