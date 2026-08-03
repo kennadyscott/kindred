@@ -1387,6 +1387,7 @@ function dbRowToTherapist(row) {
     // produced a verified badge.
     licenseVerified: row.license_verified === true, licenseNumber: row.license_number || '',
     identityVerified: row.identity_verified === true,
+    licenseRejectedReason: row.license_rejected_reason || '',
     website: row.website || '',
     ethnicity: row.ethnicity || '', affinities: row.affinities || [], faith: row.faith || [],
     availabilitySlots: [], idealClient: emptyIdealClient(),
@@ -3122,9 +3123,11 @@ function verificationBannerHtml(t) {
   const noLicenseNumber = !t.licenseNumber || !String(t.licenseNumber).trim();
   const items = [
     needsLicense
-      ? (noLicenseNumber
-          ? `<li><strong>License number &mdash; we need this from you.</strong> We check it against your state board.</li>`
-          : `<li>License &mdash; we're checking ${String(t.licenseNumber).trim()} against your state board. Nothing for you to do.</li>`)
+      ? (t.licenseRejectedReason
+          ? `<li><strong>License &mdash; we couldn't verify this.</strong> ${t.licenseRejectedReason.replace(/[<>&]/g, '')} Update it below and we'll re-check.</li>`
+          : noLicenseNumber
+            ? `<li><strong>License number &mdash; we need this from you.</strong> We check it against your state board.</li>`
+            : `<li>License &mdash; we're checking ${String(t.licenseNumber).trim()} against your state board. Nothing for you to do.</li>`)
       : `<li>License &mdash; verified &#10003;</li>`,
     needsId
       ? `<li>ID &mdash; <strong>we need you to verify this.</strong> Takes about a minute.</li>`
@@ -3136,7 +3139,7 @@ function verificationBannerHtml(t) {
       <p style="margin:0 0 8px;">${lead}</p>
       <ul style="margin:0 0 10px; padding-left:18px; line-height:1.6;">${items}</ul>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        ${noLicenseNumber ? `<button class="edit-prefs-btn" id="t-add-license-btn" style="margin:0;">Add my license number</button>` : ''}
+        ${(noLicenseNumber || t.licenseRejectedReason) ? `<button class="edit-prefs-btn" id="t-add-license-btn" style="margin:0;">${noLicenseNumber ? 'Add' : 'Update'} my license number</button>` : ''}
         ${needsId ? `<button class="edit-prefs-btn" id="t-verify-id-btn" style="margin:0;">Verify my ID</button>` : ''}
       </div>
     </div>`;
