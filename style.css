@@ -4,22 +4,32 @@
    existing rule and inline style remaps automatically:
    --coral is now the interactive plum, --teal the muted-plum accent. */
 :root {
-  --cream: #FFF8EF;
-  --ink: #2C1A30;
-  --ink-soft: #765D74;
-  --coral: #5E3862;
-  --coral-dark: #422448;
-  --teal: #765D74;
-  --teal-light: #EFE7F2;
-  --lavender: #B8A3C4;
-  --rust: #BE765F;
-  --rust-light: #F3E4D8;
+  /* Matched to the website (2026-07-31). The app was on the warm brand cream as
+     a *surface*; the site retired that in favour of an airy near-white and only
+     keeps warmth as an accent. Values are remapped under the existing legacy
+     names -- --coral has been aubergine since the first rebrand, --teal has
+     been muted plum -- so every rule and inline style follows automatically. */
+  --cream: #FCFCFE;        /* page ground -- near-white, whisper of cool */
+  --cream-2: #F4F4F9;      /* insets, alternating bands */
+  --paper: #FFFFFF;        /* cards */
+  --cream-warm: #FFF8EF;   /* the old brand cream, kept for genuinely warm accents */
+  --ink: #2B2233;
+  --ink-soft: #6E6172;
+  --coral: #422448;        /* brand Aubergine -- primary actions */
+  --coral-dark: #301A35;
+  --teal: #6E6172;
+  --teal-light: #F0EBF4;
+  --lavender: #B8A3C4;     /* brand Lilac */
+  --lavender-deep: #8E77A0;
+  --rust: #BE765F;         /* brand Clay */
+  --rust-light: #F6EAE4;
   --moss: #687A65;
-  --moss-light: #E9EDE7;
-  --sand: #F7E8DB;
-  --line: #EBDAC9;
-  --shadow: 0 10px 30px rgba(44, 26, 48, 0.12);
-  --radius: 22px;
+  --moss-light: #E6EFE4;
+  --sand: #F4F4F9;         /* was a warm sand; now the cool inset the site uses */
+  --line: #E9E7F0;
+  --shadow: 0 10px 30px rgba(43, 34, 51, 0.07);
+  --shadow-lift: 0 20px 48px rgba(43, 34, 51, 0.12);
+  --radius: 18px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -79,7 +89,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 }
 
 .logo {
-  font-family: 'Fraunces', serif !important;
+  font-family: 'Literata', Georgia, serif !important;
   font-size: 24px;
   font-weight: 600;
   color: var(--coral-dark);
@@ -114,7 +124,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   margin: auto;
 }
 .experience-title {
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   font-size: 24px;
   font-weight: 600;
   color: var(--coral-dark);
@@ -140,7 +150,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   margin: 4px auto 2px;
 }
 .explore-headline {
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   font-size: 27px;
   font-weight: 600;
   color: var(--coral-dark);
@@ -161,7 +171,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   box-shadow: var(--shadow);
 }
 .explore-block-title {
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   font-size: 16.5px;
   font-weight: 600;
   color: var(--coral-dark);
@@ -178,7 +188,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 }
 .explore-placeholder p { color: var(--teal); font-weight: 500; text-align: center; }
 .explore-section-title {
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   font-size: 21px;
   font-weight: 600;
   color: var(--coral-dark);
@@ -306,7 +316,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   text-align: left;
 }
 .welcome-stats-title {
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   color: var(--coral-dark);
 }
 .welcome-stats-line {
@@ -408,7 +418,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 .stat-value {
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   font-size: 30px;
   font-weight: 600;
   color: var(--coral-dark);
@@ -1394,7 +1404,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 
 /* ===== SWIPE CARD (mockup style) ===== */
 .serif-name {
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   font-weight: 600;
   font-size: 27px;
   color: var(--coral-dark);
@@ -1446,7 +1456,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
 .tc-2 { background: var(--moss-light); color: var(--moss); }
 .quote-block {
   position: relative;
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   font-style: italic;
   font-size: 16px;
   line-height: 1.55;
@@ -1462,7 +1472,7 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   font-size: 40px;
   font-style: normal;
   color: var(--lavender);
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   line-height: 1;
 }
 .why-match-label {
@@ -1872,7 +1882,7 @@ select.t-rate-input,
 
 /* ===== AVAILABILITY CALENDAR (therapist Home) ===== */
 .avail-section-title {
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   font-size: 18px;
   font-weight: 600;
   color: var(--coral-dark);
@@ -1920,7 +1930,7 @@ select.t-rate-input,
   margin: 0 auto 30px;
 }
 .welcome-logo {
-  font-family: 'Fraunces', serif;
+  font-family: 'Literata', Georgia, serif;
   font-size: 30px;
   font-weight: 600;
   color: var(--coral-dark);
@@ -2480,3 +2490,29 @@ select.t-rate-input,
 .save-state { font-size: 12px; margin: -6px 0 12px; min-height: 15px; color: var(--ink-soft); }
 .save-state.saved  { color: var(--moss, #687A65); }
 .save-state.error  { color: #a8443a; font-weight: 600; }
+
+/* ---------------------------------------------------------------------------
+   Site-matched card treatment (2026-07-31). On the old warm cream, white cards
+   separated themselves. On a near-white ground they need a hairline and a much
+   softer shadow, the way the website does it -- otherwise everything reads as
+   one undifferentiated sheet.
+--------------------------------------------------------------------------- */
+.stat-tile, .pref-item, .request-card, .match-row, .home-accepting-card,
+.edit-section, .card, .modal-sheet, .login-form, .option-row, .ondemand-card {
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+.stat-tile, .pref-item, .request-card, .match-row, .home-accepting-card,
+.edit-section, .ondemand-card {
+  background: var(--paper);
+}
+/* Chips/tags pick up the site's lilac wash rather than the old sand. */
+.chip-option, .tag-chip, .specialty-chip {
+  background: var(--teal-light);
+  color: var(--lavender-deep);
+  border-color: transparent;
+}
+.chip-option.selected {
+  background: var(--coral);
+  color: #fff;
+}
