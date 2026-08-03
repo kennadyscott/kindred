@@ -3141,44 +3141,94 @@ function openChat(t, role) {
 // A therapist pays first and verifies afterwards, so there is a window where
 // they are being billed and still invisible. Never let that be silent -- say
 // what is missing and what to do about it, everywhere they might look.
-function verificationBannerHtml(t) {
+const GETTING_STARTED_KEY = 'kindred-getting-started-done';
+
+/* The welcome page explains the four steps beautifully -- and a therapist sees
+   it exactly once, at the moment they least want to read: they have just paid
+   and want to build their profile. The same content, tracked against their real
+   state, belongs where they will actually be when the question occurs to them.
+
+   This replaces the old verification banner rather than sitting beside it: two
+   overlapping "here is what is outstanding" boxes is worse than one. */
+function gettingStartedHtml(t) {
   if (!t) return '';
-  const needsId = !t.identityVerified;
-  const needsLicense = !t.licenseVerified;
-  if (!needsId && !needsLicense) return '';
 
-  const paying = !!(t.listed && t.subscription);
-  const lead = paying
-    ? "<strong>You're being billed but clients can't see you yet.</strong>"
-    : '<strong>Two checks before you can be matched.</strong>';
+  const hasProfile = !!(t.name && String(t.name).trim());
+  const hasLicence = !!(t.licenseNumber && String(t.licenseNumber).trim());
+  const steps = [
+    { key: 'pay',      done: !!t.listed,          title: 'Membership active',
+      body: 'Your founding rate is locked for your first 12 months.' },
+    { key: 'profile',  done: hasProfile,          title: 'Build your profile', mine: true,
+      body: 'Your therapy style, who you work best with, what sessions feel like. Saves as you go.',
+      action: hasProfile ? null : { label: 'Build my profile', id: 't-gs-profile' } },
+    { key: 'licence',  done: hasLicence,          title: 'Add your license number', mine: true,
+      body: t.licenseRejectedReason
+        ? `We couldn't verify this. ${t.licenseRejectedReason.replace(/[<>&]/g, '')}`
+        : 'The number and the state that issued it.',
+      action: (hasLicence && !t.licenseRejectedReason) ? null
+            : { label: hasLicence ? 'Update my license number' : 'Add my license number', id: 't-gs-licence' } },
+    { key: 'identity', done: !!t.identityVerified, title: 'Verify your identity', mine: true,
+      body: 'A photo of your ID and a selfie, through Stripe. About a minute.',
+      action: t.identityVerified ? null : { label: 'Verify my ID', id: 't-gs-id' } },
+    { key: 'check',    done: !!t.licenseVerified,  title: 'We check your license',
+      body: 'A real person confirms it against your state board. Nothing for you to do.' }
+  ];
 
-  // "Nothing for you to do" is only true once we actually have a number to
-  // check. Without one the licence step IS their job, and the number lives
-  // three levels down in Edit Profile -- so say so and link straight to it.
-  const noLicenseNumber = !t.licenseNumber || !String(t.licenseNumber).trim();
-  const items = [
-    needsLicense
-      ? (t.licenseRejectedReason
-          ? `<li><strong>License &mdash; we couldn't verify this.</strong> ${t.licenseRejectedReason.replace(/[<>&]/g, '')} Update it below and we'll re-check.</li>`
-          : noLicenseNumber
-            ? `<li><strong>License number &mdash; we need this from you.</strong> We check it against your state board.</li>`
-            : `<li>License &mdash; we're checking ${String(t.licenseNumber).trim()} against your state board. Nothing for you to do.</li>`)
-      : `<li>License &mdash; verified &#10003;</li>`,
-    needsId
-      ? `<li>ID &mdash; <strong>we need you to verify this.</strong> Takes about a minute.</li>`
-      : `<li>ID &mdash; verified &#10003;</li>`
-  ].join('');
+  const doneCount = steps.filter(s => s.done).length;
+  const allDone = doneCount === steps.length;
+
+  // Once they are live, this has done its job -- let them put it away for good.
+  if (allDone) {
+    try { if (localStorage.getItem(GETTING_STARTED_KEY) === 'dismissed') return ''; } catch (e) {}
+  }
+
+  // Paying and invisible is the state that most needs naming, so it leads.
+  const stuck = t.listed && !(t.licenseVerified && t.identityVerified);
+  const lead = allDone
+    ? "<strong>You're live.</strong> Clients matching your fit can now find you."
+    : stuck
+      ? "<strong>You're being billed but clients can't see you yet.</strong> Finish these and you're live."
+      : "<strong>Getting set up.</strong> About ten minutes of your time, then it's on us.";
+
+  const items = steps.map(s => {
+    const state = s.done ? 'done' : s.mine ? 'todo' : 'waiting';
+    const mark = s.done ? '&#10003;' : s.mine ? '' : '&middot;';
+    return `<li class="gs-step is-${state}">
+      <span class="gs-mark">${mark}</span>
+      <div>
+        <p class="gs-title">${s.title}${!s.done && !s.mine ? ' <span class="gs-tag">waiting on us</span>' : ''}</p>
+        <p class="gs-body">${s.body}</p>
+        ${(!s.done && s.action) ? `<button class="gs-action" id="${s.action.id}">${s.action.label}</button>` : ''}
+      </div>
+    </li>`;
+  }).join('');
 
   return `
-    <div class="verify-banner">
-      <p style="margin:0 0 8px;">${lead}</p>
-      <ul style="margin:0 0 10px; padding-left:18px; line-height:1.6;">${items}</ul>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        ${(noLicenseNumber || t.licenseRejectedReason) ? `<button class="edit-prefs-btn" id="t-add-license-btn" style="margin:0;">${noLicenseNumber ? 'Add' : 'Update'} my license number</button>` : ''}
-        ${needsId ? `<button class="edit-prefs-btn" id="t-verify-id-btn" style="margin:0;">Verify my ID</button>` : ''}
+    <div class="getting-started ${allDone ? 'is-complete' : ''} ${stuck ? 'is-stuck' : ''}">
+      <div class="gs-head">
+        <p class="gs-lead">${lead}</p>
+        ${allDone ? '<button class="gs-dismiss" id="t-gs-dismiss" aria-label="Dismiss">&#10005;</button>' : `<span class="gs-count">${doneCount} of ${steps.length}</span>`}
       </div>
+      <ol class="gs-steps">${items}</ol>
     </div>`;
 }
+
+function wireGettingStarted() {
+  const id = document.getElementById('t-gs-id');
+  if (id) id.addEventListener('click', () => startIdentityVerification(id));
+  const lic = document.getElementById('t-gs-licence');
+  if (lic) lic.addEventListener('click', openLicenseNumberField);
+  const prof = document.getElementById('t-gs-profile');
+  if (prof) prof.addEventListener('click', () => { profileMode = 'edit'; showTScreen('t-profile'); });
+  const dis = document.getElementById('t-gs-dismiss');
+  if (dis) dis.addEventListener('click', () => {
+    try { localStorage.setItem(GETTING_STARTED_KEY, 'dismissed'); } catch (e) {}
+    renderTherapistInsights();
+  });
+}
+
+// Kept as the name the render sites already call.
+function verificationBannerHtml(t) { return gettingStartedHtml(t); }
 
 // The licence number sits inside a collapsed "Additional Details" section of
 // Edit Profile -- findable, but not discoverable. Jump straight to it.
@@ -4697,10 +4747,7 @@ function renderTherapistInsights() {
   `;
   const activateBtn = document.getElementById('t-activate-btn');
   if (activateBtn) activateBtn.addEventListener('click', openActivateProfile);
-  const homeVerifyBtn = document.getElementById('t-verify-id-btn');
-  if (homeVerifyBtn) homeVerifyBtn.addEventListener('click', () => startIdentityVerification(homeVerifyBtn));
-  const homeAddLicBtn = document.getElementById('t-add-license-btn');
-  if (homeAddLicBtn) homeAddLicBtn.addEventListener('click', openLicenseNumberField);
+  wireGettingStarted();
   const shareProfileBtn = document.getElementById('t-share-profile-btn');
   if (shareProfileBtn) shareProfileBtn.addEventListener('click', openShareMyProfile);
   const insOngoingSwitch = document.getElementById('t-insights-ongoing-switch');
@@ -5984,10 +6031,7 @@ function renderTherapistSettings() {
   document.getElementById('t-settings-profile-btn').addEventListener('click', () => showTScreen('t-profile'));
   document.getElementById('t-settings-logout-btn').addEventListener('click', logout);
   document.getElementById('t-settings-delete-btn').addEventListener('click', openTherapistDeleteSheet);
-  const verifyIdBtn = document.getElementById('t-verify-id-btn');
-  if (verifyIdBtn) verifyIdBtn.addEventListener('click', () => startIdentityVerification(verifyIdBtn));
-  const addLicBtn = document.getElementById('t-add-license-btn');
-  if (addLicBtn) addLicBtn.addEventListener('click', openLicenseNumberField);
+  wireGettingStarted();
 }
 
 // Same principle as the client's delete flow: lead with what they'd lose, keep
