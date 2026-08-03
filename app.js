@@ -1250,10 +1250,45 @@ async function authSignOut() {
   }
   clearAuthSession();
 }
+  /* Supabase access tokens last an hour. Nothing ever used the refresh_token we
+     were already storing, so a therapist was signed out hourly -- and since the
+     session was never restored at page load either, every refresh sent them back
+     to the login screen with valid credentials sitting in storage.
+     Refresh tokens rotate, so the stored one is replaced each time. */
+  let refreshInFlight = null;
+  async function refreshAuthSession() {
+    const s = loadAuthSession();
+    if (!s || !s.refresh_token) return null;
+    if (refreshInFlight) return refreshInFlight;      // never refresh twice at once
+    refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${KINDRED_AUTH.url}/auth/v1/token?grant_type=refresh_token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': KINDRED_AUTH.key },
+          body: JSON.stringify({ refresh_token: s.refresh_token })
+        });
+        if (!res.ok) { clearAuthSession(); return null; }   // revoked/expired: sign out cleanly
+        return saveAuthSession(await res.json());
+      } catch (e) {
+        return s;      // offline: keep what we have rather than logging them out
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+    return refreshInFlight;
+  }
+  // The session, refreshed if it is within two minutes of expiring.
+  async function ensureFreshSession() {
+    const s = loadAuthSession();
+    if (!s) return null;
+    if (s.expires_at && Date.now() > s.expires_at - 120000) return await refreshAuthSession();
+    return s;
+  }
+
 // Authenticated PostgREST call — the therapist's own JWT, so RLS lets them
 // touch only their own row.
 async function authRest(path, opts = {}) {
-  const s = loadAuthSession();
+  const s = await ensureFreshSession();
   if (!s) throw new Error('Not signed in.');
   return fetch(`${KINDRED_AUTH.url}/rest/v1${path}`, {
     ...opts,
@@ -5844,6 +5879,35 @@ function applyLandingParams() {
     if (pw) setTimeout(() => pw.focus(), 60);
   }
 }
+
+/* ===== STAY SIGNED IN =====
+   The session was written to localStorage and never read back at startup, so
+   every page refresh dropped a signed-in therapist at the account-type screen
+   with working credentials sitting unused. Restore it, refreshing the token if
+   it has aged out, and go straight to their portal.
+
+   Deliberately therapist-only: client state is local-only until the BAA, so
+   there is no client session to restore. */
+async function restoreSession() {
+  if (!authReady()) return false;
+  if (/[?&]email=/.test(location.search) || /therapist-signup/.test(location.hash)) return false; // explicit sign-in
+  const s = await ensureFreshSession();
+  if (!s || !s.user) return false;
+  try {
+    const row = await loadTherapistRow();
+    if (!row || !row.name || !String(row.name).trim()) return false;  // stub or none: let them sign in
+    const t = normalizeTherapist(dbRowToTherapist(row));
+    upsertTherapistInMemory(t);
+    currentTherapistId = t.id;
+    accountType = 'therapist';
+    showTherapistView();
+    return true;
+  } catch (e) {
+    return false;   // never trap someone on a blank screen because a fetch failed
+  }
+}
+window.addEventListener('load', restoreSession);
+
 window.addEventListener('load', applyLandingParams);
 
 // ===== SHARED-THERAPIST DEEP LINK =====
