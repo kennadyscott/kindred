@@ -1277,6 +1277,39 @@ function therapistToDbRow(t, userId) {
     accepting: !!t.acceptingOngoing, published: !!t.listed
   };
 }
+/* Every edit in the profile editor mutated the in-memory therapist and
+   re-rendered -- and nothing ever wrote it to the database. There is no Save
+   button either, so a therapist filling in their whole profile lost all of it
+   on reload, silently. Debounced autosave: the upsert is idempotent, so an
+   extra write costs nothing and a missed one costs their work. */
+let profileSaveTimer = null;
+let profileSaveState = 'idle';   // 'idle' | 'saving' | 'saved' | 'error'
+function persistProfileSoon(t) {
+  if (!t || !authReady() || !loadAuthSession()) return;   // demo mode: nowhere to save
+  clearTimeout(profileSaveTimer);
+  profileSaveTimer = setTimeout(async () => {
+    profileSaveState = 'saving'; paintSaveState();
+    try {
+      await saveTherapistProfile(t);
+      profileSaveState = 'saved';
+    } catch (e) {
+      console.warn('profile save failed:', e.message);
+      profileSaveState = 'error';
+    }
+    paintSaveState();
+  }, 1000);
+}
+function paintSaveState() {
+  const el = document.getElementById('t-save-state');
+  if (!el) return;
+  el.textContent = profileSaveState === 'saving' ? 'Saving...'
+                 : profileSaveState === 'saved'  ? 'All changes saved'
+                 : profileSaveState === 'error'  ? "Couldn't save - check your connection"
+                 : '';
+  el.className = 'save-state ' + profileSaveState;
+}
+
+
 // Upsert the signed-in therapist's profile (insert on first save, update after).
 async function saveTherapistProfile(t) {
   const s = loadAuthSession();
@@ -3776,15 +3809,19 @@ document.getElementById('login-submit-btn').addEventListener('click', async () =
   btn.disabled = true; btn.textContent = 'Logging in…';
   try {
     await authSignIn(email, password);
-    const row = await loadTherapistRow();
-    if (row) {
-      const t = normalizeTherapist(dbRowToTherapist(row));
-      upsertTherapistInMemory(t);
-      currentTherapistId = t.id;
-      showTherapistView();
-    } else {
-      startTherapistSignup(); // account exists but no profile yet — build it
-    }
+      const row = await loadTherapistRow();
+      // 0013 creates a stub row the moment someone pays, so "a row exists" no
+      // longer means "they have a profile". A stub has no name -- send those
+      // people through signup rather than into an empty portal.
+      const hasProfile = row && row.name && String(row.name).trim();
+      if (hasProfile) {
+        const t = normalizeTherapist(dbRowToTherapist(row));
+        upsertTherapistInMemory(t);
+        currentTherapistId = t.id;
+        showTherapistView();
+      } else {
+        startTherapistSignup(); // no row, or a paid stub with nothing in it
+      }
   } catch (e) {
     showToast(/confirm/i.test(e.message) ? 'Please confirm your email first — check your inbox.'
       : /invalid|credential|grant/i.test(e.message) ? 'Wrong email or password.' : e.message);
@@ -4908,8 +4945,13 @@ function checkboxDropdownHtml(selected, options, key, summaryLabel, max) {
 function renderTherapistProfile() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
   const container = document.getElementById('t-profile-content');
+  // Every editor mutation re-renders through here, so this is the one place
+  // that catches all of them. Debounced, and the upsert is idempotent, so the
+  // extra writes from plain navigation are harmless.
+  persistProfileSoon(t);
   container.innerHTML = `
     <div class="t-form-name">${t.name} <span class="t-form-creds">${credentialsLabel(t)}</span></div>
+    <div class="save-state" id="t-save-state"></div>
 
     <div class="profile-modes" role="tablist">
       <button class="pmode ${profileMode === 'ideal' ? 'active' : ''}" data-pmode="ideal" role="tab">✦ Ideal Client</button>

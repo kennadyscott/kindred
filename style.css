@@ -2474,3 +2474,9 @@ select.t-rate-input,
   width: auto;
   padding: 10px 18px;
 }
+
+/* Autosave feedback in the profile editor. Therapists need to know their work
+   is stored -- there is no Save button to reassure them. */
+.save-state { font-size: 12px; margin: -6px 0 12px; min-height: 15px; color: var(--ink-soft); }
+.save-state.saved  { color: var(--moss, #687A65); }
+.save-state.error  { color: #a8443a; font-weight: 600; }
