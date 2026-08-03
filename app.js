@@ -4183,13 +4183,17 @@ function renderSignupStep() {
 function attachSignupHandlers() {
   const d = newTherapistDraft;
 
+  /* One place decides whether step 0 can continue. Two copies drifted: the
+     licence field updated the value but never re-checked the button, so
+     filling in a licence last left Continue permanently disabled. */
+  const refreshStep0Next = () => {
+    const b = document.getElementById('ts-next');
+    if (b) b.disabled = !(d.name.trim().length > 0 && d.licenseNumber.trim().length > 0);
+  };
   const nameInput = document.getElementById('ts-name');
-  if (nameInput) nameInput.addEventListener('input', () => {
-    d.name = nameInput.value;
-    document.getElementById('ts-next').disabled = !(d.name.trim().length > 0 && d.licenseNumber.trim().length > 0);
-  });
+  if (nameInput) nameInput.addEventListener('input', () => { d.name = nameInput.value; refreshStep0Next(); });
   const licenseInput = document.getElementById('ts-license-number');
-  if (licenseInput) licenseInput.addEventListener('input', () => { d.licenseNumber = licenseInput.value; });
+  if (licenseInput) licenseInput.addEventListener('input', () => { d.licenseNumber = licenseInput.value; refreshStep0Next(); });
   const pronounsInput = document.getElementById('ts-pronouns');
   if (pronounsInput) pronounsInput.addEventListener('input', () => { d.pronouns = pronounsInput.value; });
   const showPronounsSwitch = document.getElementById('ts-show-pronouns-switch');
