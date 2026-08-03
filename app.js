@@ -3074,9 +3074,15 @@ function verificationBannerHtml(t) {
     ? "<strong>You're being billed but clients can't see you yet.</strong>"
     : '<strong>Two checks before you can be matched.</strong>';
 
+  // "Nothing for you to do" is only true once we actually have a number to
+  // check. Without one the licence step IS their job, and the number lives
+  // three levels down in Edit Profile -- so say so and link straight to it.
+  const noLicenseNumber = !t.licenseNumber || !String(t.licenseNumber).trim();
   const items = [
     needsLicense
-      ? `<li>License &mdash; we're checking it against your state board. Nothing for you to do.</li>`
+      ? (noLicenseNumber
+          ? `<li><strong>License number &mdash; we need this from you.</strong> We check it against your state board.</li>`
+          : `<li>License &mdash; we're checking ${String(t.licenseNumber).trim()} against your state board. Nothing for you to do.</li>`)
       : `<li>License &mdash; verified &#10003;</li>`,
     needsId
       ? `<li>ID &mdash; <strong>we need you to verify this.</strong> Takes about a minute.</li>`
@@ -3087,8 +3093,25 @@ function verificationBannerHtml(t) {
     <div class="verify-banner">
       <p style="margin:0 0 8px;">${lead}</p>
       <ul style="margin:0 0 10px; padding-left:18px; line-height:1.6;">${items}</ul>
-      ${needsId ? `<button class="edit-prefs-btn" id="t-verify-id-btn" style="margin:0;">Verify my ID</button>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${noLicenseNumber ? `<button class="edit-prefs-btn" id="t-add-license-btn" style="margin:0;">Add my license number</button>` : ''}
+        ${needsId ? `<button class="edit-prefs-btn" id="t-verify-id-btn" style="margin:0;">Verify my ID</button>` : ''}
+      </div>
     </div>`;
+}
+
+// The licence number sits inside a collapsed "Additional Details" section of
+// Edit Profile -- findable, but not discoverable. Jump straight to it.
+function openLicenseNumberField() {
+  profileMode = 'edit';          /* the editor, not Ideal Client or View */
+  editSectionsOpen.additional = true;
+  showTScreen('t-profile');      /* also calls renderTherapistProfile() */
+  setTimeout(() => {
+    const el = document.getElementById('t-form-license-number');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.focus();
+  }, 120);
 }
 
 // ===== STRIPE IDENTITY =====
@@ -4560,6 +4583,8 @@ function renderTherapistInsights() {
   if (activateBtn) activateBtn.addEventListener('click', openActivateProfile);
   const homeVerifyBtn = document.getElementById('t-verify-id-btn');
   if (homeVerifyBtn) homeVerifyBtn.addEventListener('click', () => startIdentityVerification(homeVerifyBtn));
+  const homeAddLicBtn = document.getElementById('t-add-license-btn');
+  if (homeAddLicBtn) homeAddLicBtn.addEventListener('click', openLicenseNumberField);
   const shareProfileBtn = document.getElementById('t-share-profile-btn');
   if (shareProfileBtn) shareProfileBtn.addEventListener('click', openShareMyProfile);
   const insOngoingSwitch = document.getElementById('t-insights-ongoing-switch');
@@ -5015,18 +5040,24 @@ function renderTherapistProfile() {
           <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
         </div>
 
+        <div class="t-form-label">License number <span class="ideal-hint">we check this against your state board by hand</span></div>
+        <input type="text" class="t-rate-input" id="t-form-license-number" placeholder="e.g. TX-38291" value="${t.licenseNumber || ''}">
+        ${t.licenseVerified
+          ? `<p class="portal-note" style="margin:2px 0 10px;">&#10003; Verified${t.licenseNumber ? ` &middot; ${t.licenseNumber}` : ''}. Editing this will pause your listing until we re-check it.</p>`
+          : `<p class="portal-note" style="margin:2px 0 10px;">We verify this against your state board before your profile goes live.</p>`}
+
         <div class="t-form-label">Licensed states <span class="ideal-hint">clients only match with therapists licensed in their state</span></div>
         ${(t.licensedStates && t.licensedStates.length)
-          ? `<div class="chip-grid">${t.licensedStates.map(s => `<div class="chip-option selected licensed-state-chip">${s} <span class="lic-verified" title="Verified via Stripe">✓</span> <button type="button" class="lic-remove" data-remove-licensed-state="${s}" aria-label="Remove ${s}">✕</button></div>`).join('')}</div>`
-          : `<p class="portal-note" style="margin:2px 0 8px;">No states verified yet. Verify a license below to start matching with clients there.</p>`}
+          ? `<div class="chip-grid">${t.licensedStates.map(s => `<div class="chip-option selected licensed-state-chip">${s} <span class="lic-verified" title="Pending review">•</span> <button type="button" class="lic-remove" data-remove-licensed-state="${s}" aria-label="Remove ${s}">✕</button></div>`).join('')}</div>`
+          : `<p class="portal-note" style="margin:2px 0 8px;">No states added yet. Add the states you are licensed in — we check each one before you match with clients there.</p>`}
         <div class="add-slot-row">
           <select id="t-license-state-select">
             <option value="">Add a state…</option>
             ${US_STATES.filter(s => !(t.licensedStates || []).includes(s)).map(s => `<option value="${s}">${s}</option>`).join('')}
           </select>
-          <button id="t-verify-license-btn">Verify with Stripe</button>
+          <button id="t-verify-license-btn">Add state</button>
         </div>
-        <p class="portal-note">Each state's license is verified through Stripe. A state only becomes available for matching after it's verified.</p>
+        <p class="portal-note">We check each state's license against that board's public registry. A state only becomes available for matching after your license is verified.</p>
 
         <div class="t-form-label">Gender</div>
         <div class="chip-grid">
@@ -5366,6 +5397,8 @@ function attachTherapistProfileHandlers(t) {
     renderTherapistProfile();
   }));
   document.getElementById('t-lgbtq-switch').addEventListener('click', () => { t.identity.lgbtqAffirming = !t.identity.lgbtqAffirming; renderTherapistProfile(); });
+  const licNumInput = document.getElementById('t-form-license-number');
+  if (licNumInput) licNumInput.addEventListener('input', () => { t.licenseNumber = licNumInput.value; });
   const verifyLicBtn = document.getElementById('t-verify-license-btn');
   if (verifyLicBtn) verifyLicBtn.addEventListener('click', () => {
     const s = (document.getElementById('t-license-state-select') || {}).value;
@@ -5803,6 +5836,8 @@ function renderTherapistSettings() {
   document.getElementById('t-settings-delete-btn').addEventListener('click', openTherapistDeleteSheet);
   const verifyIdBtn = document.getElementById('t-verify-id-btn');
   if (verifyIdBtn) verifyIdBtn.addEventListener('click', () => startIdentityVerification(verifyIdBtn));
+  const addLicBtn = document.getElementById('t-add-license-btn');
+  if (addLicBtn) addLicBtn.addEventListener('click', openLicenseNumberField);
 }
 
 // Same principle as the client's delete flow: lead with what they'd lose, keep
