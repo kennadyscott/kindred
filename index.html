@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,400..600;1,7..72,400..600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260731j">
+<link rel="stylesheet" href="style.css?v=20260731k">
 </head>
 <body>
 
@@ -316,10 +316,28 @@
   </nav>
 </div>
 
-<script src="app.js?v=20260731j"></script>
+<script src="app.js?v=20260731k"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    /* A new worker calls skipWaiting() + clients.claim(), so it takes control
+       of THIS page -- but the JavaScript this page already loaded is still the
+       old copy. Without the reload below, the first refresh after a deploy
+       silently runs stale code and only a SECOND refresh picks up the new
+       build. That is what made fixed bugs look unfixed.
+
+       hadController distinguishes an UPDATE from a first install: on a first
+       install there is no controller yet and nothing stale to replace, so
+       reloading there would just be a pointless flash. */
+    const hadController = !!navigator.serviceWorker.controller;
+    let swReloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || swReloading) return;
+      swReloading = true;
+      location.reload();
+    });
+    /* The ?v= makes the browser fetch sw.js itself rather than reuse a cached
+       copy -- bump it whenever sw.js changes. */
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=3').catch(() => {}));
   }
 </script>
 </body>
