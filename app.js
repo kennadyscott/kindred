@@ -6089,6 +6089,25 @@ if (!PRODUCTION_BUILD && /[?&]demo=client\b/.test(location.search)) seedClientDe
 function applyLandingParams() {
   const email = new URLSearchParams(location.search).get('email');
   const wantsSignup = /therapist-signup/.test(location.hash);
+
+  // #match -- someone came from a "Match with a therapist" button on the site.
+  // They have already told us what they want by clicking it, so asking "what
+  // brings you to Kindred?" and then showing a login screen is two walls in
+  // front of a questionnaire that needs no account at all.
+  //
+  // start-here.js has been building these links for a while (with feeling/mood/
+  // impact appended) and nothing consumed the hash, so every one of those
+  // handoffs landed on the account-type screen instead of the questionnaire.
+  //
+  // A returning client with finished answers goes to their matches rather than
+  // through the questions again -- same rule enterMatchingExperience() uses.
+  if (/(^|[#&])match\b/.test(location.hash)) {
+    accountType = 'client';
+    if (intake.completed) { finishIntake(); checkForNewMatches(); }
+    else startIntake();
+    return;
+  }
+
   if (!wantsSignup && !email) return;
 
   if (wantsSignup) {
@@ -6114,6 +6133,7 @@ function applyLandingParams() {
 async function restoreSession() {
   if (!authReady()) return false;
   if (/[?&]email=/.test(location.search) || /therapist-signup/.test(location.hash)) return false; // explicit sign-in
+  if (/(^|[#&])match\b/.test(location.hash)) return false;   // client deep link -- do not bounce them into a therapist portal
   const s = await ensureFreshSession();
   if (!s || !s.user) return false;
   try {
