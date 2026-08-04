@@ -2453,40 +2453,19 @@ function idealMatchResult(t) {
   return { stated: true, isIdeal: possible > 0 && score >= IDEAL_MATCH_THRESHOLD, score, reasons };
 }
 
-function matchPercent(t) {
-  // server mode: Postgres already scored this row — one source of truth
-  if (typeof t._serverScore === 'number') return t._serverScore;
-  let earned = 0, possible = 0;
-  if (intake.needs.length) {
-    possible += 40;
-    const overlap = t.tags.filter(tag => intake.needs.includes(tag)).length;
-    if (overlap) earned += Math.min(40, 24 + overlap * 8);
-    else if (t.practiceType === 'generalist') earned += 22;
-  }
-  const prefs = [
-    [intake.modality !== 'open', t.modalities.includes(intake.modality)],
-    [!!intake.stylePref, STYLE_ALIGN[intake.stylePref] === t.style],
-    [intake.genderPref !== 'no-preference', t.identity.gender === intake.genderPref],
-    [intake.ethnicityPref !== 'no-preference', t.ethnicity === intake.ethnicityPref],
-    [intake.lgbtqRequired, t.identity.lgbtqAffirming],
-    [intake.affinities.length > 0, intake.affinities.some(a => (t.affinities || []).includes(a))],
-    [intake.faith.length > 0, intake.faith.some(f => (t.faith || []).includes(f))],
-    [intake.languagePref !== 'any', t.languages.includes(intake.languagePref)],
-    [intake.formats.length > 0, intake.formats.some(f => t.formats.includes(f))],
-    [intake.hasInsurance === 'yes' && intake.insurance !== 'any', t.insuranceList.includes(intake.insurance)]
-  ];
-  prefs.forEach(([applies, ok]) => { if (applies) { possible += 10; if (ok) earned += 10; } });
-  if (!possible) return null;
-  // Lining up with a therapist's private ideal only ever ADDS — it can't push a
-  // score down, so a client is never penalised for not being their unicorn.
-  const idealBoost = Math.round(idealMatchResult(t).score * 6);
-  const prevBoost = Math.round(prevExperienceScore(t) * 5);
-  return Math.min(98, Math.round(62 + (earned / possible) * 36) + idealBoost + prevBoost);
-}
 
+/* No number, deliberately (decided 2026-08-03).
+   The score could never fall below 62 -- it was 62 + (earned/possible)*36 with
+   two boosts that only ever added -- so a poor match was unrepresentable and
+   the figure was reassurance dressed as measurement. It also argued against
+   Kindred's own thesis: matching is a compatibility FILTER, and everyone a
+   client sees has already passed it, so a percentage only ranked people who all
+   qualified, on preferences they had just stated themselves. "94%" on a person
+   someone might trust with their trauma is also the gamified version of that
+   decision, which the brand voice rules rule out.
+   The match-reason tags do this job honestly: specific, checkable, true. */
 function matchBadgeHtml(t) {
-  const pct = matchPercent(t);
-  return `<div class="match-pct-badge">${pct !== null ? `${pct}% ` : ''}Kindred Match</div>`;
+  return `<div class="match-badge">Kindred Match</div>`;
 }
 
 const LEAF_SVG = `<svg width="11" height="11" viewBox="0 0 11 11"><path d="M1.5 9.5C1.5 4.5 4.5 1.5 9.5 1.5C9.5 6.5 6.5 9.5 1.5 9.5Z" fill="currentColor"/></svg>`;

@@ -1423,8 +1423,8 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   height: 100%;
   object-fit: cover;
 }
-.card-photo .stamp, .card-photo .match-pct-badge, .card-photo .language-badge { z-index: 2; }
-.match-pct-badge {
+.card-photo .stamp, .card-photo .match-badge, .card-photo .language-badge { z-index: 2; }
+.match-badge {
   position: absolute;
   bottom: 12px;
   left: 12px;
