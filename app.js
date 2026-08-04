@@ -4306,9 +4306,7 @@ function renderSignupStep() {
       </select>
       <div class="intake-sub" style="margin-top:6px;">Clients looking for in-person sessions only see therapists located in their city/state.</div>
       <div class="t-form-label">Insurance accepted</div>
-      <div class="chip-grid" id="ts-insurance-grid">
-        ${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${d.insuranceList.includes(i) ? 'selected' : ''}" data-insurance="${i}">${i}</div>`).join('')}
-      </div>
+      ${checkboxDropdownHtml(d.insuranceList, insuranceAll(), 'ts-insurance', 'Choose every carrier you accept…')}
         <div class="t-form-label">Payment options</div>
         <div class="chip-grid" id="ts-payment-grid">
           ${PAYMENT_OPTIONS.map(p => `<div class="chip-option ${d.paymentOptions.includes(p.key) ? 'selected' : ''}" data-payment="${p.key}">${p.label}</div>`).join('')}
@@ -4430,7 +4428,9 @@ function attachSignupHandlers() {
   /* The signup step used a short chip grid while the editor already offered the
      full catalogue behind a dropdown -- so a therapist could pick a specialty
      after signing up that they could not pick during it. Same control now. */
-  const signupCbxArr = key => key === 'ts-spec' ? d.tags : key === 'ts-modality' ? d.modalities : null;
+  const signupCbxArr = key => key === 'ts-spec' ? d.tags
+    : key === 'ts-modality'  ? d.modalities
+    : key === 'ts-insurance' ? d.insuranceList : null;
   document.querySelectorAll('input[data-cbx]').forEach(el => el.addEventListener('change', () => {
     const arr = signupCbxArr(el.dataset.cbx); if (!arr) return;
     const at = arr.indexOf(el.value);
@@ -4496,14 +4496,6 @@ function attachSignupHandlers() {
   });
   const tsStateSelect = document.getElementById('ts-state');
   if (tsStateSelect) tsStateSelect.addEventListener('change', () => { d.state = tsStateSelect.value; renderSignupStep(); });
-  document.querySelectorAll('#ts-insurance-grid .chip-option').forEach(el => {
-    el.addEventListener('click', () => {
-      const ins = el.dataset.insurance;
-      const i = d.insuranceList.indexOf(ins);
-      if (i === -1) d.insuranceList.push(ins); else d.insuranceList.splice(i, 1);
-      renderSignupStep();
-    });
-  });
   const selfPayNoteInput = document.getElementById('ts-selfpaynote');
   if (selfPayNoteInput) selfPayNoteInput.addEventListener('input', () => { d.selfPayNote = selfPayNoteInput.value; });
   /* Slider and number field drive the same value. The slider moves in 5s for a
@@ -5144,7 +5136,6 @@ function renderRequests() {
 }
 
 let inquiriesOpen = { active: true, waitlist: true, archived: false }; // Inquiries collapsible sections
-let tSpecOtherOpen = false, tModOtherOpen = false; // transient "+ Other" panels
 let idealFieldOtherOpen = false; // ideal-client field "+ Other" dropdown
 
 // full, deduped catalogs for the ideal-client multi-selects (reflect vocab live)
@@ -5161,6 +5152,10 @@ const PAYMENT_OPTIONS = [
 const paymentLabel = k => (PAYMENT_OPTIONS.find(p => p.key === k) || {}).label || k;
 
 function specialtyAll() { return [...new Set([...NEED_OPTIONS, ...OTHER_SPECIALTIES])]; }
+// Specialties and modalities got the whole catalogue when the dropdowns went
+// in; insurance was left on a five-chip grid, so a therapist who takes Optum,
+// Medicaid or TRICARE had no way to say so. Same treatment.
+function insuranceAll() { return [...new Set([...INSURANCE_OPTIONS, ...OTHER_INSURANCES])]; }
 function modalityAll()  { return [...new Set([...MODALITY_OPTIONS, ...MODALITY_QUICK, ...OTHER_MODALITIES])]; }
 
 // A drop-down multi-select for the ideal editor: selected items show as
@@ -5323,7 +5318,7 @@ function renderTherapistProfile() {
           <div class="switch ${t.acceptsSlidingScale ? 'on' : ''}" id="t-sliding-switch"></div>
         </div>
         <div class="t-form-label">Insurance accepted</div>
-        <div class="chip-grid">${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${t.insuranceList.includes(i) ? 'selected' : ''}" data-toggle-insurance="${i}">${i}</div>`).join('')}</div>
+        ${checkboxDropdownHtml(t.insuranceList, insuranceAll(), 'insurance', 'Choose every carrier you accept…')}
         <div class="t-form-label">Payment options</div>
         <div class="chip-grid">${PAYMENT_OPTIONS.map(p => `<div class="chip-option ${(t.paymentOptions || []).includes(p.key) ? 'selected' : ''}" data-toggle-payment="${p.key}">${p.label}</div>`).join('')}</div>
 
@@ -5510,6 +5505,7 @@ function attachTherapistProfileHandlers(t) {
   const cbxArr = k => ({
     'spec': t.tags,
     'modality': t.modalities,
+    'insurance': t.insuranceList,
     'ideal-needs': t.idealClient.needs,
     'ideal-modalities': t.idealClient.modalities,
   })[k] || null;
@@ -5548,20 +5544,6 @@ function attachTherapistProfileHandlers(t) {
     else if (t.topSpecialties.length < 3) t.topSpecialties.push(s);
     renderTherapistProfile();
   }));
-  const specOtherBtn = document.getElementById('t-spec-other-btn');
-  if (specOtherBtn) specOtherBtn.addEventListener('click', () => { tSpecOtherOpen = true; renderTherapistProfile(); });
-  const specOtherSel = document.getElementById('t-spec-other-select');
-  if (specOtherSel) specOtherSel.addEventListener('change', () => {
-    if (specOtherSel.value) t.tags.push(specOtherSel.value);
-    tSpecOtherOpen = false; renderTherapistProfile();
-  });
-  const modOtherBtn = document.getElementById('t-mod-other-btn');
-  if (modOtherBtn) modOtherBtn.addEventListener('click', () => { tModOtherOpen = true; renderTherapistProfile(); });
-  const modOtherSel = document.getElementById('t-mod-other-select');
-  if (modOtherSel) modOtherSel.addEventListener('change', () => {
-    if (modOtherSel.value) t.modalities.push(modOtherSel.value);
-    tModOtherOpen = false; renderTherapistProfile();
-  });
   document.querySelectorAll('[data-toggle-modality]').forEach(el => el.addEventListener('click', () => {
     const m = el.dataset.toggleModality;
     const i = t.modalities.indexOf(m);
@@ -5771,12 +5753,6 @@ function attachTherapistProfileHandlers(t) {
   if (tCityInput) tCityInput.addEventListener('input', () => { t.location.city = tCityInput.value; });
   const tStateInput = document.getElementById('t-state-input');
   if (tStateInput) tStateInput.addEventListener('change', () => { t.location.state = tStateInput.value; });
-  document.querySelectorAll('[data-toggle-insurance]').forEach(el => el.addEventListener('click', () => {
-    const ins = el.dataset.toggleInsurance;
-    const i = t.insuranceList.indexOf(ins);
-    if (i === -1) t.insuranceList.push(ins); else t.insuranceList.splice(i, 1);
-    renderTherapistProfile();
-  }));
   const tSelfPayNoteInput = document.getElementById('t-selfpaynote-input');
   if (tSelfPayNoteInput) tSelfPayNoteInput.addEventListener('input', () => { t.selfPayNote = tSelfPayNoteInput.value; });
   /* Slider and number drive the same value: 5-dollar steps make a $20-$600 drag
