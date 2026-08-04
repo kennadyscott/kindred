@@ -1017,9 +1017,20 @@ let chatReturnScreen = 'matches';
 const CLIENT_STATE_KEY = 'kindred-client';
 const CLIENT_STATE_VERSION = 1;
 
+// Something worth restoring? Anything answered counts -- we do not want to
+// resurrect an untouched questionnaire on someone who only glanced at it.
+function intakeStarted() {
+  return !!(intake.careFor || intake.knows || (intake.needs && intake.needs.length)
+            || intake.state || intake.field || intake.age);
+}
+
 function saveClientState() {
   try {
-    if (!intake.completed) return;                 // nothing worth keeping yet
+    /* Partial answers are worth keeping too. This used to bail unless the
+       questionnaire was finished, so someone six questions in who got
+       interrupted lost the lot and started over -- the most annoying possible
+       moment to lose it. All local, so nothing here waits on the BAA. */
+    if (!intake.completed && !intakeStarted()) return;
     const referenced = {};
     const remember = t => { if (t && t.id) referenced[t.id] = t; };
     shortlist.forEach(remember);
@@ -1028,6 +1039,7 @@ function saveClientState() {
     localStorage.setItem(CLIENT_STATE_KEY, JSON.stringify({
       v: CLIENT_STATE_VERSION,
       intake,
+      intakeStep,               // resume where they stopped
       savedResources,
       crisisAcknowledged,
       clientAgreedToOnDemandPolicy,
@@ -1051,6 +1063,12 @@ function loadClientState() {
   if (!saved || saved.v !== CLIENT_STATE_VERSION || !saved.intake) return false;
 
   Object.assign(intake, saved.intake);
+  // Where they stopped, so an interrupted questionnaire resumes rather than
+  // restarting. Clamped: activeSteps() can shrink if an earlier answer
+  // changed which steps apply.
+  if (typeof saved.intakeStep === 'number') {
+    intakeStep = Math.max(0, Math.min(saved.intakeStep, activeSteps().length - 1));
+  }
   savedResources = Array.isArray(saved.savedResources) ? saved.savedResources : [];
   crisisAcknowledged = !!saved.crisisAcknowledged;
   clientAgreedToOnDemandPolicy = !!saved.clientAgreedToOnDemandPolicy;
@@ -2245,7 +2263,8 @@ function seedClientDemo() {
 }
 
 function startIntake() {
-  intakeStep = 0;
+  // Resume an unfinished questionnaire instead of throwing away their answers.
+  if (!(intake.completed === false && intakeStarted())) intakeStep = 0;
   document.getElementById('bottom-nav').classList.add('hidden');
   renderIntakeStep();
   showScreen('intake');
@@ -6193,6 +6212,22 @@ function openNotifyMe() {
     if (via !== 'text' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('Enter an email we can reach you at.'); return; }
     if (via !== 'email' && !phone) { showToast('Enter a phone number for texts.'); return; }
     try { localStorage.setItem(NOTIFY_KEY, JSON.stringify({ email, phone, via, at: Date.now() })); } catch (e) {}
+    /* Insert-only for anon, and the row holds contact details and nothing else
+       -- no intake answers, no state, no reason. That separation is what makes
+       it storable before the BAA. Fire-and-forget: a network failure must not
+       lose what they typed, which is why it is kept locally too. */
+    if (dbReady()) {
+      fetch(`${KINDRED_DB.url}/rest/v1/client_notify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: KINDRED_DB.key,
+          Authorization: `Bearer ${KINDRED_DB.key}`,
+          Prefer: 'return=minimal'
+        },
+        body: JSON.stringify({ email: email || null, phone: phone || null, contact_pref: via })
+      }).catch(() => {});
+    }
     close();
     showToast("Thanks -- we'll be in touch when someone fits.");
   });
