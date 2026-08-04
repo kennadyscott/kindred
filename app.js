@@ -586,6 +586,7 @@ function normalizeTherapist(t) {
   if (!Array.isArray(t.licensedStates)) t.licensedStates = (t.location && t.location.state) ? [t.location.state] : [];
   if (t.onDemandRate == null) t.onDemandRate = t.rateMin;
   if (t.listed === undefined) t.listed = true;
+  if (!Array.isArray(t.paymentOptions)) t.paymentOptions = [];
   if (t.licenseVerified === undefined) t.licenseVerified = false;   // never assume verified
   if (t.identityVerified === undefined) t.identityVerified = false;
   if (t.subscription === undefined) {
@@ -1306,6 +1307,7 @@ function therapistToDbRow(t, userId) {
     /* license_states is DERIVED from verified licences by a DB trigger, and
        license_number is superseded by the per-state therapist_licenses table.
        Sending either is ignored at best and misleading at worst. */
+    payment_options: t.paymentOptions || [],
     website: t.website || '', photo: t.photo || null,
     specialties: t.tags || [], modalities: t.modalities || [], style: t.style || null, practice_type: t.practiceType || 'specialist',
     best_for: t.bestFor || '', persona: t.persona || {}, media: t.media || {}, optional_prompts: t.optionalPrompts || [],
@@ -1443,6 +1445,7 @@ function dbRowToTherapist(row) {
     languages: row.languages && row.languages.length ? row.languages : ['English'],
     formats, rateMin: row.rate_min || 0, insuranceList: row.insurance || [],
     licensedStates: (row.license_states && row.license_states.length) ? row.license_states : undefined,
+    paymentOptions: row.payment_options || [],
     listed: !!row.published,
     subscription: row.published ? { plan: 'standard', founding: false, standardRate: STANDARD_RATE, introRate: STANDARD_RATE, introMonths: 0 } : null,
     acceptingOngoing: row.accepting !== false, onDemand: false, onDemandSlots: [],
@@ -2444,6 +2447,11 @@ function credentialsLabel(t) {
 function insuranceDisplayLabel(t, opts = {}) {
   if (!opts.preview && intake.hasInsurance === 'yes' && intake.insurance !== 'any') return `Accepts ${intake.insurance}`;
   if (t.insuranceList.length) return `Accepts ${t.insuranceList.join(', ')}`;
+  /* How they take payment is often what a self-pay client most needs to know
+     before reaching out -- a superbill or an HSA card changes the real cost,
+     and "Self-pay" alone says none of it. */
+  const payLabels = (t.paymentOptions || []).filter(k => k !== 'no_insurance').map(paymentLabel);
+  if (payLabels.length) return payLabels.join(' \u00b7 ');
   return t.selfPayNote || 'Self-pay';
 }
 
@@ -4140,7 +4148,7 @@ function startTherapistSignup() {
   signupStep = 0;
   newTherapistDraft = {
     name: '', credentials: ['', '', ''],
-    licenseNumber: '', licenseVerified: false, licenses: [],
+    licenseNumber: '', licenseVerified: false, licenses: [], paymentOptions: [],
     website: '',
     pronouns: '', showPronouns: true, useCompanyName: false, companyName: '',
     practiceType: 'specialist',
@@ -4210,14 +4218,10 @@ function renderSignupStep() {
         <div class="option-row ${d.practiceType === 'specialist' ? 'selected' : ''}" data-practice="specialist">I have a few core specialties</div>
         <div class="option-row ${d.practiceType === 'generalist' ? 'selected' : ''}" data-practice="generalist">I work with a broad range of concerns</div>
       </div>
-      <div class="t-form-label">${d.practiceType === 'generalist' ? 'Optional — pick any specialties you especially enjoy' : "Specialties / needs you work with"}</div>
-      <div class="chip-grid" id="ts-tags-grid">
-        ${NEED_OPTIONS.map(n => `<div class="chip-option ${d.tags.includes(n) ? 'selected' : ''}" data-tag="${n}">${n}</div>`).join('')}
-      </div>
-      <div class="t-form-label">Modalities you're certified in</div>
-      <div class="chip-grid" id="ts-modalities-grid">
-        ${MODALITY_OPTIONS.map(m => `<div class="chip-option ${d.modalities.includes(m) ? 'selected' : ''}" data-modality="${m}">${m}</div>`).join('')}
-      </div>
+        <div class="t-form-label">${d.practiceType === 'generalist' ? 'Optional — pick any specialties you especially enjoy' : "Specialties / needs you work with"}</div>
+        ${checkboxDropdownHtml(d.tags, specialtyAll(), 'ts-spec', 'Choose the specialties you work with…')}
+        <div class="t-form-label" style="margin-top:16px;">Modalities you're certified in</div>
+        ${checkboxDropdownHtml(d.modalities, modalityAll(), 'ts-modality', 'Choose the therapy types you offer…')}
       <div class="t-form-label">In one line, who do you work best with?</div>
       <input type="text" class="t-rate-input" id="ts-bestfor" placeholder="e.g. I work best with new parents navigating postpartum anxiety" value="${d.bestFor}">`;
   } else if (signupStep === 2) {
@@ -4262,13 +4266,19 @@ function renderSignupStep() {
       <div class="chip-grid" id="ts-insurance-grid">
         ${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${d.insuranceList.includes(i) ? 'selected' : ''}" data-insurance="${i}">${i}</div>`).join('')}
       </div>
-      <div class="t-form-label">If you don't take insurance, what should clients know? (optional)</div>
-      <input type="text" class="t-rate-input" id="ts-selfpaynote" placeholder="e.g. Sliding scale available" value="${d.selfPayNote}">
-      <div class="t-form-label">Your rate per session</div>
-      <div class="budget-slider-row">
-        <input type="range" id="ts-rate-slider" min="80" max="250" step="10" value="${d.rateMin}">
-        <div class="budget-value" id="ts-rate-value">$${d.rateMin}</div>
-      </div>`;
+        <div class="t-form-label">Payment options</div>
+        <div class="chip-grid" id="ts-payment-grid">
+          ${PAYMENT_OPTIONS.map(p => `<div class="chip-option ${d.paymentOptions.includes(p.key) ? 'selected' : ''}" data-payment="${p.key}">${p.label}</div>`).join('')}
+        </div>
+        <div class="t-form-label">Anything else clients should know about paying? (optional)</div>
+        <input type="text" class="t-rate-input" id="ts-selfpaynote" placeholder="e.g. First session free" value="${d.selfPayNote}">
+        <div class="t-form-label">Your rate per session</div>
+        <div class="rate-row">
+          <span class="rate-currency">$</span>
+          <input type="number" class="rate-number" id="ts-rate-number" min="20" max="600" step="1" value="${d.rateMin}">
+          <input type="range" id="ts-rate-slider" min="20" max="600" step="5" value="${d.rateMin}">
+        </div>
+        <div class="intake-sub" style="margin-top:4px;">Type an exact figure or drag &mdash; anything from $20 to $600.</div>`;
   } else if (signupStep === 4) {
     html += `
       <h1>In your words</h1>
@@ -4376,22 +4386,25 @@ function attachSignupHandlers() {
     el.addEventListener('click', () => { d.practiceType = el.dataset.practice; renderSignupStep(); });
   });
 
-  document.querySelectorAll('#ts-tags-grid .chip-option').forEach(el => {
-    el.addEventListener('click', () => {
-      const tag = el.dataset.tag;
-      const i = d.tags.indexOf(tag);
-      if (i === -1) d.tags.push(tag); else d.tags.splice(i, 1);
-      renderSignupStep();
-    });
-  });
-  document.querySelectorAll('#ts-modalities-grid .chip-option').forEach(el => {
-    el.addEventListener('click', () => {
-      const m = el.dataset.modality;
-      const i = d.modalities.indexOf(m);
-      if (i === -1) d.modalities.push(m); else d.modalities.splice(i, 1);
-      renderSignupStep();
-    });
-  });
+  /* The signup step used a short chip grid while the editor already offered the
+     full catalogue behind a dropdown -- so a therapist could pick a specialty
+     after signing up that they could not pick during it. Same control now. */
+  const signupCbxArr = key => key === 'ts-spec' ? d.tags : key === 'ts-modality' ? d.modalities : null;
+  document.querySelectorAll('input[data-cbx]').forEach(el => el.addEventListener('change', () => {
+    const arr = signupCbxArr(el.dataset.cbx); if (!arr) return;
+    const at = arr.indexOf(el.value);
+    if (at === -1) arr.push(el.value); else arr.splice(at, 1);
+    renderSignupStep();
+  }));
+  document.querySelectorAll('[data-cbx-chip]').forEach(el => el.addEventListener('click', () => {
+    const arr = signupCbxArr(el.dataset.cbxChip); if (!arr) return;
+    const at = arr.indexOf(el.dataset.val);
+    if (at !== -1) arr.splice(at, 1);
+    renderSignupStep();
+  }));
+  document.querySelectorAll('.cbx-dd').forEach(dd => dd.addEventListener('toggle', () => {
+    editDropdownOpen[dd.dataset.dd] = dd.open;   // keep the panel where they left it
+  }));
   const bestForInput = document.getElementById('ts-bestfor');
   if (bestForInput) bestForInput.addEventListener('input', () => { d.bestFor = bestForInput.value; });
 
@@ -4452,13 +4465,25 @@ function attachSignupHandlers() {
   });
   const selfPayNoteInput = document.getElementById('ts-selfpaynote');
   if (selfPayNoteInput) selfPayNoteInput.addEventListener('input', () => { d.selfPayNote = selfPayNoteInput.value; });
+  /* Slider and number field drive the same value. The slider moves in 5s for a
+     usable drag across $20-$600; the number field takes any exact figure,
+     because plenty of people charge $165 and a $10 step could not reach it. */
   const rateSlider = document.getElementById('ts-rate-slider');
-  if (rateSlider) {
-    rateSlider.addEventListener('input', () => {
-      d.rateMin = Number(rateSlider.value);
-      document.getElementById('ts-rate-value').textContent = `$${d.rateMin}`;
-    });
-  }
+  const rateNumber = document.getElementById('ts-rate-number');
+  const setRate = (v, from) => {
+    const n = Math.max(20, Math.min(600, Number(v) || 0));
+    d.rateMin = n;
+    if (from !== 'slider' && rateSlider) rateSlider.value = n;
+    if (from !== 'number' && rateNumber) rateNumber.value = n;
+  };
+  if (rateSlider) rateSlider.addEventListener('input', () => setRate(rateSlider.value, 'slider'));
+  if (rateNumber) rateNumber.addEventListener('input', () => setRate(rateNumber.value, 'number'));
+  document.querySelectorAll('#ts-payment-grid [data-payment]').forEach(el => el.addEventListener('click', () => {
+    const k = el.dataset.payment;
+    const at = d.paymentOptions.indexOf(k);
+    if (at === -1) d.paymentOptions.push(k); else d.paymentOptions.splice(at, 1);
+    renderSignupStep();
+  }));
 
   document.querySelectorAll('textarea[data-mandatory-prompt-index]').forEach(el => {
     el.addEventListener('input', () => {
@@ -5088,6 +5113,18 @@ let tSpecOtherOpen = false, tModOtherOpen = false; // transient "+ Other" panels
 let idealFieldOtherOpen = false; // ideal-client field "+ Other" dropdown
 
 // full, deduped catalogs for the ideal-client multi-selects (reflect vocab live)
+/* How a therapist takes payment. A fixed list, not free text: a typo here
+   would silently fail to match a client filtering on it, and "superbill" has
+   about six spellings in the wild. */
+const PAYMENT_OPTIONS = [
+  { key: 'no_insurance',  label: "I don't accept insurance" },
+  { key: 'superbills',    label: 'I offer superbills' },
+  { key: 'cash_only',     label: 'Cash pay only' },
+  { key: 'hsa_fsa',       label: 'HSA / FSA accepted' },
+  { key: 'sliding_scale', label: 'Sliding scale available' }
+];
+const paymentLabel = k => (PAYMENT_OPTIONS.find(p => p.key === k) || {}).label || k;
+
 function specialtyAll() { return [...new Set([...NEED_OPTIONS, ...OTHER_SPECIALTIES])]; }
 function modalityAll()  { return [...new Set([...MODALITY_OPTIONS, ...MODALITY_QUICK, ...OTHER_MODALITIES])]; }
 
@@ -5242,13 +5279,19 @@ function renderTherapistProfile() {
         </div>
 
         <div class="t-form-label">Session cost (per session, $)</div>
-        <input type="number" class="t-rate-input" id="t-rate-input" value="${t.rateMin}">
+        <div class="rate-row">
+          <span class="rate-currency">$</span>
+          <input type="number" class="rate-number" id="t-rate-input" min="20" max="600" step="1" value="${t.rateMin}">
+          <input type="range" id="t-rate-slider" min="20" max="600" step="5" value="${t.rateMin}">
+        </div>
         <div class="must-have-toggle">
           <div class="toggle-label"><strong>Accepts sliding scale</strong><span>Shown to clients who need flexible pricing</span></div>
           <div class="switch ${t.acceptsSlidingScale ? 'on' : ''}" id="t-sliding-switch"></div>
         </div>
         <div class="t-form-label">Insurance accepted</div>
         <div class="chip-grid">${INSURANCE_OPTIONS.map(i => `<div class="chip-option ${t.insuranceList.includes(i) ? 'selected' : ''}" data-toggle-insurance="${i}">${i}</div>`).join('')}</div>
+        <div class="t-form-label">Payment options</div>
+        <div class="chip-grid">${PAYMENT_OPTIONS.map(p => `<div class="chip-option ${(t.paymentOptions || []).includes(p.key) ? 'selected' : ''}" data-toggle-payment="${p.key}">${p.label}</div>`).join('')}</div>
 
         <div class="t-form-label">Website</div>
         <input type="text" class="t-rate-input" id="t-website-input" placeholder="e.g. yourpractice.com" value="${t.website || ''}">
@@ -5271,59 +5314,6 @@ function renderTherapistProfile() {
     </details>
 
     <!-- ===== SECTION 2 · ADDITIONAL DETAILS ===== -->
-    <details class="edit-section" data-edit-section="additional" ${editSectionsOpen.additional ? 'open' : ''}>
-      <summary><span class="edit-section-title">Additional Details</span><span class="edit-section-hint">licensure, identity, therapy types</span><span class="edit-caret">▾</span></summary>
-      <div class="edit-section-body">
-        <div class="must-have-toggle" style="margin-top:2px;">
-          <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>Off keeps you in Discover with a "save for later" banner</span></div>
-          <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
-        </div>
-
-          <div class="t-form-label">Your licenses <span class="ideal-hint">one per state &mdash; each is checked separately</span></div>
-          ${(t.licenses && t.licenses.length)
-            ? t.licenses.map(l => {
-                const st = l.verifiedAt ? 'ok' : l.rejectedAt ? 'denied' : 'pending';
-                const label = l.verifiedAt ? '&#10003; verified' : l.rejectedAt ? '&#10007; denied' : 'pending';
-                return `<div class="lic-row">
-                    <span class="lic-state">${l.state}</span>
-                    <span class="lic-num">${l.number}</span>
-                    <span class="lic-status ${st}">${label}</span>
-                    <button type="button" class="lic-remove" data-drop-lic="${l.state}" aria-label="Remove ${l.state}">&#10005;</button>
-                  </div>
-                  ${l.rejectedAt && l.rejectedReason ? `<p class="lic-denied-note">${String(l.rejectedReason).replace(/[<>&]/g, '')}</p>` : ''}`;
-              }).join('')
-            : `<p class="portal-note" style="margin:2px 0 8px;">No licenses yet. Add each state you're licensed in &mdash; you can only be matched with clients in a state we've verified.</p>`}
-          <div class="lic-add">
-            <select id="t-lic-state">
-              <option value="">State&hellip;</option>
-              ${US_STATES.filter(s => !(t.licenses || []).some(l => l.state === s)).map(s => `<option value="${s}">${s}</option>`).join('')}
-            </select>
-            <input type="text" class="t-rate-input" id="t-lic-number" placeholder="License number">
-            <button type="button" id="t-lic-add">Add</button>
-          </div>
-          <p class="portal-note">We check each license against that state's board by hand. A state only becomes available for matching once its license is verified.</p>
-
-        <div class="t-form-label">Gender</div>
-        <div class="chip-grid">
-          <div class="chip-option ${t.identity.gender === 'female' ? 'selected' : ''}" data-set-gender="female">Female</div>
-          <div class="chip-option ${t.identity.gender === 'male' ? 'selected' : ''}" data-set-gender="male">Male</div>
-          <div class="chip-option ${t.identity.gender === 'nonbinary' ? 'selected' : ''}" data-set-gender="nonbinary">Nonbinary</div>
-        </div>
-
-        <div class="must-have-toggle">
-          <div class="toggle-label"><strong>LGBTQ+ affirming</strong><span>Shown to clients who require this</span></div>
-          <div class="switch ${t.identity.lgbtqAffirming ? 'on' : ''}" id="t-lgbtq-switch"></div>
-        </div>
-
-        <div class="t-form-label">Languages you speak</div>
-        ${languageChipsHtml(t.languages, profileShowOtherLanguage, 'tp')}
-
-        <div class="t-form-label" style="margin-top:16px;">Types of Therapy</div>
-        ${checkboxDropdownHtml(t.modalities, modalityAll(), 'modality', 'Choose the therapy types you offer…')}
-      </div>
-    </details>
-
-    <!-- ===== SECTION 3 · GET TO KNOW YOU ===== -->
     <details class="edit-section" data-edit-section="getToKnow" ${editSectionsOpen.getToKnow ? 'open' : ''}>
       <summary><span class="edit-section-title">Get to know you</span><span class="edit-section-hint">your story, in words &amp; photos</span><span class="edit-caret">▾</span></summary>
       <div class="edit-section-body">
@@ -5391,6 +5381,59 @@ function renderTherapistProfile() {
 
           return picker + media + hint + `<div class="feed-blocks">${cards}</div>` + addPhoto + addVideo;
         })()}
+      </div>
+    </details>
+
+    <!-- ===== SECTION 3 · GET TO KNOW YOU ===== -->
+    <details class="edit-section" data-edit-section="additional" ${editSectionsOpen.additional ? 'open' : ''}>
+      <summary><span class="edit-section-title">Additional Details</span><span class="edit-section-hint">licensure, identity, therapy types</span><span class="edit-caret">▾</span></summary>
+      <div class="edit-section-body">
+        <div class="must-have-toggle" style="margin-top:2px;">
+          <div class="toggle-label"><strong>Accepting ongoing clients</strong><span>Off keeps you in Discover with a "save for later" banner</span></div>
+          <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
+        </div>
+
+          <div class="t-form-label">Your licenses <span class="ideal-hint">one per state &mdash; each is checked separately</span></div>
+          ${(t.licenses && t.licenses.length)
+            ? t.licenses.map(l => {
+                const st = l.verifiedAt ? 'ok' : l.rejectedAt ? 'denied' : 'pending';
+                const label = l.verifiedAt ? '&#10003; verified' : l.rejectedAt ? '&#10007; denied' : 'pending';
+                return `<div class="lic-row">
+                    <span class="lic-state">${l.state}</span>
+                    <span class="lic-num">${l.number}</span>
+                    <span class="lic-status ${st}">${label}</span>
+                    <button type="button" class="lic-remove" data-drop-lic="${l.state}" aria-label="Remove ${l.state}">&#10005;</button>
+                  </div>
+                  ${l.rejectedAt && l.rejectedReason ? `<p class="lic-denied-note">${String(l.rejectedReason).replace(/[<>&]/g, '')}</p>` : ''}`;
+              }).join('')
+            : `<p class="portal-note" style="margin:2px 0 8px;">No licenses yet. Add each state you're licensed in &mdash; you can only be matched with clients in a state we've verified.</p>`}
+          <div class="lic-add">
+            <select id="t-lic-state">
+              <option value="">State&hellip;</option>
+              ${US_STATES.filter(s => !(t.licenses || []).some(l => l.state === s)).map(s => `<option value="${s}">${s}</option>`).join('')}
+            </select>
+            <input type="text" class="t-rate-input" id="t-lic-number" placeholder="License number">
+            <button type="button" id="t-lic-add">Add</button>
+          </div>
+          <p class="portal-note">We check each license against that state's board by hand. A state only becomes available for matching once its license is verified.</p>
+
+        <div class="t-form-label">Gender</div>
+        <div class="chip-grid">
+          <div class="chip-option ${t.identity.gender === 'female' ? 'selected' : ''}" data-set-gender="female">Female</div>
+          <div class="chip-option ${t.identity.gender === 'male' ? 'selected' : ''}" data-set-gender="male">Male</div>
+          <div class="chip-option ${t.identity.gender === 'nonbinary' ? 'selected' : ''}" data-set-gender="nonbinary">Nonbinary</div>
+        </div>
+
+        <div class="must-have-toggle">
+          <div class="toggle-label"><strong>LGBTQ+ affirming</strong><span>Shown to clients who require this</span></div>
+          <div class="switch ${t.identity.lgbtqAffirming ? 'on' : ''}" id="t-lgbtq-switch"></div>
+        </div>
+
+        <div class="t-form-label">Languages you speak</div>
+        ${languageChipsHtml(t.languages, profileShowOtherLanguage, 'tp')}
+
+        <div class="t-form-label" style="margin-top:16px;">Types of Therapy</div>
+        ${checkboxDropdownHtml(t.modalities, modalityAll(), 'modality', 'Choose the therapy types you offer…')}
       </div>
     </details>
     </div>
@@ -5702,7 +5745,27 @@ function attachTherapistProfileHandlers(t) {
   }));
   const tSelfPayNoteInput = document.getElementById('t-selfpaynote-input');
   if (tSelfPayNoteInput) tSelfPayNoteInput.addEventListener('input', () => { t.selfPayNote = tSelfPayNoteInput.value; });
-  document.getElementById('t-rate-input').addEventListener('change', (e) => { t.rateMin = Number(e.target.value) || 0; });
+  /* Slider and number drive the same value: 5-dollar steps make a $20-$600 drag
+     usable, the number field takes any exact figure. A $10 step could not reach
+     $165, which plenty of people charge. */
+  const tRateNum = document.getElementById('t-rate-input');
+  const tRateSlider = document.getElementById('t-rate-slider');
+  const setTRate = (v, from) => {
+    const n = Math.max(20, Math.min(600, Number(v) || 0));
+    t.rateMin = n;
+    if (from !== 'slider' && tRateSlider) tRateSlider.value = n;
+    if (from !== 'number' && tRateNum) tRateNum.value = n;
+    persistProfileSoon(t);
+  };
+  if (tRateNum) tRateNum.addEventListener('input', () => setTRate(tRateNum.value, 'number'));
+  if (tRateSlider) tRateSlider.addEventListener('input', () => setTRate(tRateSlider.value, 'slider'));
+  document.querySelectorAll('[data-toggle-payment]').forEach(el => el.addEventListener('click', () => {
+    if (!Array.isArray(t.paymentOptions)) t.paymentOptions = [];
+    const k = el.dataset.togglePayment;
+    const at = t.paymentOptions.indexOf(k);
+    if (at === -1) t.paymentOptions.push(k); else t.paymentOptions.splice(at, 1);
+    renderTherapistProfile();
+  }));
   document.getElementById('t-ongoing-switch').addEventListener('click', () => {
     t.acceptingOngoing = !t.acceptingOngoing;
     t.nextAvailableRank = t.acceptingOngoing ? 1 : null;
