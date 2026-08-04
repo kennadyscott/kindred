@@ -848,11 +848,14 @@ function emptyIdealClient() {
 }
 // Identity-affinity options (from the client's requested filters). These are
 // SOFT preferences — they surface as match reasons when they line up, but
-// never hard-filter the pool empty. "No preference" is the default for
+// never hard-filter the pool empty. "Open to all" is the default for
 // ethnicity; gender/sexuality and faith are optional multi-selects.
-const ETHNICITY_OPTIONS = ['Arab and Middle Eastern', 'Asian', 'Black and African American', 'Hispanic and Latino', 'Multiracial', 'Native American', 'Pacific Islander', 'South Asian'];
-const GENDER_SEXUALITY_OPTIONS = ['Bisexual', 'Gay', 'Lesbian', 'LGBTQ+', 'Polyamory & ENM', 'Sex-Positive & Kink-Friendly', 'Transgender'];
-const FAITH_OPTIONS = ['Buddhist', 'Christian', 'Hindu', 'Jewish', 'Muslim', 'Secular and Non-Religious', 'Sikh', 'The Church of Jesus Christ of Latter-day Saints'];
+const ETHNICITY_OPTIONS = ['Arab and Middle Eastern', 'Asian', 'Black and African American', 'Hispanic and Latino', 'Multiracial', 'Native American', 'Pacific Islander', 'South Asian', 'White'];
+/* Listing only minority identities quietly implies the others are the unmarked
+   default, and leaves a straight or cisgender client with nothing to pick when
+   it genuinely matters to them. */
+const GENDER_SEXUALITY_OPTIONS = ['Bisexual', 'Cisgender', 'Gay', 'Lesbian', 'LGBTQ+', 'Polyamory & ENM', 'Sex-Positive & Kink-Friendly', 'Straight', 'Transgender'];
+const FAITH_OPTIONS = ['Atheist, Agnostic or Non-Religious', 'Buddhist', 'Christian', 'Hindu', 'Jewish', 'Muslim', 'Secular and Non-Religious', 'Sikh', 'Spiritual', 'The Church of Jesus Christ of Latter-day Saints'];
 // Three quick-tap chips cover the most common cases. "Other" opens a real
 // dropdown pulled from OTHER_LANGUAGES instead of free text, so language
 // names stay consistent between what a therapist selects and what a client
@@ -1737,7 +1740,7 @@ function renderIntakeStep() {
       <div class="intake-sub">Preferences are optional — but we do need to know where you are, since therapists are licensed by state.</div>
       <div class="t-form-label">Gender</div>
       <div class="chip-grid" id="gender-list">
-        <div class="chip-option ${intake.genderPref === 'no-preference' ? 'selected' : ''}" data-gender="no-preference">No preference</div>
+        <div class="chip-option ${intake.genderPref === 'no-preference' ? 'selected' : ''}" data-gender="no-preference">Open to all</div>
         <div class="chip-option ${intake.genderPref === 'female' ? 'selected' : ''}" data-gender="female">Female</div>
         <div class="chip-option ${intake.genderPref === 'male' ? 'selected' : ''}" data-gender="male">Male</div>
         <div class="chip-option ${intake.genderPref === 'nonbinary' ? 'selected' : ''}" data-gender="nonbinary">Nonbinary</div>
@@ -1754,7 +1757,7 @@ function renderIntakeStep() {
       </div>
       <div class="t-form-label">Ethnicity</div>
       <select id="ethnicity-select">
-        <option value="no-preference" ${intake.ethnicityPref === 'no-preference' ? 'selected' : ''}>No preference</option>
+        <option value="no-preference" ${intake.ethnicityPref === 'no-preference' ? 'selected' : ''}>Open to all</option>
         ${ETHNICITY_OPTIONS.map(e => `<option value="${e}" ${intake.ethnicityPref === e ? 'selected' : ''}>${e}</option>`).join('')}
       </select>
       <div class="t-form-label">Language</div>
@@ -2277,7 +2280,7 @@ function renderStack() {
         <button class="loosen-btn" id="notify-btn">Notify me when there's a match</button>
       </div>`;
       const nb = document.getElementById('notify-btn');
-      if (nb) nb.addEventListener('click', () => showToast("We'll let you know as soon as someone who fits joins."));
+      if (nb) nb.addEventListener('click', openNotifyMe);
       return;
     }
     cardStack.innerHTML = `<div class="empty-pool">
@@ -5914,7 +5917,7 @@ function identitySummary() {
   if (intake.languagePref !== 'any') parts.push(`Speaks ${intake.languagePref}${intake.languageRequired ? ' (must-have)' : ' (preferred)'}`);
   if (intake.affinities.length) parts.push(...intake.affinities);
   if (intake.faith.length) parts.push(...intake.faith);
-  return parts.length ? parts.join(', ') : 'No preference specified';
+  return parts.length ? parts.join(', ') : 'Open to all specified';
 }
 function modalitySummary() {
   if (intake.modality === 'open') return 'Open to any approach';
@@ -5953,7 +5956,7 @@ function renderProfileScreen() {
 
       <div class="t-form-label">Therapist gender</div>
       <div class="chip-grid">
-        <div class="chip-option ${intake.genderPref === 'no-preference' ? 'selected' : ''}" data-you-gender="no-preference">No preference</div>
+        <div class="chip-option ${intake.genderPref === 'no-preference' ? 'selected' : ''}" data-you-gender="no-preference">Open to all</div>
         <div class="chip-option ${intake.genderPref === 'female' ? 'selected' : ''}" data-you-gender="female">Female</div>
         <div class="chip-option ${intake.genderPref === 'male' ? 'selected' : ''}" data-you-gender="male">Male</div>
         <div class="chip-option ${intake.genderPref === 'nonbinary' ? 'selected' : ''}" data-you-gender="nonbinary">Nonbinary</div>
@@ -5961,7 +5964,7 @@ function renderProfileScreen() {
 
       <div class="t-form-label">Language</div>
       <div class="chip-grid">
-        <div class="chip-option ${intake.languagePref === 'any' ? 'selected' : ''}" data-you-language="any">No preference</div>
+        <div class="chip-option ${intake.languagePref === 'any' ? 'selected' : ''}" data-you-language="any">Open to all</div>
         ${LANGUAGE_QUICK_OPTIONS.map(l => `<div class="chip-option ${intake.languagePref === l ? 'selected' : ''}" data-you-language="${l}">${l}</div>`).join('')}
       </div>
 
@@ -6137,6 +6140,64 @@ window.addEventListener('load', async () => {
 });
 
 window.addEventListener('load', applyLandingParams);
+
+/* "Notify me when there's a match" used to show a toast and collect nothing --
+   a promise with no way to keep it. This takes the one detail needed to keep
+   it, and nothing else.
+
+   Deliberately does NOT ask what they are looking for: the intake already knows
+   that, and an email stored next to "seeking help with trauma" is health data.
+   Kept apart, an address is just an address. Client data stays on the device
+   until the BAA is signed, so this is held locally for now. */
+const NOTIFY_KEY = 'kindred-notify-me';
+function loadNotifyMe() {
+  try { return JSON.parse(localStorage.getItem(NOTIFY_KEY) || 'null'); } catch (e) { return null; }
+}
+function openNotifyMe() {
+  const saved = loadNotifyMe() || { email: '', phone: '', via: 'email' };
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <h2>We'll tell you when someone fits</h2>
+    <div class="intake-sub">Kindred is new and we're onboarding therapists carefully. Leave one way to reach you and we'll get in touch the moment someone who matches joins.</div>
+
+    <div class="t-form-label">How should we reach you?</div>
+    <div class="chip-grid" id="notify-via">
+      <div class="chip-option ${saved.via === 'email' ? 'selected' : ''}" data-via="email">Email</div>
+      <div class="chip-option ${saved.via === 'text' ? 'selected' : ''}" data-via="text">Text</div>
+      <div class="chip-option ${saved.via === 'both' ? 'selected' : ''}" data-via="both">Either</div>
+    </div>
+
+    <div class="t-form-label">Email</div>
+    <input type="email" class="t-rate-input" id="notify-email" placeholder="you@example.com" value="${saved.email || ''}">
+    <div class="t-form-label">Phone <span class="ideal-hint">only if you want texts</span></div>
+    <input type="tel" class="t-rate-input" id="notify-phone" placeholder="Optional" value="${saved.phone || ''}">
+
+    <p class="portal-note" style="margin-top:10px;">We only use this to tell you a therapist joined. We never say why you're waiting, and we don't attach it to your answers.</p>
+    <button class="primary-btn" id="notify-save">Let me know</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  const close = () => document.getElementById('confirm-modal').classList.add('hidden');
+  const sc = sheet.querySelector('.sheet-close');
+  if (sc) sc.addEventListener('click', close);
+
+  let via = saved.via || 'email';
+  document.querySelectorAll('#notify-via [data-via]').forEach(el => el.addEventListener('click', () => {
+    via = el.dataset.via;
+    document.querySelectorAll('#notify-via [data-via]').forEach(x => x.classList.toggle('selected', x.dataset.via === via));
+  }));
+
+  document.getElementById('notify-save').addEventListener('click', () => {
+    const email = (document.getElementById('notify-email').value || '').trim();
+    const phone = (document.getElementById('notify-phone').value || '').trim();
+    if (via !== 'text' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('Enter an email we can reach you at.'); return; }
+    if (via !== 'email' && !phone) { showToast('Enter a phone number for texts.'); return; }
+    try { localStorage.setItem(NOTIFY_KEY, JSON.stringify({ email, phone, via, at: Date.now() })); } catch (e) {}
+    close();
+    showToast("Thanks -- we'll be in touch when someone fits.");
+  });
+}
+
 
 // ===== SHARED-THERAPIST DEEP LINK =====
 // A link someone was sent (…#therapist=t3) opens straight to that therapist's
