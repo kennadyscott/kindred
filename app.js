@@ -23,10 +23,30 @@ let KINDRED_FLAGS = { clientDataPersistence: false, therapistBillingLive: false 
 // Coming back from Stripe's hosted flow. Finishing the flow is NOT passing it:
 // the result arrives by webhook, which can take a moment. Say exactly that
 // rather than showing a success the DB hasn't confirmed.
-function handleIdentityReturn() {
-  if (!/[?&]identity=done/.test(location.search)) return;
-  history.replaceState(null, '', location.pathname);
-  setTimeout(() => showToast("Thanks -- we're confirming your ID. This usually takes under a minute."), 400);
+/* Coming back from Stripe's hosted flow. This used to be defined and never
+   called, so a therapist landed on "What brings you to Kindred?" -- the
+   account-type screen -- with no idea whether their verification had worked.
+   Finishing the flow is NOT passing it: the verdict arrives by webhook moments
+   later, so this confirms we received it without claiming an outcome the
+   database has not agreed to. */
+function openIdentityReturn(signedIn) {
+  const sheet = document.getElementById('confirm-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-close"></div>
+    <div class="id-return-check" aria-hidden="true">&#10003;</div>
+    <h2>Thanks for verifying</h2>
+    <div class="intake-sub">Stripe is confirming your ID now &mdash; it usually takes under a minute. Your dashboard updates on its own the moment it clears; you don't need to do it again.</div>
+    <button class="primary-btn" id="id-return-btn">${signedIn ? 'Back to my dashboard' : 'Sign in to continue'}</button>
+  `;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  const close = () => document.getElementById('confirm-modal').classList.add('hidden');
+  const sc = sheet.querySelector('.sheet-close');
+  if (sc) sc.addEventListener('click', close);
+  document.getElementById('id-return-btn').addEventListener('click', () => {
+    close();
+    if (signedIn) { showTScreen('t-home'); }
+    else { accountType = 'therapist'; openLogin(); }
+  });
 }
 
 function clientDataPersistenceEnabled() { return !!KINDRED_FLAGS.clientDataPersistence; }
@@ -1591,7 +1611,25 @@ let intakeStep = 0;
 // Keyed step order so inserting or reordering steps never means renumbering a
 // pile of `intakeStep === N` checks. The 'needs' step renders either the
 // clinical chips or the plain-language list depending on the knows-fork.
-const INTAKE_STEPS = ['careFor', 'knows', 'needs', 'who', 'approach', 'experience', 'guidance', 'anythingElse', 'aboutYou', 'logistics'];
+/* Two halves, in this order: everything about THEM, then everything about the
+   therapist they want. The old order interleaved the two -- "who do you want to
+   work with?" arrived before "a little about you" -- which made the
+   questionnaire feel like it kept changing subject. */
+const INTAKE_STEPS = [
+  // Let's get to know you
+  'careFor', 'knows', 'needs', 'experience', 'aboutYou', 'logistics',
+  // What you're looking for in a therapist
+  'who', 'approach', 'guidance', 'anythingElse'
+];
+const INTAKE_SECTION = {
+  careFor: 'about', knows: 'about', needs: 'about',
+  experience: 'about', aboutYou: 'about', logistics: 'about',
+  who: 'therapist', approach: 'therapist', guidance: 'therapist', anythingElse: 'therapist'
+};
+const INTAKE_SECTION_LABEL = {
+  about: "Let's get to know you",
+  therapist: 'What you want in a therapist'
+};
 
 // Two genuinely different paths, chosen at the 'knows' step:
 //   'no'  — new to therapy. Matched from SYMPTOMS in plain language. We never
@@ -1612,8 +1650,12 @@ const intakeContent = document.getElementById('intake-content');
 function renderIntakeStep() {
   const steps = activeSteps();
   const k = steps[intakeStep];
-  let html = `<div class="intake-progress">${steps.map((_, i) =>
-    `<div class="dot ${i <= intakeStep ? 'done' : ''}"></div>`).join('')}</div>`;
+  const section = INTAKE_SECTION[k] || 'about';
+  // First step of the second half: say plainly that the subject has changed.
+  const firstOfSection = steps.findIndex(x => INTAKE_SECTION[x] === section) === intakeStep;
+  let html = `<div class="intake-progress">${steps.map((x, i) =>
+    `<div class="dot ${i <= intakeStep ? 'done' : ''} ${INTAKE_SECTION[x] === 'therapist' ? 'dot-therapist' : ''}"></div>`).join('')}</div>
+    <p class="intake-section ${firstOfSection ? 'is-new' : ''}">${INTAKE_SECTION_LABEL[section]}</p>`;
 
   if (k === 'careFor') {
     html += `
@@ -4275,10 +4317,8 @@ function renderSignupStep() {
         <div class="t-form-label">Your rate per session</div>
         <div class="rate-row">
           <span class="rate-currency">$</span>
-          <input type="number" class="rate-number" id="ts-rate-number" min="20" max="600" step="1" value="${d.rateMin}">
-          <input type="range" id="ts-rate-slider" min="20" max="600" step="5" value="${d.rateMin}">
-        </div>
-        <div class="intake-sub" style="margin-top:4px;">Type an exact figure or drag &mdash; anything from $20 to $600.</div>`;
+          <input type="number" class="rate-number" id="ts-rate-number" min="20" max="600" step="1" placeholder="165" value="${d.rateMin || ''}">
+        </div>`;
   } else if (signupStep === 4) {
     html += `
       <h1>In your words</h1>
@@ -4468,16 +4508,10 @@ function attachSignupHandlers() {
   /* Slider and number field drive the same value. The slider moves in 5s for a
      usable drag across $20-$600; the number field takes any exact figure,
      because plenty of people charge $165 and a $10 step could not reach it. */
-  const rateSlider = document.getElementById('ts-rate-slider');
+  /* Just a number. A slider was imprecise at every useful figure and its range
+     excluded both ends of the market -- typing is faster and exact. */
   const rateNumber = document.getElementById('ts-rate-number');
-  const setRate = (v, from) => {
-    const n = Math.max(20, Math.min(600, Number(v) || 0));
-    d.rateMin = n;
-    if (from !== 'slider' && rateSlider) rateSlider.value = n;
-    if (from !== 'number' && rateNumber) rateNumber.value = n;
-  };
-  if (rateSlider) rateSlider.addEventListener('input', () => setRate(rateSlider.value, 'slider'));
-  if (rateNumber) rateNumber.addEventListener('input', () => setRate(rateNumber.value, 'number'));
+  if (rateNumber) rateNumber.addEventListener('input', () => { d.rateMin = Number(rateNumber.value) || 0; });
   document.querySelectorAll('#ts-payment-grid [data-payment]').forEach(el => el.addEventListener('click', () => {
     const k = el.dataset.payment;
     const at = d.paymentOptions.indexOf(k);
@@ -5282,7 +5316,6 @@ function renderTherapistProfile() {
         <div class="rate-row">
           <span class="rate-currency">$</span>
           <input type="number" class="rate-number" id="t-rate-input" min="20" max="600" step="1" value="${t.rateMin}">
-          <input type="range" id="t-rate-slider" min="20" max="600" step="5" value="${t.rateMin}">
         </div>
         <div class="must-have-toggle">
           <div class="toggle-label"><strong>Accepts sliding scale</strong><span>Shown to clients who need flexible pricing</span></div>
@@ -5748,17 +5781,12 @@ function attachTherapistProfileHandlers(t) {
   /* Slider and number drive the same value: 5-dollar steps make a $20-$600 drag
      usable, the number field takes any exact figure. A $10 step could not reach
      $165, which plenty of people charge. */
+  /* Just a number -- a slider was imprecise at every useful figure. */
   const tRateNum = document.getElementById('t-rate-input');
-  const tRateSlider = document.getElementById('t-rate-slider');
-  const setTRate = (v, from) => {
-    const n = Math.max(20, Math.min(600, Number(v) || 0));
-    t.rateMin = n;
-    if (from !== 'slider' && tRateSlider) tRateSlider.value = n;
-    if (from !== 'number' && tRateNum) tRateNum.value = n;
+  if (tRateNum) tRateNum.addEventListener('input', () => {
+    t.rateMin = Number(tRateNum.value) || 0;
     persistProfileSoon(t);
-  };
-  if (tRateNum) tRateNum.addEventListener('input', () => setTRate(tRateNum.value, 'number'));
-  if (tRateSlider) tRateSlider.addEventListener('input', () => setTRate(tRateSlider.value, 'slider'));
+  });
   document.querySelectorAll('[data-toggle-payment]').forEach(el => el.addEventListener('click', () => {
     if (!Array.isArray(t.paymentOptions)) t.paymentOptions = [];
     const k = el.dataset.togglePayment;
@@ -6101,7 +6129,12 @@ async function restoreSession() {
     return false;   // never trap someone on a blank screen because a fetch failed
   }
 }
-window.addEventListener('load', restoreSession);
+window.addEventListener('load', async () => {
+  const returning = /[?&]identity=done/.test(location.search);
+  if (returning) history.replaceState(null, '', location.pathname);  // don't re-fire on refresh
+  const signedIn = await restoreSession();
+  if (returning) openIdentityReturn(signedIn);
+});
 
 window.addEventListener('load', applyLandingParams);
 

@@ -2588,3 +2588,29 @@ select.t-rate-input,
                border-radius: 12px; font: inherit; text-align: center;
                background: var(--paper); margin: 0; }
 .rate-row input[type=range] { flex: 1; }
+
+/* Identity return confirmation. */
+.id-return-check {
+  width: 46px; height: 46px; border-radius: 999px; margin: 4px auto 12px;
+  display: grid; place-items: center; font-size: 22px;
+  background: var(--moss-light); color: var(--moss);
+}
+
+/* Which half of the questionnaire this is. The second half changes subject
+   from the client to the therapist they want, and saying so stops it feeling
+   like the questions wander. */
+.intake-section {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--lavender-deep); margin: 2px 0 14px;
+}
+.intake-section.is-new { color: var(--coral); }
+.intake-progress .dot.dot-therapist.done { background: var(--lavender-deep); }
+
+/* .primary-btn is white-on-plum, for use over a coloured field like the welcome
+   screen. Inside a white modal sheet it renders as invisible text on white --
+   so filled here, which is what every modal actually wants. */
+.modal-sheet .primary-btn {
+  background: var(--coral);
+  color: #fff;
+}
+.modal-sheet .primary-btn:hover { background: var(--coral-dark); }
