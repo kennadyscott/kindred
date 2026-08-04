@@ -1303,7 +1303,10 @@ function therapistToDbRow(t, userId) {
     name: t.name, credentials: t.credentials || [], pronouns: t.pronouns || '', show_pronouns: !!t.showPronouns,
     // license_verified is deliberately NOT sent: it is admin-only, and the DB
     // trigger reverts it on any non-service-role write.
-    license_states: t.licensedStates || [], license_number: t.licenseNumber || '', website: t.website || '', photo: t.photo || null,
+    /* license_states is DERIVED from verified licences by a DB trigger, and
+       license_number is superseded by the per-state therapist_licenses table.
+       Sending either is ignored at best and misleading at worst. */
+    website: t.website || '', photo: t.photo || null,
     specialties: t.tags || [], modalities: t.modalities || [], style: t.style || null, practice_type: t.practiceType || 'specialist',
     best_for: t.bestFor || '', persona: t.persona || {}, media: t.media || {}, optional_prompts: t.optionalPrompts || [],
     formats: t.formats || [], insurance: t.insuranceList || [], languages: t.languages || [], rate_min: t.rateMin || 0,
@@ -1366,6 +1369,36 @@ async function saveTherapistProfile(t) {
   if (!res.ok) throw new Error('save profile: ' + (await res.text()));
   return true;
 }
+/* Licences live in their own table now: one row per (therapist, state), each
+   with its own number and its own verification. therapists.license_states is
+   derived from the VERIFIED ones by a DB trigger, so nothing here writes it. */
+async function loadLicenses() {
+  if (!authReady() || !loadAuthSession()) return [];
+  try {
+    const res = await authRest('/therapist_licenses?select=*&order=state');
+    if (!res.ok) return [];
+    return (await res.json()).map(r => ({
+      state: r.state, number: r.license_number,
+      verifiedAt: r.verified_at, rejectedAt: r.rejected_at,
+      rejectedReason: r.rejected_reason || ''
+    }));
+  } catch (e) { return []; }
+}
+async function saveLicense(state, number) {
+  const s = loadAuthSession();
+  if (!s) return false;
+  const res = await authRest('/therapist_licenses', {
+    method: 'POST',
+    headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ user_id: s.user.id, state: String(state).toUpperCase(), license_number: String(number).trim() })
+  });
+  return res.ok;
+}
+async function deleteLicense(state) {
+  const res = await authRest('/therapist_licenses?state=eq.' + encodeURIComponent(String(state).toUpperCase()), { method: 'DELETE' });
+  return res.ok;
+}
+
 async function loadTherapistRow() {
   const s = loadAuthSession();
   if (!authReady() || !s) return null;
@@ -3154,19 +3187,23 @@ function gettingStartedHtml(t) {
   if (!t) return '';
 
   const hasProfile = !!(t.name && String(t.name).trim());
-  const hasLicence = !!(t.licenseNumber && String(t.licenseNumber).trim());
+  const licences = t.licenses || [];
+  const hasLicence = licences.length > 0;
+  const deniedLicence = licences.find(l => l.rejectedAt);
   const steps = [
     { key: 'pay',      done: !!t.listed,          title: 'Membership active',
       body: 'Your founding rate is locked for your first 12 months.' },
     { key: 'profile',  done: hasProfile,          title: 'Build your profile', mine: true,
       body: 'Your therapy style, who you work best with, what sessions feel like. Saves as you go.',
       action: hasProfile ? null : { label: 'Build my profile', id: 't-gs-profile' } },
-    { key: 'licence',  done: hasLicence,          title: 'Add your license number', mine: true,
-      body: t.licenseRejectedReason
-        ? `We couldn't verify this. ${t.licenseRejectedReason.replace(/[<>&]/g, '')}`
-        : 'The number and the state that issued it.',
-      action: (hasLicence && !t.licenseRejectedReason) ? null
-            : { label: hasLicence ? 'Update my license number' : 'Add my license number', id: 't-gs-licence' } },
+    { key: 'licence',  done: hasLicence && !deniedLicence, title: 'Add your license(s)', mine: true,
+      body: deniedLicence
+        ? `${deniedLicence.state}: ${String(deniedLicence.rejectedReason || '').replace(/[<>&]/g, '')}`
+        : hasLicence
+          ? licences.map(l => l.state + ' ' + l.number).join(' &middot; ')
+          : 'One per state &mdash; each is checked against that board separately.',
+      action: (hasLicence && !deniedLicence) ? null
+            : { label: hasLicence ? 'Fix my license' : 'Add my license', id: 't-gs-licence' } },
     { key: 'identity', done: !!t.identityVerified, title: 'Verify your identity', mine: true,
       body: 'A photo of your ID and a selfie, through Stripe. About a minute.',
       action: t.identityVerified ? null : { label: 'Verify my ID', id: 't-gs-id' } },
@@ -3237,7 +3274,7 @@ function openLicenseNumberField() {
   editSectionsOpen.additional = true;
   showTScreen('t-profile');      /* also calls renderTherapistProfile() */
   setTimeout(() => {
-    const el = document.getElementById('t-form-license-number');
+    const el = document.getElementById('t-lic-state');
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.focus();
@@ -3913,6 +3950,7 @@ document.getElementById('login-submit-btn').addEventListener('click', async () =
       const hasProfile = row && row.name && String(row.name).trim();
       if (hasProfile) {
         const t = normalizeTherapist(dbRowToTherapist(row));
+        t.licenses = await loadLicenses();
         upsertTherapistInMemory(t);
         currentTherapistId = t.id;
         showTherapistView();
@@ -4102,7 +4140,7 @@ function startTherapistSignup() {
   signupStep = 0;
   newTherapistDraft = {
     name: '', credentials: ['', '', ''],
-    licenseNumber: '', licenseVerified: false,
+    licenseNumber: '', licenseVerified: false, licenses: [],
     website: '',
     pronouns: '', showPronouns: true, useCompanyName: false, companyName: '',
     practiceType: 'specialist',
@@ -4148,9 +4186,22 @@ function renderSignupStep() {
       <input type="text" class="t-rate-input" id="ts-cred-0" placeholder="e.g. LPC" value="${d.credentials[0]}">
       <input type="text" class="t-rate-input" id="ts-cred-1" placeholder="e.g. PhD" value="${d.credentials[1]}">
       <input type="text" class="t-rate-input" id="ts-cred-2" placeholder="e.g. Certified Gottman Therapist" value="${d.credentials[2]}">
-      <div class="t-form-label">License number</div>
-      <input type="text" class="t-rate-input" id="ts-license-number" placeholder="e.g. TX-38291" value="${d.licenseNumber}">
-      <div class="intake-sub" style="margin-top:6px;">We check every license against your state board's registry by hand before your profile goes live. Clients only ever see verified therapists.</div>`;
+        <div class="t-form-label">Your licenses <span class="ideal-hint">one per state &mdash; each is checked separately</span></div>
+        <div id="ts-license-list">${(d.licenses || []).map(l => `
+          <div class="lic-row">
+            <span class="lic-state">${l.state}</span>
+            <span class="lic-num">${l.number}</span>
+            <button type="button" class="lic-remove" data-drop-lic="${l.state}" aria-label="Remove ${l.state}">&#10005;</button>
+          </div>`).join('')}</div>
+        <div class="lic-add">
+          <select id="ts-lic-state">
+            <option value="">State&hellip;</option>
+            ${US_STATES.filter(s => !(d.licenses || []).some(l => l.state === s)).map(s => `<option value="${s}">${s}</option>`).join('')}
+          </select>
+          <input type="text" class="t-rate-input" id="ts-lic-number" placeholder="License number">
+          <button type="button" id="ts-lic-add">Add</button>
+        </div>
+        <div class="intake-sub" style="margin-top:6px;">A therapist can only be matched with clients in a state they're licensed in, so each license is checked against that state's board by hand before it counts.</div>`;
   } else if (signupStep === 1) {
     html += `
       <h1>What do you specialize in?</h1>
@@ -4264,7 +4315,7 @@ function renderSignupStep() {
   }
 
   let canProceed = true;
-  if (signupStep === 0) canProceed = d.name.trim().length > 0 && d.licenseNumber.trim().length > 0;
+  if (signupStep === 0) canProceed = d.name.trim().length > 0 && (d.licenses || []).length > 0;
   else if (signupStep === 3) canProceed = d.city.trim() !== '' && d.state !== '';
   else if (signupStep === 4) canProceed = d.mandatoryPromptAnswers.every(a => a.trim().length > 0);
   html += `
@@ -4283,14 +4334,31 @@ function attachSignupHandlers() {
   /* One place decides whether step 0 can continue. Two copies drifted: the
      licence field updated the value but never re-checked the button, so
      filling in a licence last left Continue permanently disabled. */
+  /* One place decides whether step 0 can continue: a name, and at least one
+     licence with a state attached. A number without a state cannot be checked
+     against anything. */
   const refreshStep0Next = () => {
     const b = document.getElementById('ts-next');
-    if (b) b.disabled = !(d.name.trim().length > 0 && d.licenseNumber.trim().length > 0);
+    if (b) b.disabled = !(d.name.trim().length > 0 && (d.licenses || []).length > 0);
   };
   const nameInput = document.getElementById('ts-name');
   if (nameInput) nameInput.addEventListener('input', () => { d.name = nameInput.value; refreshStep0Next(); });
-  const licenseInput = document.getElementById('ts-license-number');
-  if (licenseInput) licenseInput.addEventListener('input', () => { d.licenseNumber = licenseInput.value; refreshStep0Next(); });
+  const licAdd = document.getElementById('ts-lic-add');
+  if (licAdd) licAdd.addEventListener('click', () => {
+    const st = (document.getElementById('ts-lic-state') || {}).value;
+    const num = (document.getElementById('ts-lic-number') || {}).value || '';
+    if (!st) { showToast('Pick the state that issued the license.'); return; }
+    if (!num.trim()) { showToast('Enter the license number.'); return; }
+    d.licenses = d.licenses || [];
+    d.licenses.push({ state: st, number: num.trim() });
+    d.licenseNumber = d.licenses[0].number;   // kept for older copy that reads it
+    renderSignupStep();
+  });
+  document.querySelectorAll('[data-drop-lic]').forEach(el => el.addEventListener('click', () => {
+    d.licenses = (d.licenses || []).filter(l => l.state !== el.dataset.dropLic);
+    d.licenseNumber = d.licenses.length ? d.licenses[0].number : '';
+    renderSignupStep();
+  }));
   const pronounsInput = document.getElementById('ts-pronouns');
   if (pronounsInput) pronounsInput.addEventListener('input', () => { d.pronouns = pronounsInput.value; });
   const showPronounsSwitch = document.getElementById('ts-show-pronouns-switch');
@@ -4543,6 +4611,9 @@ function finishTherapistSignup() {
   };
   if (authSession) {
     saveTherapistProfile(newT)
+      // Licences go to their own table. The DB derives license_states from the
+      // verified ones, so these must land before we read the row back.
+      .then(() => Promise.all((d.licenses || []).map(l => saveLicense(l.state, l.number))))
       .then(loadTherapistRow)
       .then(row => {
         if (!row) return;
@@ -5208,24 +5279,29 @@ function renderTherapistProfile() {
           <div class="switch ${t.acceptingOngoing ? 'on' : ''}" id="t-ongoing-switch"></div>
         </div>
 
-        <div class="t-form-label">License number <span class="ideal-hint">we check this against your state board by hand</span></div>
-        <input type="text" class="t-rate-input" id="t-form-license-number" placeholder="e.g. TX-38291" value="${t.licenseNumber || ''}">
-        ${t.licenseVerified
-          ? `<p class="portal-note" style="margin:2px 0 10px;">&#10003; Verified${t.licenseNumber ? ` &middot; ${t.licenseNumber}` : ''}. Editing this will pause your listing until we re-check it.</p>`
-          : `<p class="portal-note" style="margin:2px 0 10px;">We verify this against your state board before your profile goes live.</p>`}
-
-        <div class="t-form-label">Licensed states <span class="ideal-hint">clients only match with therapists licensed in their state</span></div>
-        ${(t.licensedStates && t.licensedStates.length)
-          ? `<div class="chip-grid">${t.licensedStates.map(s => `<div class="chip-option selected licensed-state-chip">${s} <span class="lic-verified" title="Pending review">•</span> <button type="button" class="lic-remove" data-remove-licensed-state="${s}" aria-label="Remove ${s}">✕</button></div>`).join('')}</div>`
-          : `<p class="portal-note" style="margin:2px 0 8px;">No states added yet. Add the states you are licensed in — we check each one before you match with clients there.</p>`}
-        <div class="add-slot-row">
-          <select id="t-license-state-select">
-            <option value="">Add a state…</option>
-            ${US_STATES.filter(s => !(t.licensedStates || []).includes(s)).map(s => `<option value="${s}">${s}</option>`).join('')}
-          </select>
-          <button id="t-verify-license-btn">Add state</button>
-        </div>
-        <p class="portal-note">We check each state's license against that board's public registry. A state only becomes available for matching after your license is verified.</p>
+          <div class="t-form-label">Your licenses <span class="ideal-hint">one per state &mdash; each is checked separately</span></div>
+          ${(t.licenses && t.licenses.length)
+            ? t.licenses.map(l => {
+                const st = l.verifiedAt ? 'ok' : l.rejectedAt ? 'denied' : 'pending';
+                const label = l.verifiedAt ? '&#10003; verified' : l.rejectedAt ? '&#10007; denied' : 'pending';
+                return `<div class="lic-row">
+                    <span class="lic-state">${l.state}</span>
+                    <span class="lic-num">${l.number}</span>
+                    <span class="lic-status ${st}">${label}</span>
+                    <button type="button" class="lic-remove" data-drop-lic="${l.state}" aria-label="Remove ${l.state}">&#10005;</button>
+                  </div>
+                  ${l.rejectedAt && l.rejectedReason ? `<p class="lic-denied-note">${String(l.rejectedReason).replace(/[<>&]/g, '')}</p>` : ''}`;
+              }).join('')
+            : `<p class="portal-note" style="margin:2px 0 8px;">No licenses yet. Add each state you're licensed in &mdash; you can only be matched with clients in a state we've verified.</p>`}
+          <div class="lic-add">
+            <select id="t-lic-state">
+              <option value="">State&hellip;</option>
+              ${US_STATES.filter(s => !(t.licenses || []).some(l => l.state === s)).map(s => `<option value="${s}">${s}</option>`).join('')}
+            </select>
+            <input type="text" class="t-rate-input" id="t-lic-number" placeholder="License number">
+            <button type="button" id="t-lic-add">Add</button>
+          </div>
+          <p class="portal-note">We check each license against that state's board by hand. A state only becomes available for matching once its license is verified.</p>
 
         <div class="t-form-label">Gender</div>
         <div class="chip-grid">
@@ -5565,21 +5641,29 @@ function attachTherapistProfileHandlers(t) {
     renderTherapistProfile();
   }));
   document.getElementById('t-lgbtq-switch').addEventListener('click', () => { t.identity.lgbtqAffirming = !t.identity.lgbtqAffirming; renderTherapistProfile(); });
-  const licNumInput = document.getElementById('t-form-license-number');
-  if (licNumInput) licNumInput.addEventListener('input', () => { t.licenseNumber = licNumInput.value; });
-  const verifyLicBtn = document.getElementById('t-verify-license-btn');
-  if (verifyLicBtn) verifyLicBtn.addEventListener('click', () => {
-    const s = (document.getElementById('t-license-state-select') || {}).value;
-    if (!s) { showToast('Pick a state to verify.'); return; }
-    openStateLicenseNotice(t, s, () => {
-      if (!Array.isArray(t.licensedStates)) t.licensedStates = [];
-      if (!t.licensedStates.includes(s)) t.licensedStates.push(s);
-      showToast(`${s} added — pending verification`);
-      renderTherapistProfile();
-    });
+  /* Licences are rows in therapist_licenses now, each with its own state,
+     number and verification. Adding or removing one writes straight through --
+     the DB derives license_states from the VERIFIED ones, so a new state is
+     never matchable until it has been checked. */
+  const licAddBtn = document.getElementById('t-lic-add');
+  if (licAddBtn) licAddBtn.addEventListener('click', async () => {
+    const st = (document.getElementById('t-lic-state') || {}).value;
+    const num = (document.getElementById('t-lic-number') || {}).value || '';
+    if (!st) { showToast('Pick the state that issued the license.'); return; }
+    if (!num.trim()) { showToast('Enter the license number.'); return; }
+    licAddBtn.disabled = true;
+    const ok = await saveLicense(st, num);
+    licAddBtn.disabled = false;
+    if (!ok) { showToast("Couldn't save that license. Try again."); return; }
+    t.licenses = await loadLicenses();
+    showToast(st + ' added -- pending verification');
+    renderTherapistProfile();
   });
-  document.querySelectorAll('[data-remove-licensed-state]').forEach(el => el.addEventListener('click', () => {
-    t.licensedStates = (t.licensedStates || []).filter(s => s !== el.dataset.removeLicensedState);
+  document.querySelectorAll('[data-drop-lic]').forEach(el => el.addEventListener('click', async () => {
+    const st = el.dataset.dropLic;
+    if (!confirm('Remove your ' + st + ' license? You will stop being matched with clients there.')) return;
+    await deleteLicense(st);
+    t.licenses = await loadLicenses();
     renderTherapistProfile();
   }));
   document.querySelectorAll('#tp-languages-grid [data-language]').forEach(el => el.addEventListener('click', () => {
@@ -5944,6 +6028,7 @@ async function restoreSession() {
     const row = await loadTherapistRow();
     if (!row || !row.name || !String(row.name).trim()) return false;  // stub or none: let them sign in
     const t = normalizeTherapist(dbRowToTherapist(row));
+    t.licenses = await loadLicenses();     // per-state, with their own verification
     upsertTherapistInMemory(t);
     currentTherapistId = t.id;
     accountType = 'therapist';
@@ -5993,7 +6078,7 @@ function renderTherapistSettings() {
 
   document.getElementById('t-settings-content').innerHTML = `
     <div class="t-form-name">${t.name}</div>
-    <p class="portal-note" style="margin-top:4px;">Signed in as ${t.name}${t.licenseNumber ? ` · license ${t.licenseNumber}` : ''}</p>
+    <p class="portal-note" style="margin-top:4px;">Signed in as ${t.name}${(t.licenses && t.licenses.length) ? ` · licensed in ${t.licenses.map(l => l.state).join(', ')}` : ''}</p>
 
     <div class="settings-group-title">Notifications</div>
     ${row('notifyNewInquiry', 'New inquiries', 'When a client reaches out to you')}
