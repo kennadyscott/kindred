@@ -4153,6 +4153,7 @@ function getToKnowBlocks(t) {
 function blockPromptCount(t) { return getToKnowBlocks(t).filter(b => b.type === 'prompt').length; }
 function blockPhotoCount(t)  { return getToKnowBlocks(t).filter(b => b.type === 'photo').length; }
 function blockHasVideo(t)    { return getToKnowBlocks(t).some(b => b.type === 'video'); }
+const MAX_TOP_SPECIALTIES = 3;
 const MAX_PHOTOS = 4;       // up to 4 photos (+ 1 video) alternate with blurbs
 
 /* Photos were stored as raw readAsDataURL output. A current phone camera
@@ -5238,12 +5239,48 @@ let profileMode = 'edit'; // 'ideal' | 'view' | 'edit' — the profile tab's thr
 // Collapsible Edit-Profile sections + checkbox dropdowns keep their open/closed
 // state across the full re-renders that chip toggles trigger.
 let editSectionsOpen  = { first: true, additional: false, getToKnow: false, promptPicker: false };
-let editDropdownOpen  = { spec: false, modality: false, 'ideal-needs': false, 'ideal-modalities': false, 'top-spec': false };
+let editDropdownOpen  = { spec: false, modality: false, 'ideal-needs': false, 'ideal-modalities': false };
 let dragBlockIndex = null; // which get-to-know block is being dragged
 
 // A drop-down whose options are checkboxes. Selected values also show as
 // removable chips above it. Re-renders on change, but the <details> open state
 // is persisted in editDropdownOpen so the panel stays put.
+/* Specialties were TWO dropdowns over the same catalogue -- "your top 3" and
+   "the full set" -- so a therapist picked Anxiety, Burnout and Trauma, then
+   picked the identical three again below. One list instead: choose what you
+   work with, star up to three. Starred ones sort to the front so the list
+   always reads in the order clients see it. */
+function specialtyPickerHtml(t) {
+  const top = t.topSpecialties || [];
+  const all = t.tags || [];
+  // starred first, in the order they were starred; everything else after
+  const ordered = [...top.filter(v => all.includes(v)), ...all.filter(v => !top.includes(v))];
+  const full = top.length >= MAX_TOP_SPECIALTIES;
+  const chips = ordered.map(v => {
+    const on = top.includes(v);
+    const lock = !on && full;
+    return `<div class="spec-chip ${on ? 'is-top' : ''}">
+      <button type="button" class="spec-star ${lock ? 'is-locked' : ''}" data-star-spec="${v}"
+              aria-pressed="${on}" ${lock ? 'disabled' : ''}
+              title="${on ? 'Remove from your top 3' : lock ? `You already have ${MAX_TOP_SPECIALTIES}` : 'Make this a top 3 specialty'}"
+              aria-label="${on ? `${v}: remove from top 3` : `${v}: add to top 3`}">${on ? '★' : '☆'}</button>
+      <span class="spec-chip-label">${v}</span>
+      <button type="button" class="spec-drop" data-drop-spec="${v}" aria-label="Remove ${v}">✕</button>
+    </div>`;
+  }).join('');
+  return `
+    <div class="cbx-field">
+      ${ordered.length ? `<div class="spec-chips">${chips}</div>` : ''}
+      <details class="cbx-dd" data-dd="spec" ${editDropdownOpen['spec'] ? 'open' : ''}>
+        <summary><span>${all.length ? `${all.length} selected` : 'Choose the specialties you work with…'}</span><span class="cbx-caret">▾</span></summary>
+        <div class="cbx-dd-list">
+          ${specialtyAll().map(o => `<label class="cbx-row"><input type="checkbox" data-cbx="spec" value="${o}" ${all.includes(o) ? 'checked' : ''}><span>${o}</span></label>`).join('')}
+        </div>
+      </details>
+      <p class="spec-hint">Tap ☆ to star up to ${MAX_TOP_SPECIALTIES}. Starred specialties lead your profile — clients see two of them plus one that matches what they came for.</p>
+    </div>`;
+}
+
 function checkboxDropdownHtml(selected, options, key, summaryLabel, max) {
   const capped = max ? selected.length >= max : false;
   const summary = selected.length ? `${selected.length}${max ? `/${max}` : ''} selected` : summaryLabel;
@@ -5392,10 +5429,8 @@ function renderTherapistProfile() {
         <div class="t-form-label">In one line, who do you work best with?</div>
         <input type="text" class="t-rate-input" id="t-bestfor-input" placeholder="e.g. I work best with new parents navigating postpartum anxiety" value="${t.bestFor || ''}">
 
-        <div class="t-form-label">Your top 3 specialties <span class="ideal-hint">these lead your profile — clients see two of these plus one that matches their need</span></div>
-        ${checkboxDropdownHtml(t.topSpecialties || [], specialtyAll(), 'top-spec', 'Pick your headline specialties…', 3)}
-        <div class="t-form-label" style="margin-top:14px;">Specialties / needs you work with <span class="ideal-hint">the full set — your top 3 are included automatically</span></div>
-        ${checkboxDropdownHtml(t.tags, specialtyAll(), 'spec', 'Choose the specialties you work with…')}
+        <div class="t-form-label">Specialties you work with <span class="ideal-hint">star up to 3 — those lead your profile</span></div>
+        ${specialtyPickerHtml(t)}
       </div>
     </details>
 
@@ -5559,6 +5594,25 @@ function attachTherapistProfileHandlers(t) {
   document.querySelectorAll('details[data-dd]').forEach(el => el.addEventListener('toggle', () => { editDropdownOpen[el.dataset.dd] = el.open; }));
   // checkbox dropdowns — one component, several targets (public specialties &
   // types of therapy, plus the private ideal-client needs & modalities)
+  /* star / unstar, and drop a specialty entirely. Unstarring never removes it
+     from the working set -- those are two different statements. */
+  document.querySelectorAll('[data-star-spec]').forEach(el => el.addEventListener('click', () => {
+    if (!Array.isArray(t.topSpecialties)) t.topSpecialties = [];
+    const v = el.dataset.starSpec, i = t.topSpecialties.indexOf(v);
+    if (i !== -1) t.topSpecialties.splice(i, 1);
+    else if (t.topSpecialties.length < MAX_TOP_SPECIALTIES) t.topSpecialties.push(v);
+    renderTherapistProfile();
+  }));
+  document.querySelectorAll('[data-drop-spec]').forEach(el => el.addEventListener('click', () => {
+    const v = el.dataset.dropSpec;
+    const i = t.tags.indexOf(v);
+    if (i !== -1) t.tags.splice(i, 1);
+    // a starred specialty they no longer work with cannot stay starred
+    const j = (t.topSpecialties || []).indexOf(v);
+    if (j !== -1) t.topSpecialties.splice(j, 1);
+    renderTherapistProfile();
+  }));
+
   const cbxArr = k => ({
     'spec': t.tags,
     'modality': t.modalities,
@@ -5566,16 +5620,7 @@ function attachTherapistProfileHandlers(t) {
     'ideal-needs': t.idealClient.needs,
     'ideal-modalities': t.idealClient.modalities,
   })[k] || null;
-  // top-3 is capped and auto-joins the working specialty set
-  const toggleTopSpec = v => {
-    if (!Array.isArray(t.topSpecialties)) t.topSpecialties = [];
-    const i = t.topSpecialties.indexOf(v);
-    if (i !== -1) t.topSpecialties.splice(i, 1);
-    else if (t.topSpecialties.length < 3) { t.topSpecialties.push(v); if (!t.tags.includes(v)) t.tags.push(v); }
-    renderTherapistProfile();
-  };
   document.querySelectorAll('input[data-cbx]').forEach(el => el.addEventListener('change', () => {
-    if (el.dataset.cbx === 'top-spec') { toggleTopSpec(el.value); return; }
     const arr = cbxArr(el.dataset.cbx); if (!arr) return;
     const v = el.value, i = arr.indexOf(v);
     if (i === -1) arr.push(v);
@@ -5586,19 +5631,10 @@ function attachTherapistProfileHandlers(t) {
     renderTherapistProfile();
   }));
   document.querySelectorAll('[data-cbx-chip]').forEach(el => el.addEventListener('click', () => {
-    if (el.dataset.cbxChip === 'top-spec') { toggleTopSpec(el.dataset.val); return; }
     const arr = cbxArr(el.dataset.cbxChip); if (!arr) return;
     const v = el.dataset.val, i = arr.indexOf(v);
     if (i !== -1) arr.splice(i, 1);
     if (el.dataset.cbxChip === 'spec') { const j = (t.topSpecialties || []).indexOf(v); if (j !== -1) t.topSpecialties.splice(j, 1); }
-    renderTherapistProfile();
-  }));
-  document.querySelectorAll('[data-top-spec]').forEach(el => el.addEventListener('click', () => {
-    if (!t.topSpecialties) t.topSpecialties = [];
-    const s = el.dataset.topSpec;
-    const i = t.topSpecialties.indexOf(s);
-    if (i !== -1) t.topSpecialties.splice(i, 1);
-    else if (t.topSpecialties.length < 3) t.topSpecialties.push(s);
     renderTherapistProfile();
   }));
   document.querySelectorAll('[data-toggle-modality]').forEach(el => el.addEventListener('click', () => {

@@ -616,13 +616,23 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   line-height: 1.4;
   color: var(--ink);
 }
+/* Was width:100% + max-height:260 with no height, so each photo landed at
+   whatever its own aspect ratio produced -- a ragged feed -- and any photo
+   tall enough to hit the cap got cropped from the CENTRE, which takes the top
+   off a portrait. That is why a photo of someone standing lost their head.
+
+   A fixed 4:5 frame makes every photo the same shape, and object-position
+   biased upward keeps faces in frame, since people are almost always in the
+   top half of a photo taken of them. */
 .prompt-photo {
   width: 100%;
+  aspect-ratio: 4 / 5;
   border-radius: 14px;
   margin-top: 2px;
   display: block;
   object-fit: cover;
-  max-height: 260px;
+  object-position: center 30%;
+  background: var(--cream);
 }
 
 /* ===== PROFILE FEED (interleaved prompts + media) ===== */
@@ -2182,7 +2192,9 @@ select.t-rate-input,
 }
 .block-remove:hover { color:#a8443a; }
 .feed-block .intake-textarea { margin:0; }
-.feed-block-photo-body img { width:100%; max-height:180px; object-fit:cover; border-radius:10px; display:block; }
+/* Same crop bias as the client-facing feed, so what a therapist arranges in
+   the editor is what a client actually sees. */
+.feed-block-photo-body img { width:100%; aspect-ratio:4/5; max-height:220px; object-fit:cover; object-position:center 30%; border-radius:10px; display:block; margin:0 auto; }
 .feed-block-video-body { display:flex; flex-direction:column; gap:8px; }
 .feed-block-video-body video { width:100%; max-height:200px; border-radius:10px; background:#000; }
 .feed-block-video-body .video-empty { font-size:12px; color:var(--ink-soft); padding:14px; text-align:center; background:var(--cream); border-radius:10px; }
@@ -2622,3 +2634,28 @@ select.t-rate-input,
 .ts-photo-row:hover { border-color: var(--coral); }
 .ts-photo-row:focus-within { outline: 2px solid var(--coral); outline-offset: 2px; }
 .ts-photo-row .media-upload-btn { display: inline-block; }
+
+/* ===== specialty picker — one list, star the top three ===== */
+.spec-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.spec-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  border: 1.5px solid var(--line); border-radius: 999px;
+  padding: 3px 4px 3px 6px; background: #fff; font-size: 12px;
+}
+/* Starred chips read as a distinct tier, not just a different colour --
+   they are what leads the profile. */
+.spec-chip.is-top { border-color: var(--aubergine); background: var(--aubergine); }
+.spec-chip.is-top .spec-chip-label { color: #fff; font-weight: 700; }
+.spec-chip.is-top .spec-star { color: #FFD36E; }
+.spec-chip.is-top .spec-drop { color: rgba(255,255,255,.75); }
+.spec-chip-label { color: var(--ink); padding: 0 2px; }
+.spec-star, .spec-drop {
+  border: none; background: none; cursor: pointer; padding: 2px 4px;
+  font-size: 13px; line-height: 1; color: var(--ink-soft);
+}
+.spec-star { font-size: 14px; }
+.spec-star:hover:not(.is-locked) { color: var(--coral); }
+.spec-star.is-locked { cursor: default; opacity: .35; }
+.spec-drop:hover { color: var(--coral); }
+.spec-star:focus-visible, .spec-drop:focus-visible { outline: 2px solid var(--coral); outline-offset: 1px; border-radius: 4px; }
+.spec-hint { margin-top: 8px; font-size: 11px; color: var(--ink-soft); line-height: 1.45; }
