@@ -4154,6 +4154,40 @@ function blockPromptCount(t) { return getToKnowBlocks(t).filter(b => b.type === 
 function blockPhotoCount(t)  { return getToKnowBlocks(t).filter(b => b.type === 'photo').length; }
 function blockHasVideo(t)    { return getToKnowBlocks(t).some(b => b.type === 'video'); }
 const MAX_PHOTOS = 4;       // up to 4 photos (+ 1 video) alternate with blurbs
+
+/* Photos were stored as raw readAsDataURL output. A current phone camera
+   produces 3-8MB per shot, which base64 inflates by a third again, and the
+   result is written to therapists.photo and re-sent on EVERY autosave -- so a
+   therapist tweaking one line of their bio pushes several megabytes each time.
+   Downscaling to a long edge of 1200 and re-encoding as JPEG turns that into
+   roughly 150-300KB, which is more than a swipe card or profile header needs.
+
+   Falls back to the original file if anything goes wrong: a photo that is too
+   big is a far better outcome than no photo at all. */
+const PHOTO_MAX_EDGE = 1200;
+const PHOTO_QUALITY  = 0.82;
+function readPhoto(file) {
+  return new Promise(resolve => {
+    const bail = () => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => resolve(null); r.readAsDataURL(file); };
+    try {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(img.width, img.height));
+          const c = document.createElement('canvas');
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          resolve(c.toDataURL('image/jpeg', PHOTO_QUALITY));
+        } catch (e) { URL.revokeObjectURL(url); bail(); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); bail(); };
+      img.src = url;
+    } catch (e) { bail(); }
+  });
+}
 const NEW_THERAPIST_GRADIENTS = [
   'linear-gradient(135deg,#c97b9e,#a3557a)',
   'linear-gradient(135deg,#7ba7c9,#4f7ea3)',
@@ -4190,7 +4224,7 @@ const signupContent = document.getElementById('therapist-signup-content');
 function startTherapistSignup() {
   signupStep = 0;
   newTherapistDraft = {
-    name: '', credentials: ['', '', ''],
+    name: '', photo: null, credentials: ['', '', ''],
     licenseNumber: '', licenseVerified: false, licenses: [], paymentOptions: [],
     website: '',
     pronouns: '', showPronouns: true, useCompanyName: false, companyName: '',
@@ -4217,6 +4251,23 @@ function renderSignupStep() {
     html += `
       <h1>Let's set up your profile</h1>
       <div class="intake-sub">This is what clients see first — you can edit all of it later.</div>
+
+      <!-- Signup had no photo upload anywhere across its six steps. The lead
+           photo only existed in the profile editor, under Media, which a
+           therapist had to go looking for AFTER finishing setup and seeing an
+           empty preview. It belongs here: it is the swipe-card image, so it
+           sits with the name it appears beside. -->
+      <div class="t-form-label">Your photo</div>
+      <label class="media-row ts-photo-row">
+        <span class="media-thumb">${d.photo ? `<img src="${d.photo}" alt="">` : '<span>—</span>'}</span>
+        <span class="media-row-text">
+          <strong>${d.photo ? 'Change photo' : 'Add a photo'}</strong>
+          <span>The first thing a client sees. A clear, friendly headshot works best — you can add more later.</span>
+        </span>
+        <span class="media-upload-btn">${d.photo ? 'Change' : 'Add'}</span>
+        <input type="file" accept="image/*" id="ts-photo" hidden>
+      </label>
+
       <div class="t-form-label">Full name</div>
       <input type="text" class="t-rate-input" id="ts-name" placeholder="e.g. Dr. Jordan Reyes" value="${d.name}">
       <div class="t-form-label">Pronouns (optional)</div>
@@ -4533,14 +4584,20 @@ function attachSignupHandlers() {
   document.querySelectorAll('textarea[data-optional-prompt-answer]').forEach(el => {
     el.addEventListener('input', () => { d.optionalPromptAnswers[el.dataset.optionalPromptAnswer] = el.value; });
   });
+  const tsPhoto = document.getElementById('ts-photo');
+  if (tsPhoto) tsPhoto.addEventListener('change', () => {
+    const file = tsPhoto.files[0];
+    if (!file) return;
+    readPhoto(file).then(src => { if (src) { d.photo = src; renderSignupStep(); } });
+  });
   document.querySelectorAll('input[data-optional-prompt-photo]').forEach(el => {
     el.addEventListener('change', () => {
       const file = el.files[0];
       if (!file) return;
       const q = el.dataset.optionalPromptPhoto;
-      const reader = new FileReader();
-      reader.onload = () => { d.optionalPromptPhotos[q] = reader.result; renderSignupStep(); };
-      reader.readAsDataURL(file);
+      /* Same downscale as every other photo path -- these ride along in
+         optional_prompts and were the largest un-shrunk payload of the lot. */
+      readPhoto(file).then(src => { if (src) { d.optionalPromptPhotos[q] = src; renderSignupStep(); } });
     });
   });
   document.querySelectorAll('[data-remove-optional-prompt]').forEach(el => {
@@ -4621,7 +4678,7 @@ function finishTherapistSignup() {
     idealClient: emptyIdealClient(), // filled in later from the profile tab
     pronouns: d.pronouns.trim(), showPronouns: d.showPronouns,
     useCompanyName: d.useCompanyName, companyName: d.companyName.trim(),
-    photo: null,
+    photo: d.photo || null,
     initials, gradient,
     meta: buildTherapistMeta(d),
     bestFor: d.bestFor.trim(), selfPayNote: d.selfPayNote.trim(),
@@ -5602,9 +5659,7 @@ function attachTherapistProfileHandlers(t) {
       t.media.video = URL.createObjectURL(file); // object URL keeps big videos out of data URLs
       renderTherapistProfile();
     } else { // lead photo
-      const reader = new FileReader();
-      reader.onload = () => { t.photo = reader.result; renderTherapistProfile(); };
-      reader.readAsDataURL(file);
+      readPhoto(file).then(src => { if (src) { t.photo = src; renderTherapistProfile(); } });
     }
   }));
   // ===== get-to-know draggable blocks (prompts + photos) =====
@@ -5630,9 +5685,11 @@ function attachTherapistProfileHandlers(t) {
     const file = addBlockPhoto.files[0];
     if (!file) return;
     if (blockPhotoCount(t) >= MAX_PHOTOS) return;
-    const reader = new FileReader();
-    reader.onload = () => { getToKnowBlocks(t).push({ type: 'photo', src: reader.result }); renderTherapistProfile(); };
-    reader.readAsDataURL(file);
+    readPhoto(file).then(src => {
+      if (!src) return;
+      getToKnowBlocks(t).push({ type: 'photo', src });
+      renderTherapistProfile();
+    });
   });
   const addBlockVideo = document.querySelector('[data-add-block-video]');
   if (addBlockVideo) addBlockVideo.addEventListener('change', () => {

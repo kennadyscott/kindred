@@ -2614,3 +2614,11 @@ select.t-rate-input,
   color: #fff;
 }
 .modal-sheet .primary-btn:hover { background: var(--coral-dark); }
+
+/* Signup's lead-photo row. Reuses .media-row, but as a <label> wrapping a
+   hidden input so the whole row is the target -- the editor's version puts a
+   real file input in the row and only the button is clickable. */
+.ts-photo-row { cursor: pointer; border: 1.5px solid var(--line); }
+.ts-photo-row:hover { border-color: var(--coral); }
+.ts-photo-row:focus-within { outline: 2px solid var(--coral); outline-offset: 2px; }
+.ts-photo-row .media-upload-btn { display: inline-block; }
