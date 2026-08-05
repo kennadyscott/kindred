@@ -4243,7 +4243,54 @@ function startTherapistSignup() {
   showScreen('therapist-signup');
 }
 
+/* Every checkbox tick re-renders the whole panel, which throws away the
+   scroll position of the .cbx-dd-list it happened in -- so ticking the third
+   therapy type sent you back to the top of a 240px window and you had to
+   scroll down again for the fourth. Open/closed state was already kept in
+   editDropdownOpen; this is the other half of the same problem.
+
+   Focus is restored too, or a keyboard user loses their place in the list on
+   every single tick, which is the same bug with a worse ending. */
+let editDropdownScroll = {};
+
+function captureDropdownState() {
+  document.querySelectorAll('.cbx-dd[data-dd]').forEach(dd => {
+    const list = dd.querySelector('.cbx-dd-list');
+    if (list) editDropdownScroll[dd.dataset.dd] = list.scrollTop;
+  });
+  const a = document.activeElement;
+  return (a && a.dataset && a.dataset.cbx) ? { key: a.dataset.cbx, value: a.value } : null;
+}
+
+function restoreDropdownState(focus) {
+  document.querySelectorAll('.cbx-dd[data-dd]').forEach(dd => {
+    const list = dd.querySelector('.cbx-dd-list');
+    const y = editDropdownScroll[dd.dataset.dd];
+    if (list && y) list.scrollTop = y;
+  });
+  if (!focus) return;
+  /* Matched by walking rather than an attribute selector: option labels carry
+     &, parentheses and slashes, which would need escaping to be safe here. */
+  const el = [...document.querySelectorAll('input[data-cbx]')]
+    .find(i => i.dataset.cbx === focus.key && i.value === focus.value);
+  if (el) el.focus({ preventScroll: true });
+}
+
+
+/* Wrappers, so all ~70 call sites keep the scroll fix without each one
+   remembering to ask for it. */
+function renderTherapistProfile() {
+  const focus = captureDropdownState();
+  renderTherapistProfileBody();
+  restoreDropdownState(focus);
+}
 function renderSignupStep() {
+  const focus = captureDropdownState();
+  renderSignupStepBody();
+  restoreDropdownState(focus);
+}
+
+function renderSignupStepBody() {
   const d = newTherapistDraft;
   let html = `<div class="intake-progress">${Array.from({ length: TOTAL_SIGNUP_STEPS }).map((_, i) =>
     `<div class="dot ${i <= signupStep ? 'done' : ''}"></div>`).join('')}</div>`;
@@ -5300,7 +5347,7 @@ function checkboxDropdownHtml(selected, options, key, summaryLabel, max) {
     </div>`;
 }
 
-function renderTherapistProfile() {
+function renderTherapistProfileBody() {
   const t = THERAPISTS.find(t => t.id === currentTherapistId);
   const container = document.getElementById('t-profile-content');
   // Every editor mutation re-renders through here, so this is the one place
