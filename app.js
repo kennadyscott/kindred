@@ -3238,6 +3238,14 @@ function gettingStartedHtml(t) {
   if (!t) return '';
 
   const hasProfile = !!(t.name && String(t.name).trim());
+  /* Ideal Client sits on its own tab in the profile editor and nothing pointed
+     at it, so it was easy to finish setup having never opened it. The bar is
+     engagement, not completeness: any one of these means they have been in
+     there and made a decision. Requiring a specific field would block the
+     therapist whose top specialties already say it. */
+  const ic = t.idealClient || {};
+  const hasIdeal = ['needs', 'ageBands', 'fields', 'genders', 'modalities', 'availability', 'mustHaves']
+    .some(k => Array.isArray(ic[k]) && ic[k].length > 0);
   const licences = t.licenses || [];
   const hasLicence = licences.length > 0;
   const deniedLicence = licences.find(l => l.rejectedAt);
@@ -3247,6 +3255,11 @@ function gettingStartedHtml(t) {
     { key: 'profile',  done: hasProfile,          title: 'Build your profile', mine: true,
       body: 'Your therapy style, who you work best with, what sessions feel like. Saves as you go.',
       action: hasProfile ? null : { label: 'Build my profile', id: 't-gs-profile' } },
+    { key: 'ideal',    done: hasIdeal,            title: 'Describe your ideal client', mine: true,
+      body: hasIdeal
+        ? 'Sharpening this over time is the single best thing you can do for your matches.'
+        : "Who you're the right fit for — ages, what they're working on, how they want to work. Private to you, and it's what makes your matches accurate.",
+      action: hasIdeal ? null : { label: 'Describe my ideal client', id: 't-gs-ideal' } },
     { key: 'licence',  done: hasLicence && !deniedLicence, title: 'Add your license(s)', mine: true,
       body: deniedLicence
         ? `${deniedLicence.state}: ${String(deniedLicence.rejectedReason || '').replace(/[<>&]/g, '')}`
@@ -3272,11 +3285,18 @@ function gettingStartedHtml(t) {
 
   // Paying and invisible is the state that most needs naming, so it leads.
   const stuck = t.listed && !(t.licenseVerified && t.identityVerified);
+  /* Publishing is driven by billing, licence and identity -- NOT by this list.
+     So a therapist can be live with the ideal-client step still outstanding,
+     and telling them they are "getting set up" would be plainly false while
+     clients are already seeing them. */
+  const live = t.listed && t.licenseVerified && t.identityVerified;
   const lead = allDone
     ? "<strong>You're live.</strong> Clients matching your fit can now find you."
     : stuck
       ? "<strong>You're being billed but clients can't see you yet.</strong> Finish these and you're live."
-      : "<strong>Getting set up.</strong> About ten minutes of your time, then it's on us.";
+      : live
+        ? "<strong>You're live</strong> &mdash; clients can find you. One thing left that will sharpen who reaches you."
+        : "<strong>Getting set up.</strong> About ten minutes of your time, then it's on us.";
 
   const items = steps.map(s => {
     const state = s.done ? 'done' : s.mine ? 'todo' : 'waiting';
@@ -3308,6 +3328,8 @@ function wireGettingStarted() {
   if (lic) lic.addEventListener('click', openLicenseNumberField);
   const prof = document.getElementById('t-gs-profile');
   if (prof) prof.addEventListener('click', () => { profileMode = 'edit'; showTScreen('t-profile'); });
+  const ideal = document.getElementById('t-gs-ideal');
+  if (ideal) ideal.addEventListener('click', () => { profileMode = 'ideal'; showTScreen('t-profile'); });
   const dis = document.getElementById('t-gs-dismiss');
   if (dis) dis.addEventListener('click', () => {
     try { localStorage.setItem(GETTING_STARTED_KEY, 'dismissed'); } catch (e) {}
