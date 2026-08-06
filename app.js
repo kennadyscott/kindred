@@ -1410,6 +1410,47 @@ const PENDING_COLUMNS = ['marketing_opt_in'];
 let unavailableColumns = new Set();
 
 // Upsert the signed-in therapist's profile (insert on first save, update after).
+/* ---------------------------- analytics ----------------------------------
+   The same aggregate tracker the marketing site uses, and the same rules:
+   an event name and nothing else. No user id, no session id, no state, no
+   licence number — the events table has no column for a person and this must
+   not become the thing that adds one.
+
+   The app is where the therapist funnel actually happens (the site hands off
+   after payment), so without this the drop-off between paying and going live
+   is invisible. That gap is currently 100%: two paid accounts, zero live.
+-------------------------------------------------------------------------- */
+const KA_SUPA = 'https://izukppxgoerqtustfbnk.supabase.co';
+const KA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6dWtwcHhnb2VycXR1c3RmYm5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NTAzMTYsImV4cCI6MjEwMDQyNjMxNn0.FeJFOu4PmOJAbk2OqfMH1sQX6DlynKmTyhc-dtKfvZk';
+const KA_ONCE_KEY = 'kindred-milestones';
+function kaSeen(event) {
+  try { return (JSON.parse(localStorage.getItem(KA_ONCE_KEY) || '[]') || []).includes(event); }
+  catch (e) { return false; }
+}
+function kaMark(event) {
+  try {
+    const a = JSON.parse(localStorage.getItem(KA_ONCE_KEY) || '[]') || [];
+    if (!a.includes(event)) { a.push(event); localStorage.setItem(KA_ONCE_KEY, JSON.stringify(a)); }
+  } catch (e) {}
+}
+function kTrack(event, once) {
+  try {
+    if (navigator.doNotTrack === '1' || window.doNotTrack === '1') return;
+    if (localStorage.getItem('kindred-no-analytics') === '1') return;
+    /* A milestone is reached once per therapist, not once per page load. The
+       checklist repaints constantly, so without this "live" would count how
+       often someone opened the app rather than how many went live. Persisted,
+       so it survives a reload too. */
+    if (once) { if (kaSeen(event)) return; kaMark(event); }
+    fetch(KA_SUPA + '/rest/v1/events', {
+      method: 'POST', keepalive: true,
+      headers: { 'Content-Type': 'application/json', apikey: KA_ANON,
+                 Authorization: 'Bearer ' + KA_ANON, Prefer: 'return=minimal' },
+      body: JSON.stringify({ event: String(event).slice(0, 64), props: {} })
+    }).catch(() => {});
+  } catch (e) { /* analytics must never break the app */ }
+}
+
 async function saveTherapistProfile(t) {
   const s = loadAuthSession();
   if (!authReady() || !s) return false;
@@ -1425,6 +1466,7 @@ async function saveTherapistProfile(t) {
   };
 
   let res = await send();
+  if (res.ok) kTrack('app_profile_saved');
   if (!res.ok) {
     const body = await res.text();
     const missing = PENDING_COLUMNS.find(c => !unavailableColumns.has(c) && body.includes(c));
@@ -1462,6 +1504,10 @@ async function saveLicense(state, number) {
     headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ user_id: s.user.id, state: String(state).toUpperCase(), license_number: String(number).trim() })
   });
+  /* Deliberately no state in the payload — which states have supply is a
+     server-side aggregate (admin_supply_by_state), not something to put in an
+     events row where it would start to identify people at low volumes. */
+  if (res.ok) kTrack('app_license_entered');
   return res.ok;
 }
 async function deleteLicense(state) {
@@ -3318,6 +3364,11 @@ function gettingStartedHtml(t) {
      and telling them they are "getting set up" would be plainly false while
      clients are already seeing them. */
   const live = t.listed && t.licenseVerified && t.identityVerified;
+  /* The two states worth counting. `stuck` is the leak: paying and invisible.
+     `live` is the only outcome that serves a client. Both once-per-therapist. */
+  if (stuck) kTrack('app_paying_but_invisible', true);
+  if (live) kTrack('app_therapist_live', true);
+  if (allDone) kTrack('app_setup_complete', true);
   const lead = allDone
     ? "<strong>You're live.</strong> Clients matching your fit can now find you."
     : stuck
