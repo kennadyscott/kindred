@@ -2659,3 +2659,10 @@ select.t-rate-input,
 .spec-drop:hover { color: var(--coral); }
 .spec-star:focus-visible, .spec-drop:focus-visible { outline: 2px solid var(--coral); outline-offset: 1px; border-radius: 4px; }
 .spec-hint { margin-top: 8px; font-size: 11px; color: var(--ink-soft); line-height: 1.45; }
+
+/* Shown only to someone arriving straight from checkout, where "log in" needs
+   a reason -- they made this account three minutes ago. */
+.login-context {
+  font-size: 12.5px; line-height: 1.5; color: var(--ink-soft);
+  background: var(--cream); border-radius: 12px; padding: 10px 12px; margin-bottom: 14px;
+}

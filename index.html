@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,400..600;1,7..72,400..600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260804d">
+<link rel="stylesheet" href="style.css?v=20260804j">
 </head>
 <body>
 
@@ -47,6 +47,7 @@
       <div class="logo" id="login-title">Log In</div>
     </header>
     <div class="login-form">
+      <p class="login-context" id="login-context" hidden></p>
       <div class="t-form-label">Email</div>
       <input type="email" class="t-rate-input" id="login-email" placeholder="you@example.com">
       <div class="t-form-label">Password</div>
@@ -316,7 +317,7 @@
   </nav>
 </div>
 
-<script src="app.js?v=20260804i"></script>
+<script src="app.js?v=20260804j"></script>
 <script>
   if ('serviceWorker' in navigator) {
     /* A new worker calls skipWaiting() + clients.claim(), so it takes control

@@ -4074,6 +4074,13 @@ document.getElementById('choose-therapist-btn').addEventListener('click', () => 
 
 function openLogin() {
   document.getElementById('login-title').textContent = accountType === 'client' ? 'Client Login' : 'Therapist Login';
+  /* Reset what the post-checkout path may have changed -- someone who signs
+     out and back in is not arriving from a purchase, and DOES need the
+     create-account option. */
+  const ctx = document.getElementById('login-context');
+  if (ctx) { ctx.hidden = true; ctx.textContent = ''; }
+  const create = document.getElementById('login-create-btn');
+  if (create) create.hidden = false;
   showScreen('login');
 }
 
@@ -6361,6 +6368,23 @@ function applyLandingParams() {
     if (f) f.value = email;
     const pw = document.getElementById('login-password');
     if (pw) setTimeout(() => pw.focus(), 60);
+
+    /* Everyone arriving with ?email= has JUST created an account and paid on
+       the website. "Therapist Login / New here? Create an Account" told them
+       the opposite, and taking that button with a different address would
+       build a second account with no subscription attached -- their payment
+       matched the first email, so it would orphan the money and land in the
+       manual-review log. They demonstrably are not new; say so, and remove
+       the option that is wrong for them. */
+    const title = document.getElementById('login-title');
+    if (title) title.textContent = 'Welcome to Kindred';
+    const ctx = document.getElementById('login-context');
+    if (ctx) {
+      ctx.textContent = 'Your membership is active. Sign in with the password you just chose and we\u2019ll start your profile \u2014 the app and the website keep separate sessions, so this is the one time you\u2019ll do it twice.';
+      ctx.hidden = false;
+    }
+    const create = document.getElementById('login-create-btn');
+    if (create) create.hidden = true;
   }
 }
 
