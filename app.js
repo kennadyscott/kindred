@@ -4080,7 +4080,7 @@ function openLogin() {
   const ctx = document.getElementById('login-context');
   if (ctx) { ctx.hidden = true; ctx.textContent = ''; }
   const create = document.getElementById('login-create-btn');
-  if (create) create.hidden = false;
+  if (create) { create.hidden = false; create.textContent = 'New here? Create an Account'; }
   showScreen('login');
 }
 
@@ -6369,22 +6369,31 @@ function applyLandingParams() {
     const pw = document.getElementById('login-password');
     if (pw) setTimeout(() => pw.focus(), 60);
 
-    /* Everyone arriving with ?email= has JUST created an account and paid on
-       the website. "Therapist Login / New here? Create an Account" told them
-       the opposite, and taking that button with a different address would
-       build a second account with no subscription attached -- their payment
-       matched the first email, so it would orphan the money and land in the
-       manual-review log. They demonstrably are not new; say so, and remove
-       the option that is wrong for them. */
+    /* TWO paths reach this screen after paying, needing opposite things:
+         A. activate.html -- account and password created BEFORE checkout, so
+            they log in.
+         B. a Stripe link used directly -- no account exists yet, so they set
+            a password here for the first time.
+       The client cannot tell them apart: Supabase will not reveal whether an
+       address has an account, and rightly so. So keep both routes and name
+       them, rather than guessing and stranding half the arrivals.
+
+       What both must NOT do is change the email. It is what ties the payment
+       to the account -- the webhook matched on it -- so a different address
+       here orphans the money into the manual-review log. Hence the field is
+       prefilled and the copy says why it matters. */
     const title = document.getElementById('login-title');
     if (title) title.textContent = 'Welcome to Kindred';
     const ctx = document.getElementById('login-context');
     if (ctx) {
-      ctx.textContent = 'Your membership is active. Sign in with the password you just chose and we\u2019ll start your profile \u2014 the app and the website keep separate sessions, so this is the one time you\u2019ll do it twice.';
+      ctx.innerHTML = '<strong>Your membership is active.</strong> Keep the email below exactly as it is \u2014 it\u2019s what links your payment to your profile.<br><br>'
+        + 'Already chose a password? <strong>Log in.</strong> Haven\u2019t yet? <strong>Create your account</strong> and pick one now.';
       ctx.hidden = false;
     }
+    /* Renamed: "New here?" reads as a wrong turn to someone who has just paid,
+       even though for path B it is exactly the right one. */
     const create = document.getElementById('login-create-btn');
-    if (create) create.hidden = true;
+    if (create) { create.hidden = false; create.textContent = 'Create my password'; }
   }
 }
 
