@@ -2365,12 +2365,19 @@ function renderStack() {
     // requirements" when the roster is simply still filling up is bad advice
     // and reads as their fault. Distinguish them.
     if (rosterCount === 0) {
+      /* This is the ONLY ending a client reaches today -- nobody is verified
+         yet, so every completed intake lands here. It was written as an
+         apology for an empty shelf. It now says what is actually happening,
+         because "we check every licence by hand" is the reason the shelf is
+         empty and the reason it is worth waiting for. */
       cardStack.innerHTML = `<div class="empty-pool">
-        <strong>We're still welcoming therapists in your area.</strong><br><br>
-        Kindred is new, and we're onboarding carefully — every therapist is
-        licensed and verified before they can be matched. Your answers are
-        saved, so we can tell you the moment someone who fits joins.
-        <button class="loosen-btn" id="notify-btn">Notify me when there's a match</button>
+        <strong>We're building our therapist community right now.</strong><br><br>
+        Every therapist on Kindred is licensed and identity-verified before
+        they can be matched — and we check each licence by hand, against the
+        issuing state board. That takes time, and it's the whole point.<br><br>
+        Join the waitlist and you'll be among the first to know when
+        therapists arrive. Your answers stay on this device, ready for you.
+        <button class="loosen-btn" id="notify-btn">Join the waitlist</button>
       </div>`;
       const nb = document.getElementById('notify-btn');
       if (nb) nb.addEventListener('click', openNotifyMe);
@@ -6411,8 +6418,8 @@ function openNotifyMe() {
   const sheet = document.getElementById('confirm-sheet');
   sheet.innerHTML = `
     <div class="sheet-close"></div>
-    <h2>We'll tell you when someone fits</h2>
-    <div class="intake-sub">Kindred is new and we're onboarding therapists carefully. Leave one way to reach you and we'll get in touch the moment someone who matches joins.</div>
+    <h2>Join the waitlist</h2>
+    <div class="intake-sub">We're verifying our founding therapists now — every licence checked by hand. Leave one way to reach you and you'll hear from us first, the moment they're live.</div>
 
     <div class="t-form-label">How should we reach you?</div>
     <div class="chip-grid" id="notify-via">
@@ -6426,8 +6433,8 @@ function openNotifyMe() {
     <div class="t-form-label">Phone <span class="ideal-hint">only if you want texts</span></div>
     <input type="tel" class="t-rate-input" id="notify-phone" placeholder="Optional" value="${saved.phone || ''}">
 
-    <p class="portal-note" style="margin-top:10px;">We only use this to tell you a therapist joined. We never say why you're waiting, and we don't attach it to your answers.</p>
-    <button class="primary-btn" id="notify-save">Let me know</button>
+    <p class="portal-note" style="margin-top:10px;">We only use this to tell you therapists have arrived. We never record why you're waiting, and this is never attached to your answers — those stay on your device.</p>
+    <button class="primary-btn" id="notify-save">Join the waitlist</button>
   `;
   document.getElementById('confirm-modal').classList.remove('hidden');
   const close = () => document.getElementById('confirm-modal').classList.add('hidden');
