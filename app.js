@@ -6414,24 +6414,15 @@ function loadNotifyMe() {
   try { return JSON.parse(localStorage.getItem(NOTIFY_KEY) || 'null'); } catch (e) { return null; }
 }
 function openNotifyMe() {
-  const saved = loadNotifyMe() || { email: '', phone: '', via: 'email' };
+  const saved = loadNotifyMe() || { email: '' };
   const sheet = document.getElementById('confirm-sheet');
   sheet.innerHTML = `
     <div class="sheet-close"></div>
     <h2>Join the waitlist</h2>
     <div class="intake-sub">We're verifying our founding therapists now — every licence checked by hand. Leave one way to reach you and you'll hear from us first, the moment they're live.</div>
 
-    <div class="t-form-label">How should we reach you?</div>
-    <div class="chip-grid" id="notify-via">
-      <div class="chip-option ${saved.via === 'email' ? 'selected' : ''}" data-via="email">Email</div>
-      <div class="chip-option ${saved.via === 'text' ? 'selected' : ''}" data-via="text">Text</div>
-      <div class="chip-option ${saved.via === 'both' ? 'selected' : ''}" data-via="both">Either</div>
-    </div>
-
     <div class="t-form-label">Email</div>
     <input type="email" class="t-rate-input" id="notify-email" placeholder="you@example.com" value="${saved.email || ''}">
-    <div class="t-form-label">Phone <span class="ideal-hint">only if you want texts</span></div>
-    <input type="tel" class="t-rate-input" id="notify-phone" placeholder="Optional" value="${saved.phone || ''}">
 
     <p class="portal-note" style="margin-top:10px;">We only use this to tell you therapists have arrived. We never record why you're waiting, and this is never attached to your answers — those stay on your device.</p>
     <button class="primary-btn" id="notify-save">Join the waitlist</button>
@@ -6441,18 +6432,15 @@ function openNotifyMe() {
   const sc = sheet.querySelector('.sheet-close');
   if (sc) sc.addEventListener('click', close);
 
-  let via = saved.via || 'email';
-  document.querySelectorAll('#notify-via [data-via]').forEach(el => el.addEventListener('click', () => {
-    via = el.dataset.via;
-    document.querySelectorAll('#notify-via [data-via]').forEach(x => x.classList.toggle('selected', x.dataset.via === via));
-  }));
-
+  /* Email only. SMS meant collecting a phone number, which is a stronger
+     identifier than an address, needs its own consent to text, and would have
+     been a second channel to build before either could be used. The columns
+     stay in client_notify -- dropping them would lose nothing and cost a
+     migration -- they are simply never written. */
   document.getElementById('notify-save').addEventListener('click', () => {
     const email = (document.getElementById('notify-email').value || '').trim();
-    const phone = (document.getElementById('notify-phone').value || '').trim();
-    if (via !== 'text' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('Enter an email we can reach you at.'); return; }
-    if (via !== 'email' && !phone) { showToast('Enter a phone number for texts.'); return; }
-    try { localStorage.setItem(NOTIFY_KEY, JSON.stringify({ email, phone, via, at: Date.now() })); } catch (e) {}
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('Enter an email we can reach you at.'); return; }
+    try { localStorage.setItem(NOTIFY_KEY, JSON.stringify({ email, at: Date.now() })); } catch (e) {}
     /* Insert-only for anon, and the row holds contact details and nothing else
        -- no intake answers, no state, no reason. That separation is what makes
        it storable before the BAA. Fire-and-forget: a network failure must not
@@ -6466,11 +6454,11 @@ function openNotifyMe() {
           Authorization: `Bearer ${KINDRED_DB.key}`,
           Prefer: 'return=minimal'
         },
-        body: JSON.stringify({ email: email || null, phone: phone || null, contact_pref: via })
+        body: JSON.stringify({ email, contact_pref: 'email' })
       }).catch(() => {});
     }
     close();
-    showToast("Thanks -- we'll be in touch when someone fits.");
+    showToast("You're on the waitlist — we'll email you when therapists arrive.");
   });
 }
 
