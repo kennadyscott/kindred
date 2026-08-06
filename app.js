@@ -1355,7 +1355,8 @@ function therapistToDbRow(t, userId) {
     formats: t.formats || [], insurance: t.insuranceList || [], languages: t.languages || [], rate_min: t.rateMin || 0,
     location: t.location || {}, gender: t.identity ? t.identity.gender : null, lgbtq_affirming: t.identity ? !!t.identity.lgbtqAffirming : false,
     ethnicity: t.ethnicity || '', affinities: t.affinities || [], faith: t.faith || [], ideal_client: t.idealClient || {},
-    accepting: !!t.acceptingOngoing
+    accepting: !!t.acceptingOngoing,
+    marketing_opt_in: !!t.marketingOptIn
     /* `published` is deliberately NOT sent. Billing owns it: the Stripe webhook
        sets it on payment and clears it on cancellation or a failed charge.
        The flow is landing -> payment -> profile, so the profile is always saved
@@ -1400,16 +1401,42 @@ function paintSaveState() {
 }
 
 
+/* Columns added by a migration that may not have been run yet. Sending one
+   before it exists makes PostgREST reject the WHOLE upsert with 42703, so a
+   therapist's entire profile would stop saving because of a checkbox. On that
+   error the column is dropped and the save retried, and it stays dropped for
+   the rest of the session rather than failing once per keystroke. */
+const PENDING_COLUMNS = ['marketing_opt_in'];
+let unavailableColumns = new Set();
+
 // Upsert the signed-in therapist's profile (insert on first save, update after).
 async function saveTherapistProfile(t) {
   const s = loadAuthSession();
   if (!authReady() || !s) return false;
-  const res = await authRest('/therapists', {
-    method: 'POST',
-    headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify(therapistToDbRow(t, s.user.id))
-  });
-  if (!res.ok) throw new Error('save profile: ' + (await res.text()));
+
+  const send = async () => {
+    const row = therapistToDbRow(t, s.user.id);
+    unavailableColumns.forEach(c => { delete row[c]; });
+    return authRest('/therapists', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(row)
+    });
+  };
+
+  let res = await send();
+  if (!res.ok) {
+    const body = await res.text();
+    const missing = PENDING_COLUMNS.find(c => !unavailableColumns.has(c) && body.includes(c));
+    if (missing && /42703|does not exist|schema cache/i.test(body)) {
+      console.warn(`${missing} column not present yet — saving without it. Run the migration.`);
+      unavailableColumns.add(missing);
+      res = await send();
+      if (res.ok) return true;
+      throw new Error('save profile: ' + (await res.text()));
+    }
+    throw new Error('save profile: ' + body);
+  }
   return true;
 }
 /* Licences live in their own table now: one row per (therapist, state), each
@@ -1484,6 +1511,7 @@ function dbRowToTherapist(row) {
     modalities: row.modalities || [], style: row.style || 'balanced',
     identity: { gender: row.gender || '', lgbtqAffirming: !!row.lgbtq_affirming },
     languages: row.languages && row.languages.length ? row.languages : ['English'],
+    marketingOptIn: !!row.marketing_opt_in,
     formats, rateMin: row.rate_min || 0, insuranceList: row.insurance || [],
     licensedStates: (row.license_states && row.license_states.length) ? row.license_states : undefined,
     paymentOptions: row.payment_options || [],
@@ -4248,6 +4276,7 @@ function startTherapistSignup() {
   signupStep = 0;
   newTherapistDraft = {
     name: '', photo: null, credentials: ['', '', ''],
+    marketingOptIn: false,   // consent is opt-IN; never default this to true
     licenseNumber: '', licenseVerified: false, licenses: [], paymentOptions: [],
     website: '',
     pronouns: '', showPronouns: true, useCompanyName: false, companyName: '',
@@ -4481,6 +4510,20 @@ function renderSignupStepBody() {
           <input type="text" id="ts-new-slot-input" placeholder="e.g. Mon 3:00pm">
           <button id="ts-add-slot-btn">Add</button>
         </div>
+      </div>
+
+      <!-- The only place consent is asked for. Deliberately OFF by default: a
+           pre-ticked box is not consent, and it is the fastest way to lose a
+           founding therapist. Deliberately last, so it is a closing question
+           rather than a hurdle in front of the work.
+           Named as marketing so nobody can later claim they thought it was
+           about their account -- that mail sends either way. -->
+      <div class="must-have-toggle" style="margin-top:18px;">
+        <div class="toggle-label">
+          <strong>Send me occasional Kindred emails</strong>
+          <span>What's working for other therapists, new features, the odd bit of practice-building. Roughly monthly, unsubscribe any time. Nothing to do with your account, billing or licence &mdash; those always send.</span>
+        </div>
+        <div class="switch ${d.marketingOptIn ? 'on' : ''}" id="ts-marketing-switch"></div>
       </div>`;
   }
 
@@ -4682,6 +4725,8 @@ function attachSignupHandlers() {
 
   const ongoingSwitch = document.getElementById('ts-ongoing-switch');
   if (ongoingSwitch) ongoingSwitch.addEventListener('click', () => { d.acceptingOngoing = !d.acceptingOngoing; renderSignupStep(); });
+  const mktSwitch = document.getElementById('ts-marketing-switch');
+  if (mktSwitch) mktSwitch.addEventListener('click', () => { d.marketingOptIn = !d.marketingOptIn; renderSignupStep(); });
   const ondemandSwitch = document.getElementById('ts-ondemand-switch');
   if (ondemandSwitch) ondemandSwitch.addEventListener('click', () => {
     if (!d.onDemand && !d.agreedToOnDemandPolicy) {
@@ -4749,6 +4794,7 @@ function finishTherapistSignup() {
     pronouns: d.pronouns.trim(), showPronouns: d.showPronouns,
     useCompanyName: d.useCompanyName, companyName: d.companyName.trim(),
     photo: d.photo || null,
+    marketingOptIn: !!d.marketingOptIn,
     initials, gradient,
     meta: buildTherapistMeta(d),
     bestFor: d.bestFor.trim(), selfPayNote: d.selfPayNote.trim(),
@@ -6391,7 +6437,6 @@ let therapistSettings = {
   notifyNewInquiry: true,
   notifyMessages: true,
   notifyWeeklySummary: true,
-  notifyProductNews: false,
   showInSearch: true,
   hideFromCurrentClients: false
 };
@@ -6413,7 +6458,17 @@ function renderTherapistSettings() {
     ${row('notifyNewInquiry', 'New inquiries', 'When a client reaches out to you')}
     ${row('notifyMessages', 'Messages', 'Replies in an existing conversation')}
     ${row('notifyWeeklySummary', 'Weekly summary', 'Your profile views, hearts, and inquiries')}
-    ${row('notifyProductNews', 'Product news', "What's new on Kindred — occasional, never spammy")}
+    <!-- This row used to read from therapistSettings, an in-memory object that
+         is never persisted -- so it looked like a marketing preference, stored
+         nothing, and reset on every reload. It is now the real consent flag,
+         which is also what makes the opt-in withdrawable. -->
+    <div class="must-have-toggle">
+      <div class="toggle-label">
+        <strong>Kindred emails</strong>
+        <span>What's working for other therapists, new features, practice-building. Roughly monthly, and you can turn this off any time. Your account, billing and licence emails are separate and always send.</span>
+      </div>
+      <div class="switch ${t.marketingOptIn ? 'on' : ''}" id="t-settings-marketing"></div>
+    </div>
 
     <div class="settings-group-title">Privacy</div>
     ${row('showInSearch', 'Appear in matching', 'Turning this off hides you from new matches without deleting anything')}
@@ -6439,6 +6494,15 @@ function renderTherapistSettings() {
       therapistSettings[k] = !therapistSettings[k];
       renderTherapistSettings();
     });
+  });
+  /* Consent is not a device preference, so unlike the rows above this one is
+     written to the profile and saved. Withdrawing has to stick, or the opt-in
+     was never real. */
+  const mkt = document.getElementById('t-settings-marketing');
+  if (mkt) mkt.addEventListener('click', () => {
+    t.marketingOptIn = !t.marketingOptIn;
+    persistProfileSoon(t);
+    renderTherapistSettings();
   });
   const settingsActivateBtn = document.getElementById('t-settings-activate-btn');
   if (settingsActivateBtn) settingsActivateBtn.addEventListener('click', openActivateProfile);
