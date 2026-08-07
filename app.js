@@ -3330,17 +3330,30 @@ function gettingStartedHtml(t) {
   const licences = t.licenses || [];
   const hasLicence = licences.length > 0;
   const deniedLicence = licences.find(l => l.rejectedAt);
+  /* ORDER IS THE PRODUCT DECISION, not a layout choice.
+     Payment used to be step one: a card before a therapist had seen how
+     Kindred represents them, on a marketplace with nobody in it yet. Building
+     the profile IS the pitch -- it is where they see themselves described by
+     how they work rather than by their credentials -- so it comes first and
+     costs nothing.
+
+     Activation is the paywall, and licence checking sits AFTER it on purpose:
+     hand-verifying a state board takes real time, and spending it on people
+     who never activate is work with no return. */
   const steps = [
-    { key: 'pay',      done: !!t.listed,          title: 'Membership active',
-      body: 'Your founding rate is locked for your first 12 months.' },
     { key: 'profile',  done: hasProfile,          title: 'Build your profile', mine: true,
-      body: 'Your therapy style, who you work best with, what sessions feel like. Saves as you go.',
+      body: 'Your therapy style, who you work best with, what sessions feel like. Free, and it saves as you go.',
       action: hasProfile ? null : { label: 'Build my profile', id: 't-gs-profile' } },
     { key: 'ideal',    done: hasIdeal,            title: 'Describe your ideal client', mine: true,
       body: hasIdeal
         ? 'Sharpening this over time is the single best thing you can do for your matches.'
         : "Who you're the right fit for — ages, what they're working on, how they want to work. Private to you, and it's what makes your matches accurate.",
       action: hasIdeal ? null : { label: 'Describe my ideal client', id: 't-gs-ideal' } },
+    { key: 'pay',      done: !!t.listed,          title: 'Activate your profile', mine: true,
+      body: t.listed
+        ? 'Your founding rate is locked for your first 12 months.'
+        : 'Everything above is free. Activating starts your membership and puts you in front of clients — we verify your licence and identity next.',
+      action: t.listed ? null : { label: 'Activate my profile', id: 't-gs-activate' } },
     { key: 'licence',  done: hasLicence && !deniedLicence, title: 'Add your license(s)', mine: true,
       body: deniedLicence
         ? `${deniedLicence.state}: ${String(deniedLicence.rejectedReason || '').replace(/[<>&]/g, '')}`
@@ -3414,6 +3427,19 @@ function wireGettingStarted() {
   if (lic) lic.addEventListener('click', openLicenseNumberField);
   const prof = document.getElementById('t-gs-profile');
   if (prof) prof.addEventListener('click', () => { profileMode = 'edit'; showTScreen('t-profile'); });
+  /* The paywall. Sends them to the website's activate page rather than trying
+     to take money in the app -- that is what keeps Apple out of it entirely.
+     LATER, once there are clients: this step is the place for "N people in
+     your state are waiting", which is the strongest possible reason to
+     activate. It needs client_notify to store state, which it deliberately
+     does not today -- that is a privacy decision to revisit, not an oversight. */
+  const act = document.getElementById('t-gs-activate');
+  if (act) act.addEventListener('click', () => {
+    const url = new URL('https://kindredtherapymatch.com/activate.html');
+    const s = loadAuthSession();
+    if (s && s.user && s.user.email) url.searchParams.set('email', s.user.email);
+    window.open(url.toString(), '_blank', 'noopener');
+  });
   const ideal = document.getElementById('t-gs-ideal');
   if (ideal) ideal.addEventListener('click', () => { profileMode = 'ideal'; showTScreen('t-profile'); });
   const dis = document.getElementById('t-gs-dismiss');
