@@ -3352,7 +3352,7 @@ function gettingStartedHtml(t) {
     { key: 'pay',      done: !!t.listed,          title: 'Activate your profile', mine: true,
       body: t.listed
         ? 'Your founding rate is locked for your first 12 months.'
-        : 'Everything above is free. Activating starts your membership and puts you in front of clients — we verify your licence and identity next.',
+        : 'Everything above is free. Go live with 30 days free — we verify your licence and identity next, and nothing is charged until day 31.',
       action: t.listed ? null : { label: 'Activate my profile', id: 't-gs-activate' } },
     { key: 'licence',  done: hasLicence && !deniedLicence, title: 'Add your license(s)', mine: true,
       body: deniedLicence
@@ -3436,6 +3436,12 @@ function wireGettingStarted() {
   const act = document.getElementById('t-gs-activate');
   if (act) act.addEventListener('click', () => {
     const url = new URL('https://kindredtherapymatch.com/activate.html');
+    /* Everyone who has built a profile gets the 30 days free. The trial link
+       was made for outreach, but the app and the site are different origins,
+       so an "arrived from outreach" flag cannot travel here anyway -- and
+       someone who has written their whole profile is precisely who you want
+       over the line. One word to remove if that ever stops being true. */
+    url.searchParams.set('offer', 'trial30');
     const s = loadAuthSession();
     if (s && s.user && s.user.email) url.searchParams.set('email', s.user.email);
     window.open(url.toString(), '_blank', 'noopener');
@@ -4844,6 +4850,7 @@ function attachSignupHandlers() {
   if (backBtn) backBtn.addEventListener('click', () => { signupStep--; renderSignupStep(); });
 
   document.getElementById('ts-next').addEventListener('click', () => {
+    saveSignupProgress(d);            // keep what they have typed so far
     if (signupStep < TOTAL_SIGNUP_STEPS - 1) {
       signupStep++;
       renderSignupStep();
@@ -4851,6 +4858,83 @@ function attachSignupHandlers() {
       finishTherapistSignup();
     }
   });
+}
+
+/* ---- partial signup saves -------------------------------------------------
+   The therapist row was only written when the wizard FINISHED. Someone who
+   made an account, typed their name, added a licence and then closed the tab
+   left nothing behind but an auth user -- their work was gone, and there was
+   no way to tell "started and stalled" from "never began".
+
+   Now every Continue writes what exists so far. Two rules keep that safe:
+     - only non-empty values are sent, because PostgREST's merge-duplicates
+       upsert overwrites every column in the payload, so posting an empty
+       array would erase a real one on the next step;
+     - it never sends `published`, same as the full save -- billing owns that.
+
+   Best-effort and silent: a failed autosave must not interrupt someone in the
+   middle of writing their profile. localStorage is not a fallback here because
+   the point is reaching a database you can email from.
+--------------------------------------------------------------------------- */
+function draftToPartialRow(d, userId) {
+  const row = { user_id: userId };
+  const put = (k, v) => {
+    if (v == null) return;
+    if (typeof v === 'string' && !v.trim()) return;
+    if (Array.isArray(v) && !v.length) return;
+    row[k] = v;
+  };
+  put('name', (d.name || '').trim());
+  put('photo', d.photo);
+  put('credentials', (d.credentials || []).map(c => (c || '').trim()).filter(Boolean));
+  put('pronouns', (d.pronouns || '').trim());
+  put('website', (d.website || '').trim());
+  put('specialties', d.tags);
+  put('modalities', d.modalities);
+  put('style', d.style);
+  put('practice_type', d.practiceType);
+  put('best_for', (d.bestFor || '').trim());
+  put('languages', d.languages);
+  put('formats', d.formats);
+  put('insurance', d.insuranceList);
+  put('payment_options', d.paymentOptions);
+  put('gender', d.gender);
+  if (d.rateMin) row.rate_min = d.rateMin;
+  if (d.city || d.state) row.location = { city: d.city || '', state: d.state || '' };
+  if (typeof d.lgbtqAffirming === 'boolean') row.lgbtq_affirming = d.lgbtqAffirming;
+  if (typeof d.marketingOptIn === 'boolean') row.marketing_opt_in = d.marketingOptIn;
+  return row;
+}
+
+let signupSaveTimer = null;
+function saveSignupProgress(d) {
+  const s = loadAuthSession();
+  if (!authReady() || !s || !s.user) return;
+  clearTimeout(signupSaveTimer);
+  signupSaveTimer = setTimeout(async () => {
+    const row = draftToPartialRow(d, s.user.id);
+    unavailableColumns.forEach(c => { delete row[c]; });
+    try {
+      const res = await authRest('/therapists', {
+        method: 'POST',
+        headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(row)
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        const missing = PENDING_COLUMNS.find(c => !unavailableColumns.has(c) && body.includes(c));
+        if (missing && /42703|does not exist|schema cache/i.test(body)) {
+          unavailableColumns.add(missing);
+          delete row[missing];
+          await authRest('/therapists', {
+            method: 'POST',
+            headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+            body: JSON.stringify(row)
+          });
+        }
+      }
+    } catch (e) { /* never interrupt someone mid-profile */ }
+  }, 600);
 }
 
 function buildTherapistMeta(d) {
