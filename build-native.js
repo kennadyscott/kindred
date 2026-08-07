@@ -9,7 +9,7 @@
       The web/dev copy at the repo root stays false.
 
    2. Leaves config.json OUT of the bundle. The app deliberately fetches its
-      runtime flags from https://app.kindredtherapymatch.com/config.json so a
+      runtime flags from https://kindredtherapymatch.com/app/config.json so a
       flag can be flipped after launch without an App Store resubmission. If we
       bundled it, a stale copy could win.
 
@@ -19,7 +19,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = __dirname;
+/* The web app moved to kindred-site/app/ so it shares an origin with the
+   site. Capacitor serves its own bundle and never loads from the web origin,
+   so this is just a different source directory -- the native build is
+   otherwise unaffected by the move. */
+const ROOT = require('path').join(__dirname, '..', 'kindred-site', 'app');
 const OUT = path.join(ROOT, 'www');
 
 const ASSETS = [

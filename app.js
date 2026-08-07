@@ -4610,11 +4610,21 @@ function renderSignupStepBody() {
       ${d.selectedOptionalPrompts.map(q => `
         <div class="t-form-label">${q}</div>
         <textarea class="intake-textarea" data-optional-prompt-answer="${q}" rows="2" placeholder="Finish the sentence in your own voice...">${d.optionalPromptAnswers[q] || ''}</textarea>
-        <div class="prompt-photo-row">
-          ${d.optionalPromptPhotos[q] ? `<img class="prompt-photo-thumb" src="${d.optionalPromptPhotos[q]}">` : ''}
-          <input type="file" accept="image/*" data-optional-prompt-photo="${q}">
-        </div>
-        <button type="button" class="text-btn" data-remove-optional-prompt="${q}">Remove this prompt</button>
+        <!-- Was a bare <input type="file">, which renders as the browser's grey
+             "Choose File / No file chosen" and tells a therapist nothing about
+             what to put there. A photo beside a prompt is meant to SHOW the
+             thing the sentence says, so the control suggests what that could be. -->
+        <label class="prompt-photo-add ${d.optionalPromptPhotos[q] ? 'has-photo' : ''}">
+          ${d.optionalPromptPhotos[q]
+            ? `<img class="prompt-photo-thumb" src="${d.optionalPromptPhotos[q]}" alt="">`
+            : '<span class="ppa-plus" aria-hidden="true">+</span>'}
+          <span class="ppa-copy">
+            <strong>${d.optionalPromptPhotos[q] ? 'Change this photo' : 'Add a photo (optional)'}</strong>
+            <span>${d.optionalPromptPhotos[q] ? 'Tap to swap it out.' : 'Your office, the view on your walk, your dog, your bookshelf &mdash; something that shows what you just wrote.'}</span>
+          </span>
+          <input type="file" accept="image/*" hidden data-optional-prompt-photo="${q}">
+        </label>
+        <button type="button" class="prompt-remove-btn" data-remove-optional-prompt="${q}">Remove this prompt</button>
       `).join('')}`;
   } else if (signupStep === 5) {
     html += `

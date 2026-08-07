@@ -2682,3 +2682,33 @@ select.t-rate-input,
   font-size: 12.5px; line-height: 1.5; color: var(--ink-soft);
   background: var(--cream); border-radius: 12px; padding: 10px 12px; margin-bottom: 14px;
 }
+
+/* ===== optional prompt: photo control =====
+   The browser's default file input ("Choose File / No file chosen") gives a
+   therapist no idea what belongs there, and .text-btn is white -- so "Remove
+   this prompt" was white on white and effectively invisible. */
+.prompt-photo-add {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  border: 1.5px dashed var(--line); border-radius: 14px;
+  padding: 10px 12px; margin-top: 8px; background: #fff;
+}
+.prompt-photo-add:hover { border-color: var(--coral); }
+.prompt-photo-add:focus-within { outline: 2px solid var(--coral); outline-offset: 2px; }
+.prompt-photo-add.has-photo { border-style: solid; }
+.ppa-plus {
+  width: 44px; height: 44px; flex: none; border-radius: 10px;
+  background: var(--cream); color: var(--ink-soft);
+  display: grid; place-items: center; font-size: 20px; font-weight: 300;
+}
+.prompt-photo-add .prompt-photo-thumb {
+  width: 44px; height: 44px; flex: none; border-radius: 10px; object-fit: cover;
+}
+.ppa-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ppa-copy strong { font-size: 13px; color: var(--ink); }
+.ppa-copy span { font-size: 11px; color: var(--ink-soft); line-height: 1.4; }
+.prompt-remove-btn {
+  background: none; border: none; cursor: pointer; padding: 8px 0 0;
+  font-size: 12px; font-weight: 600; color: var(--ink-soft);
+  text-decoration: underline;
+}
+.prompt-remove-btn:hover { color: #A8443A; }
