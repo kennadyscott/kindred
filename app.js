@@ -1352,6 +1352,10 @@ function therapistToDbRow(t, userId) {
     website: t.website || '', photo: t.photo || null,
     specialties: t.tags || [], modalities: t.modalities || [], style: t.style || null, practice_type: t.practiceType || 'specialist',
     best_for: t.bestFor || '', persona: t.persona || {}, media: t.media || {}, optional_prompts: t.optionalPrompts || [],
+    /* The ordered feed. Was built in memory and never sent, so every photo a
+       therapist added and every drag they made lived only until the tab
+       closed. Order is the point -- a bare photo list would lose it. */
+    blocks: Array.isArray(t.blocks) ? t.blocks : [],
     formats: t.formats || [], insurance: t.insuranceList || [], languages: t.languages || [], rate_min: t.rateMin || 0,
     location: t.location || {}, gender: t.identity ? t.identity.gender : null, lgbtq_affirming: t.identity ? !!t.identity.lgbtqAffirming : false,
     ethnicity: t.ethnicity || '', affinities: t.affinities || [], faith: t.faith || [], ideal_client: t.idealClient || {},
@@ -1406,7 +1410,7 @@ function paintSaveState() {
    therapist's entire profile would stop saving because of a checkbox. On that
    error the column is dropped and the save retried, and it stays dropped for
    the rest of the session rather than failing once per keystroke. */
-const PENDING_COLUMNS = ['marketing_opt_in'];
+const PENDING_COLUMNS = ['marketing_opt_in', 'blocks'];
 let unavailableColumns = new Set();
 
 // Upsert the signed-in therapist's profile (insert on first save, update after).
@@ -1558,6 +1562,10 @@ function dbRowToTherapist(row) {
     identity: { gender: row.gender || '', lgbtqAffirming: !!row.lgbtq_affirming },
     languages: row.languages && row.languages.length ? row.languages : ['English'],
     marketingOptIn: !!row.marketing_opt_in,
+    /* Empty means a profile from before this was stored -- leave it undefined
+       so getToKnowBlocks() rebuilds the default arrangement instead of
+       showing an empty feed. */
+    ...(Array.isArray(row.blocks) && row.blocks.length ? { blocks: row.blocks } : {}),
     formats, rateMin: row.rate_min || 0, insuranceList: row.insurance || [],
     licensedStates: (row.license_states && row.license_states.length) ? row.license_states : undefined,
     paymentOptions: row.payment_options || [],
