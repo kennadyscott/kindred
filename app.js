@@ -6463,6 +6463,15 @@ if (!PRODUCTION_BUILD && /[?&]demo=client\b/.test(location.search)) seedClientDe
 function applyLandingParams() {
   const email = new URLSearchParams(location.search).get('email');
   const wantsSignup = /therapist-signup/.test(location.hash);
+  /* Separate from #therapist-signup because the two want opposite emphasis:
+     a returning therapist pressing "Therapist sign in" should not be shown a
+     Create button as the primary action. Both skip the account-type screen --
+     they already said which they were, on the website. */
+  if (/therapist-signin/.test(location.hash) && !wantsSignup) {
+    accountType = 'therapist';
+    openLogin();
+    return;
+  }
 
   // #match -- someone came from a "Match with a therapist" button on the site.
   // They have already told us what they want by clicking it, so asking "what
