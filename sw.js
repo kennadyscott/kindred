@@ -2,7 +2,7 @@
 // online, so a new deploy shows up immediately. The previous version let the
 // browser's HTTP cache serve a stale app.js to the SW's fetch — {cache:'reload'}
 // bypasses that. The cache is only a fallback for when you're actually offline.
-const CACHE = 'kindred-v15';   // bumped 2026-08-04 to evict anything an older worker stored
+const CACHE = 'kindred-v16';   // bumped 2026-08-04 to evict anything an older worker stored
 
 self.addEventListener('install', (e) => { self.skipWaiting(); });
 

@@ -4112,7 +4112,15 @@ function openLogin() {
   const ctx = document.getElementById('login-context');
   if (ctx) { ctx.hidden = true; ctx.textContent = ''; }
   const create = document.getElementById('login-create-btn');
-  if (create) { create.hidden = false; create.textContent = 'New here? Create an Account'; }
+  const login  = document.getElementById('login-submit-btn');
+  if (create && login) {
+    create.hidden = false;
+    create.textContent = 'New here? Create an Account';
+    create.style.cssText = 'background:white;border:1.5px solid var(--coral);color:var(--coral-dark);';
+    login.textContent = 'Log In';
+    login.style.cssText = 'margin-top:20px;background:var(--coral);color:white;';
+    login.parentNode.insertBefore(login, create);   // Log In back above Create
+  }
   showScreen('login');
 }
 
@@ -6472,6 +6480,30 @@ function applyLandingParams() {
   if (wantsSignup) {
     accountType = 'therapist';
     openLogin();
+    /* #therapist-signup with NO email is now the front door: the landing page
+       sends brand-new therapists straight here to build a profile before
+       paying anything. Opening on "Log In" with create as the pale secondary
+       button asks a stranger to sign in to an account they have never had, so
+       the emphasis flips. With an email it means they came back from checkout
+       and the block below handles it instead. */
+    if (!email) {
+      const title = document.getElementById('login-title');
+      if (title) title.textContent = 'Create your account';
+      const ctx = document.getElementById('login-context');
+      if (ctx) {
+        ctx.innerHTML = '<strong>Build your profile free.</strong> No card, nothing to pay &mdash; you only activate once it&rsquo;s ready and you&rsquo;ve seen how you look to clients.';
+        ctx.hidden = false;
+      }
+      const create = document.getElementById('login-create-btn');
+      const login  = document.getElementById('login-submit-btn');
+      if (create && login) {
+        create.textContent = 'Create my account';
+        create.style.cssText = 'background:var(--coral);color:white;';
+        login.textContent = 'I already have an account';
+        login.style.cssText = 'background:white;border:1.5px solid var(--coral);color:var(--coral-dark);';
+        create.parentNode.insertBefore(create, login);
+      }
+    }
   }
   if (email) {
     const f = document.getElementById('login-email');
