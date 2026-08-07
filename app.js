@@ -5133,7 +5133,14 @@ function showTherapistView() {
   document.getElementById('bottom-nav').classList.add('hidden');
   document.getElementById('therapist-nav').classList.remove('hidden');
   showTScreen('t-insights');
-  if (!therapistWelcomeShown) {
+  /* Only for someone who has actually been visible to clients. It reports the
+     week's hearts and matches, and a therapist who has not activated has never
+     been matchable -- so it greeted a brand-new signup with a modal of zeros
+     in front of the checklist that was the only thing they needed to see.
+     Nothing to report is not a reason to interrupt. */
+  const t = THERAPISTS.find(x => x.id === currentTherapistId);
+  const everLive = !!(t && t.listed && t.licenseVerified && t.identityVerified);
+  if (!therapistWelcomeShown && everLive) {
     therapistWelcomeShown = true;
     openTherapistWelcome();
   }
