@@ -4169,7 +4169,21 @@ document.getElementById('login-submit-btn').addEventListener('click', async () =
         currentTherapistId = t.id;
         showTherapistView();
       } else {
-        startTherapistSignup(); // no row, or a paid stub with nothing in it
+        /* No profile on the server. Before handing them a blank wizard, check
+           whether this device still holds one that failed to save -- being
+           asked to retype twenty minutes of work is the worst possible
+           moment, and it is exactly what happened before this existed. */
+        let stash = null;
+        try { stash = JSON.parse(localStorage.getItem('kindred-profile-unsaved') || 'null'); } catch (e) {}
+        if (stash && stash.name && String(stash.name).trim()) {
+          Object.assign(newTherapistDraft, stash);
+          showToast('Picking up the profile you already wrote.');
+          startTherapistSignup();
+          signupStep = TOTAL_SIGNUP_STEPS - 1;   // straight to the finish, not the first question
+          renderSignupStep();
+        } else {
+          startTherapistSignup(); // genuinely new, or a paid stub with nothing in it
+        }
       }
   } catch (e) {
     showToast(/confirm/i.test(e.message) ? 'Please confirm your email first — check your inbox.'
@@ -5025,6 +5039,49 @@ function finishTherapistSignup() {
     showTherapistView();
     if (!newT.listed) openActivateProfile();   // only when genuinely unpaid
   };
+
+  /* A failed save here used to console.warn and carry on, so the therapist saw
+     their finished profile, paid, came back, and found nothing -- twenty
+     minutes of writing gone with no error at any point. The profile is only
+     in memory until this request lands, so the failure has to be both LOUD
+     and RECOVERABLE.
+
+     Kept on the device first: if the request fails, the work still exists and
+     can be retried rather than retyped. */
+  const stashDraft = () => {
+    try { localStorage.setItem('kindred-profile-unsaved', JSON.stringify(d)); } catch (e) {}
+  };
+  const clearDraft = () => {
+    try { localStorage.removeItem('kindred-profile-unsaved'); } catch (e) {}
+  };
+  stashDraft();
+
+  const saveFailed = (err) => {
+    console.error('PROFILE SAVE FAILED', err);
+    showTherapistView();
+    const sheet = document.getElementById('confirm-sheet');
+    sheet.innerHTML = `
+      <div class="sheet-close"></div>
+      <h2>We couldn't save your profile</h2>
+      <div class="intake-sub">Everything you wrote is still here on this device — nothing is lost. This is on us, not you. Try again, and if it keeps failing send us a note and we'll sort it out.</div>
+      <p class="portal-note" style="margin-top:10px;">${String(err && err.message || err).replace(/[<>&]/g, '').slice(0, 200)}</p>
+      <button class="primary-btn" id="profile-save-retry">Try saving again</button>
+      <button class="edit-prefs-btn" id="profile-save-email" style="color:var(--ink-soft);">Email us instead</button>`;
+    document.getElementById('confirm-modal').classList.remove('hidden');
+    const close = () => document.getElementById('confirm-modal').classList.add('hidden');
+    sheet.querySelector('.sheet-close')?.addEventListener('click', close);
+    document.getElementById('profile-save-email')?.addEventListener('click', () => {
+      window.open('mailto:info@kindredtherapymatch.com?subject=' + encodeURIComponent('My Kindred profile would not save'), '_blank');
+    });
+    document.getElementById('profile-save-retry')?.addEventListener('click', () => {
+      const b = document.getElementById('profile-save-retry');
+      b.disabled = true; b.textContent = 'Saving…';
+      saveTherapistProfile(newT)
+        .then(() => { clearDraft(); close(); showToast('Saved — your profile is safe.'); })
+        .catch(e2 => { b.disabled = false; b.textContent = 'Try saving again'; showToast('Still failing: ' + e2.message); });
+    });
+  };
+
   if (authSession) {
     saveTherapistProfile(newT)
       // Licences go to their own table. The DB derives license_states from the
@@ -5041,8 +5098,8 @@ function finishTherapistSignup() {
               introRate: STANDARD_RATE, introMonths: 0 }
           : null;
       })
-      .catch(e => console.warn('profile save deferred:', e.message))
-      .then(finish);
+      .then(() => { clearDraft(); finish(); })
+      .catch(saveFailed);
   } else {
     finish();
   }
