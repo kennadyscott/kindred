@@ -6590,7 +6590,16 @@ window.addEventListener('load', async () => {
   if (returning) openIdentityReturn(signedIn);
 });
 
-window.addEventListener('load', applyLandingParams);
+/* Deep links decide which screen a visitor lands on, so this must not depend
+   on catching a single event. If `load` has already fired by the time this
+   line runs -- which a service worker taking over, a bfcache restore, or a
+   slow-then-cached script can all cause -- the listener is attached to an
+   event that will never come again, and the visitor is dumped on "what brings
+   you to Kindred?" holding a link that said exactly what they were.
+   Observed once and never reproduced, which is the worst kind of bug to leave
+   in: run it now if the document is already done, otherwise on load. */
+if (document.readyState === 'complete') applyLandingParams();
+else window.addEventListener('load', applyLandingParams);
 
 /* "Notify me when there's a match" used to show a toast and collect nothing --
    a promise with no way to keep it. This takes the one detail needed to keep
