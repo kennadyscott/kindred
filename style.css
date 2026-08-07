@@ -1010,10 +1010,18 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   position: relative;
 }
 .nav-btn.active { color: var(--coral-dark); }
-.nav-icon { font-size: 17px; }
+/* Drawn icons rather than emoji: emoji render differently on every platform
+   and cannot be tinted, so the bar looked like five unrelated stickers. These
+   carry the brand palette and sit on a consistent baseline. */
+.nav-icon { font-size: 17px; display: grid; place-items: center; height: 24px; }
+.nav-icon svg { width: 23px; height: 23px; display: block; }
+/* The active tab is already named by its label colour; dimming the rest keeps
+   the icons from competing with it. */
+.nav-btn:not(.active) .nav-icon svg { opacity: .62; }
+.nav-btn.active .nav-icon svg { opacity: 1; }
 .nav-btn span:last-child { font-size: 10px; white-space: nowrap; }
 .five-tabs .nav-btn { padding: 0 2px; }
-.five-tabs .nav-icon { font-size: 15px; }
+.five-tabs .nav-icon svg { width: 21px; height: 21px; }
 .five-tabs .nav-btn span:last-child { font-size: 9px; letter-spacing: -0.2px; }
 .nav-badge {
   position: absolute;
@@ -1399,17 +1407,25 @@ h1, h2, .logo, .chat-name, .nav-btn span:last-child {
   letter-spacing: 0.5px;
   color: var(--ink-soft);
   font-weight: 700;
-  margin-top: 4px;
+  /* Was 4px, which ran "Matched on" straight into the specialties above it --
+     two different claims with no visual break between them. */
+  margin-top: 22px;
 }
+/* Sat outside the centred .spec-tags row as an inline-block, so it dropped to
+   its own line hard against the left edge while the specialty chips above it
+   were centred -- one group reading as two. Centred and given room. */
 .practice-badge {
-  display: inline-block;
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
   background: var(--teal-light);
   color: var(--teal);
   font-size: 11px;
   font-weight: 700;
   padding: 5px 10px;
   border-radius: 20px;
-  margin-top: 2px;
+  margin-top: 10px;
 }
 
 /* ===== SWIPE CARD (mockup style) ===== */

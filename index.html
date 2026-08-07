@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,400..600;1,7..72,400..600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260804j">
+<link rel="stylesheet" href="style.css?v=20260804u">
 </head>
 <body>
 
@@ -294,30 +294,45 @@
   <div class="toast hidden" id="waitlist-toast">Request sent — they'll confirm availability soon.</div>
 
   <!-- ===== BOTTOM NAV ===== -->
-  <nav class="bottom-nav hidden five-tabs" id="bottom-nav">
-    <button class="nav-btn" data-screen="explore">
-      <span class="nav-icon"><img class="nav-emblem" src="brand-emblem.png" alt=""></span><span>Kindred</span>
-    </button>
+  <nav class="bottom-nav hidden" id="bottom-nav">
     <button class="nav-btn active" data-screen="discover">
-      <span class="nav-icon">🔍</span><span>Discover</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6.2" fill="#E9E3F2"/>
+        <circle cx="10.5" cy="10.5" r="6.2" stroke="#422448" stroke-width="1.8"/>
+        <path d="M15.2 15.2 20 20" stroke="#422448" stroke-width="2.1" stroke-linecap="round"/>
+      </svg></span><span>Discover</span>
     </button>
     <button class="nav-btn" data-screen="ondemand">
-      <span class="nav-icon">⚡</span><span>On-Demand</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M13.4 2.5 5.8 13.1h4.7l-1 8.4 7.7-10.7h-4.8z" fill="#F6C453" stroke="#E5A93A" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M19.6 6.4v2M18.6 7.4h2" stroke="#F6C453" stroke-width="1.3" stroke-linecap="round"/>
+      </svg></span><span>On-Demand</span>
     </button>
     <button class="nav-btn" data-screen="shortlist">
-      <span class="nav-icon">💜</span><span>Short List</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M6.5 3.6h11a1 1 0 0 1 1 1v15.6l-6.5-4.4-6.5 4.4V4.6a1 1 0 0 1 1-1z" fill="#E9E3F2" stroke="#422448" stroke-width="1.8" stroke-linejoin="round"/>
+      </svg></span><span>Short List</span>
     </button>
     <button class="nav-btn" data-screen="matches">
-      <span class="nav-icon">💬</span><span>Top 5</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M6.6 3.8h10.8v5.1a5.4 5.4 0 0 1-10.8 0z" fill="#DDEDE9" stroke="#4E8C82" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M6.6 5.2H4.2v1.6a3.2 3.2 0 0 0 2.6 3.1M17.4 5.2h2.4v1.6a3.2 3.2 0 0 1-2.6 3.1" stroke="#4E8C82" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M12 14.4v3.4M8.4 20.3h7.2" stroke="#4E8C82" stroke-width="1.7" stroke-linecap="round"/>
+        <path d="M12 9.1c-1.5-1.3-3-2-3-3.3a1.55 1.55 0 0 1 3-.55 1.55 1.55 0 0 1 3 .55c0 1.3-1.5 2-3 3.3z" fill="#8FCBBE"/>
+      </svg></span><span>Top 5</span>
       <span class="nav-badge hidden" id="nav-badge">0</span>
     </button>
     <button class="nav-btn" data-screen="profile">
-      <span class="nav-icon">🙂</span><span>You</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="9.2" fill="#FBE6DF"/>
+        <circle cx="12" cy="9.6" r="3.1" stroke="#D9705A" stroke-width="1.8"/>
+        <path d="M6.3 19.1c1.1-3 3.2-4.5 5.7-4.5s4.6 1.5 5.7 4.5" stroke="#D9705A" stroke-width="1.8" stroke-linecap="round"/>
+      </svg></span><span>You</span>
     </button>
   </nav>
 </div>
 
-<script src="app.js?v=20260804s"></script>
+<script src="app.js?v=20260804u"></script>
 <script>
   if ('serviceWorker' in navigator) {
     /* A new worker calls skipWaiting() + clients.claim(), so it takes control
